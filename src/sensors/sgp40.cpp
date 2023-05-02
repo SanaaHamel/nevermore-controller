@@ -18,20 +18,22 @@ namespace {
 constexpr uint8_t SGP40_ADDRESS = 0x59;
 
 // SGP40 wants its cmds in BE order
-constexpr auto CMD_SGP40_SELF_TEST = byteswap(0x280E_u16);      // available in all modes, doesn't change mode
-constexpr auto CMD_SGP40_MEASURE = byteswap(0x260F_u16);        // transitions to measure mode
-constexpr auto CMD_SGP4x_HEATER_OFF = byteswap(0x3615_u16);     // transitions to idle mode
-constexpr auto CMD_SGP4x_SERIAL_NUMBER = byteswap(0x3682_u16);  // only available when in idle mode
+enum class Cmd : uint16_t {
+    SGP40_SELF_TEST = byteswap(0x280E_u16),      // available in all modes, doesn't change mode
+    SGP40_MEASURE = byteswap(0x260F_u16),        // transitions to measure mode
+    SGP4x_HEATER_OFF = byteswap(0x3615_u16),     // transitions to idle mode
+    SGP4x_SERIAL_NUMBER = byteswap(0x3682_u16),  // only available when in idle mode
+};
 
 bool sgp4x_heater_off(i2c_inst_t* bus) {
     if (!bus) return false;
-    return 2 == i2c_write_blocking(bus, SGP40_ADDRESS, CMD_SGP4x_HEATER_OFF);
+    return 2 == i2c_write_blocking(bus, SGP40_ADDRESS, Cmd::SGP4x_HEATER_OFF);
 }
 
 // returns true IIF self-test passed. any error (I2C or self-test) -> false
 bool sgp40_self_test(i2c_inst_t* bus) {
     if (!bus) return false;
-    if (2 != i2c_write_blocking(bus, SGP40_ADDRESS, CMD_SGP40_SELF_TEST)) return false;
+    if (2 != i2c_write_blocking(bus, SGP40_ADDRESS, Cmd::SGP40_SELF_TEST)) return false;
 
     sleep(320ms);  // spec says max delay of 320ms
 
@@ -57,7 +59,7 @@ bool sgp40_measure_issue(i2c_inst_t* bus, double temperature, double humidity) {
 
     auto temperature_tick = to_tick(temperature, -45, 130);
     auto humidity_tick = to_tick(humidity, 0, 100);
-    PackedTuple cmd{CMD_SGP40_SELF_TEST, temperature_tick, crc8(temperature_tick, 0xFF), humidity_tick,
+    PackedTuple cmd{Cmd::SGP40_SELF_TEST, temperature_tick, crc8(temperature_tick, 0xFF), humidity_tick,
             crc8(humidity_tick, 0xFF)};
     return sizeof(cmd) == i2c_write_blocking(bus, SGP40_ADDRESS, cmd);
 }

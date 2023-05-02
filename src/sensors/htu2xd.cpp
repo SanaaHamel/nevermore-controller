@@ -14,13 +14,15 @@ namespace {
 
 constexpr uint8_t HTU1xD_I2C_ADDRESS = 0x40;
 
-constexpr uint8_t CMD_MEASURE_TEMPERATURE_BLOCKING = 0xE3;
-constexpr uint8_t CMD_MEASURE_HUMIDITY_BLOCKING = 0xE5;
-constexpr uint8_t CMD_MEASURE_TEMPERATURE_NON_BLOCKING = 0xF3;
-constexpr uint8_t CMD_MEASURE_HUMIDITY_NON_BLOCKING = 0xF5;
-constexpr uint8_t CMD_REGISTER_READ = 0xE6;
-constexpr uint8_t CMD_REGISTER_WRITE = 0xE7;
-constexpr uint8_t CMD_SOFT_RESET = 0xFE;
+enum class Cmd : uint8_t {
+    MEASURE_TEMPERATURE_BLOCKING = 0xE3,
+    MEASURE_HUMIDITY_BLOCKING = 0xE5,
+    MEASURE_TEMPERATURE_NON_BLOCKING = 0xF3,
+    MEASURE_HUMIDITY_NON_BLOCKING = 0xF5,
+    REGISTER_READ = 0xE6,
+    REGISTER_WRITE = 0xE7,
+    SOFT_RESET = 0xFE,
+};
 
 constexpr double HTU2xD_HUMIDITY_COMPENSATION_ZERO_POINT = 25;
 constexpr double HTU2xD_HUMIDITY_COMPENSATION_COEFFICIENT = 25;
@@ -49,17 +51,17 @@ double htu2xd_humidity_compensated(double humidity_uncompensated, double tempera
 }
 
 bool htu2xd_reset(i2c_inst_t* bus) {
-    return 1 == i2c_write_blocking(bus, HTU1xD_I2C_ADDRESS, CMD_SOFT_RESET, false);
+    return 1 == i2c_write_blocking(bus, HTU1xD_I2C_ADDRESS, Cmd::SOFT_RESET, false);
 }
 
 // Once a measure is enqueued, call await to retrieve the value.
 // You cannot interweave multiple measurements to the same device.
 // Returns `false` on failure to enqueue.
 bool htu2xd_issue(i2c_inst_t* bus, HTU2xD_Measure kind) {
-    uint8_t cmd;
+    Cmd cmd;
     switch (kind) {
-        case HTU2xD_Measure::Temperature: cmd = CMD_MEASURE_TEMPERATURE_NON_BLOCKING; break;
-        case HTU2xD_Measure::Humidity: cmd = CMD_MEASURE_HUMIDITY_NON_BLOCKING; break;
+        case HTU2xD_Measure::Temperature: cmd = Cmd::MEASURE_TEMPERATURE_NON_BLOCKING; break;
+        case HTU2xD_Measure::Humidity: cmd = Cmd::MEASURE_HUMIDITY_NON_BLOCKING; break;
     }
 
     if (auto r = i2c_write_blocking(bus, HTU1xD_I2C_ADDRESS, cmd); r < 0) {
