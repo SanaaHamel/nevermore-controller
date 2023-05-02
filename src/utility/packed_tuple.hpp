@@ -71,12 +71,12 @@ public:
 };
 
 template <size_t I, typename... A>
-auto& std::get(PackedTuple<A...>& xs) noexcept {
+auto& get(PackedTuple<A...>& xs) noexcept {
     return xs.template get<I>();
 }
 
 template <size_t I, typename... A>
-auto& std::get(PackedTuple<A...> const& xs) noexcept {
+auto& get(PackedTuple<A...> const& xs) noexcept {
     return xs.template get<I>();
 }
 

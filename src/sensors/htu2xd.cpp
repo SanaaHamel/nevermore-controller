@@ -75,7 +75,7 @@ std::optional<std::tuple<HTU2xD_Measure, double>> htu2xd_read_compensated(
     // in either case we're waiting for the same kind of payload
     auto response = i2c_read_blocking_crc<0, uint16_t>(bus, HTU1xD_I2C_ADDRESS);
     if (!response) return {};
-    auto const data = byteswap(std::get<0>(*response));
+    auto const data = byteswap(get<0>(*response));
 
     [[maybe_unused]] auto const reserved_flag = (data & 0b01) == 0b01;  // should be zero
     auto const is_humidity = (data & 0b10) == 0b10;
