@@ -5,6 +5,7 @@
 #include "sdk/ble_data_types.hpp"
 #include "sdk/timer.hpp"
 #include "sensors/async_sensor.hpp"
+#include "sensors/bme280.hpp"
 #include "sensors/htu2xd.hpp"
 #include "sensors/sgp40.hpp"
 #include <algorithm>
@@ -18,7 +19,11 @@ namespace {
 
 constexpr uint32_t ADC_CHANNEL_TEMP_SENSOR = 4;
 
-constexpr auto SENSOR_POWER_ON_DELAY = std::max({HTU21D_POWER_ON_DELAY, SGP40_POWER_ON_DELAY});
+constexpr auto SENSOR_POWER_ON_DELAY = std::max({
+        BME280_POWER_ON_DELAY,
+        HTU21D_POWER_ON_DELAY,
+        SGP40_POWER_ON_DELAY,
+});
 
 using VecSensors = std::vector<std::unique_ptr<Sensor>>;
 
@@ -63,6 +68,7 @@ VecSensors sensors_init_bus(async_context_t& ctx_async, i2c_inst_t* bus, Sensor:
 
     // order matters since they'll be updated in whatever order they were found/probed for
     probe_for(htu2xd(bus, state));
+    probe_for(bme280(bus, state));
     probe_for(sgp40(bus, state));
 
     if (sensors.empty()) printf("!! No sensors found?\n");
