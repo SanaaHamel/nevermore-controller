@@ -19,7 +19,7 @@ constexpr uint8_t ADVERTISEMENT_DATA_PRELUDE[] = {
 };
 
 struct [[gnu::packed]] AdvertiseData {
-    uint8_t prelude[sizeof(ADVERTISEMENT_DATA_PRELUDE)];
+    uint8_t prelude[sizeof(ADVERTISEMENT_DATA_PRELUDE)]{};
     EnvironmentService::ServiceData environment_service_data{};
 
     AdvertiseData() {
