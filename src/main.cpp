@@ -159,10 +159,16 @@ int main() {
     l2cap_init();
     sm_init();
 
+    // GCC 10.3.1 bug: -Werror=format reports that `I2C_BAUD_RATE_HZ` is a `long unsigned int`.
+    // This is technically true on this platform, see static-assert below, but it is benign since
+    // `unsigned == long unsigned int` is also true on this platform. Pedant.
+    // Fix by casting to unsigned instead of changing format specifier, this keeps clangd happy
+    // since `clangd`, incorrectly, thinks that `unsigned != long unsigned int` on this platform.
+    static_assert(sizeof(I2C_BAUD_RATE_HZ) == sizeof(unsigned));
     printf("I2C bus 0 running at %u hz (requested %u hz)\n", i2c_init(i2c0, I2C_BAUD_RATE_HZ),
-            I2C_BAUD_RATE_HZ);
+            unsigned(I2C_BAUD_RATE_HZ));
     printf("I2C bus 1 running at %u hz (requested %u hz)\n", i2c_init(i2c1, I2C_BAUD_RATE_HZ),
-            I2C_BAUD_RATE_HZ);
+            unsigned(I2C_BAUD_RATE_HZ));
 
     auto& ctx_async = *cyw43_arch_async_context();
 

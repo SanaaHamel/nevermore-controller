@@ -15,7 +15,6 @@ uint32_t clock_div(uint32_t source_hz, uint32_t target_hz) {
 // stolen/derived from: https://github.com/micropython/micropython/blob/master/ports/rp2/machine_pwm.c
 uint16_t pwm_gpio_duty(uint8_t gpio, uint16_t duty) {
     uint const slice_num = pwm_gpio_to_slice_num(gpio);
-    uint const chan = pwm_gpio_to_channel(gpio);
     check_slice_num_param(slice_num);
 
     // Use rounding here to set it as accurately as possible

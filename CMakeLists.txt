@@ -17,15 +17,20 @@ file(GLOB_RECURSE SRC_H ${SRC_DIR}/*.h)
 file(GLOB_RECURSE SRC_C ${SRC_DIR}/*.c)
 file(GLOB_RECURSE SRC_HPP ${SRC_DIR}/*.hpp)
 file(GLOB_RECURSE SRC_CPP ${SRC_DIR}/*.cpp)
-file(GLOB_RECURSE SRC_GATT ${SRC_DIR}/*.gatt)
+set(SRC_FILES ${SRC_H} ${SRC_C} ${SRC_HPP} ${SRC_CPP})
 
-# suppress pointless warning
-add_compile_options(-Wno-psabi)
+# `psabi` is a useless warning for our purposes
+add_compile_options(-Wall -Wno-psabi)
 add_compile_definitions(PARAM_ASSERTIONS_ENABLE_ALL=1)
 
 add_executable(nevermore-ble
-  ${SRC_H} ${SRC_C} ${SRC_HPP} ${SRC_CPP}
+  ${SRC_FILES}
 )
+
+target_include_directories(nevermore-ble PRIVATE
+  ${SRC_DIR}
+)
+
 target_link_libraries(nevermore-ble
   pico_stdlib
   pico_cyw43_arch_none
@@ -37,9 +42,11 @@ target_link_libraries(nevermore-ble
   hardware_pwm
 )
 
-target_include_directories(nevermore-ble PRIVATE
-  ${SRC_DIR}
-)
+if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+  # Specify source files explicitly b/c some SDK sources trigger warnings.
+  # target_compile_options(nevermore-ble PRIVATE -Werror)
+  set_source_files_properties(${SRC_FILES} PROPERTIES COMPILE_FLAGS -Werror)
+endif()
 
 pico_enable_stdio_usb(nevermore-ble 1)
 pico_enable_stdio_uart(nevermore-ble 1)
