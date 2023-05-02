@@ -17,9 +17,15 @@ constexpr GPIO_Pin first_i2c_pin(uint8_t bus, I2C_Pin kind) {
 
 }  // namespace
 
+// Following fields can be specified via CMake and handled by the standard pico linker:
+//  Name, Description, URL, Version, Build Attribute (CMake build type)
+
+// We do this manually for clarity and to ensure some fields are minimally stale.
+// (CMake module for git-description only forces a re-configure.)
 bi_decl(bi_program_description("Nevermore Controller"));
 bi_decl(bi_program_url("https://github.com/SanaaHamel/nevermore-controller"));
-bi_decl(bi_program_version_string("@GIT_DESCRIPTION@ " CMAKE_BUILD_TYPE));
+bi_decl(bi_program_version_string("@GIT_DESCRIPTION@"));
+bi_decl(bi_program_build_date_string("@BUILD_TIMESTAMP@"));
 
 // clang-format off
 bi_decl(bi_4pins_with_names(

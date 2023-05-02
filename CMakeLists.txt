@@ -19,6 +19,7 @@ file(GLOB_RECURSE SRC_C ${SRC_DIR}/*.c)
 file(GLOB_RECURSE SRC_HPP ${SRC_DIR}/*.hpp)
 file(GLOB_RECURSE SRC_CPP ${SRC_DIR}/*.cpp)
 
+string(TIMESTAMP BUILD_TIMESTAMP "%Y-%m-%d %H:%M:%S UTC" UTC)
 git_describe_working_tree(GIT_DESCRIPTION --always)
 configure_file("${SRC_DIR}/binary_info.cpp.in" "${SRC_DIR}/binary_info.cpp" @ONLY)
 list(APPEND SRC_CPP "${SRC_DIR}/binary_info.cpp")
@@ -28,7 +29,6 @@ set(SRC_FILES ${SRC_H} ${SRC_C} ${SRC_HPP} ${SRC_CPP})
 # `psabi` is a useless warning for our purposes
 add_compile_options(-Wall -Wno-psabi)
 add_compile_definitions(PARAM_ASSERTIONS_ENABLE_ALL=1)
-add_compile_definitions(CMAKE_BUILD_TYPE="${CMAKE_BUILD_TYPE}")
 
 add_executable(nevermore-ble
   ${SRC_FILES}
