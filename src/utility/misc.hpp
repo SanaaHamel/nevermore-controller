@@ -11,14 +11,6 @@ constexpr T clamp(T n, T min, T max) {
     return n;
 }
 
-// I2C reserves some addresses for special purposes.
-// These are any addresses of the form: 000 0xxx, 111 1xxx
-constexpr inline bool i2c_address_reserved(uint8_t addr) {
-    constexpr uint8_t MASK = 0b1111000;
-    auto const masked = addr & MASK;
-    return masked == 0 || masked == MASK;
-}
-
 // included in C++23
 constexpr inline uint8_t byteswap(uint8_t x) {
     return x;

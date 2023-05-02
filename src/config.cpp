@@ -1,4 +1,5 @@
 #include "config.hpp"
+#include "sdk/i2c.hpp"
 #include "sdk/pwm.hpp"
 #include <array>
 #include <cstdint>
@@ -36,7 +37,7 @@ constexpr bool all_pins_unique() {
 constexpr uint8_t i2c_bus_pins_defined(uint8_t bus) {
     uint8_t defined = 0;
     for (auto pin : PINS_I2C) {
-        auto pin_bus = (pin / 2) & 1u;
+        auto pin_bus = i2c_gpio_bus_num(pin);
         auto pin_kind = 1u << (pin % 2);
         if (pin_bus == bus) defined |= pin_kind;
     }
