@@ -1,0 +1,21 @@
+
+Nevermore Controller
+====================
+
+A Pi Pico W based controller for https://github.com/nevermore3d/Nevermore_Max[Nevermore Max] and
+https://github.com/nevermore3d/StealthMax[StealthMax] filters.
+This controller is BlueTooth LE enabled, minimising required wiring and allowing multiple clients
+to interact with the controller.
+
+Features
+--------
+
+* [ ] Klipper Compatibity Module
+* [x] BLE - Advertisement of environmental sensors state
+* [x] Fan - Tachometer
+* [ ] Fan - PWM Control - Automatic
+* [x] Fan - PWM Control - Override (via BLE)
+* [ ] Sensor - BME280 (Temperature, Humidity, Pressure)
+* [x] Sensor - HTU2xD (Temperature, Humidity)
+* [x] Sensor - SGP40 (Volatile Organic Compound Index)
+* [ ] WS2812 support
