@@ -1,6 +1,5 @@
 #include "config.hpp"
 #include "sdk/pwm.hpp"
-#include <algorithm>
 #include <array>
 #include <cstdint>
 
@@ -12,19 +11,12 @@ namespace {
 
 // RP2040 has 30 GPIO pins, but the pico doesn't expose all of them.
 constexpr array PINS_RESERVED_PICO_W{23, 24, 25, 29};
+// Don't ever allow these pins to be used.
+constexpr array PINS_RESERVED_UART{0, 1};
 
-template <typename F>
-constexpr bool pins_forall(F&& go) {
-    if (!all_of(begin(PINS_I2C), end(PINS_I2C), go)) return false;
-    if (!(go(PIN_FAN_PWM) && go(PIN_FAN_TACHOMETER))) return false;
-    if (!go(PIN_NEOPIXEL_DATA_IN)) return false;
-
-    return true;
-}
-
-template <typename F>
-constexpr bool pin_exists(F&& go) {
-    return !pins_forall([&](auto p) { return !go(p); });
+template <typename Xs>
+constexpr auto contains(Xs const& xs) {
+    return [=](auto&& x) { return find(begin(xs), end(xs), x) != end(xs); };
 }
 
 constexpr bool all_pins_valid() {
@@ -41,12 +33,6 @@ constexpr bool all_pins_unique() {
     });
 }
 
-constexpr bool all_pins_available() {
-    return pins_forall([](GPIO_Pin pin) {
-        return find(begin(PINS_RESERVED_PICO_W), end(PINS_RESERVED_PICO_W), pin) == end(PINS_RESERVED_PICO_W);
-    });
-}
-
 constexpr uint8_t i2c_bus_pins_defined(uint8_t bus) {
     uint8_t defined = 0;
     for (auto pin : PINS_I2C) {
@@ -60,8 +46,10 @@ constexpr uint8_t i2c_bus_pins_defined(uint8_t bus) {
 
 static_assert(all_pins_valid(), "`config.hpp` uses a GPIO pin outside of range [0, 29].");
 static_assert(all_pins_unique(), "`config.hpp` uses duplicate pins. A pin can be used at most once.");
-static_assert(
-        all_pins_available(), "`config.hpp` uses a pin not exposed on the Pico W. This is likely a mistake.");
+static_assert(!pin_exists(contains(PINS_RESERVED_PICO_W)),
+        "`config.hpp` uses a pin not exposed on the Pico W. This is likely a mistake.");
+static_assert(!pin_exists(contains(PINS_RESERVED_UART)),
+        "`config.hpp` uses pin 0 or pin 1. These are reserved for UART and cannot be used.");
 
 static_assert(i2c_bus_pins_defined(0) & 0b01, "`config.hpp` has no pins defined for I2C0 SDA.");
 static_assert(i2c_bus_pins_defined(0) & 0b10, "`config.hpp` has no pins defined for I2C0 SCL.");

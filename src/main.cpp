@@ -18,6 +18,7 @@
 #include "pico/cyw43_arch.h"
 #include "pico/stdio.h"
 #include "sensors.hpp"
+#include "utility/square_wave.hpp"
 #include <array>
 #include <cstdint>
 #include <cstdio>
@@ -144,6 +145,14 @@ void pins_setup() {
 
     // we're setting up the WS2812 controller on PIO0
     gpio_set_function(PIN_NEOPIXEL_DATA_IN, GPIO_FUNC_PIO0);
+
+#ifndef NDEBUG
+    if (PIN_DBG_SQUARE_WAVE) {
+        // setup a debug
+        square_wave_pwm_init(*PIN_DBG_SQUARE_WAVE, 30);
+    } else
+        printf("!! No available PWM slice for square wave generator.\n");
+#endif
 }
 
 }  // namespace

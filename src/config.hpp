@@ -1,5 +1,6 @@
 #pragma once
 
+#include <algorithm>
 #include <chrono>
 #include <cstdint>
 
@@ -50,3 +51,17 @@ static_assert(I2C_BAUD_RATE_HZ <= 400 * 1000, "I2C_BAUD_RATE_HZ too high for som
 ////////////////////////////////////////////////////
 
 constexpr GPIO_Pin PIN_MAX = 30;  // DO NOT ALTER.
+
+template <typename F>
+constexpr bool pins_forall(F&& go) {
+    if (!std::all_of(std::begin(PINS_I2C), std::end(PINS_I2C), go)) return false;
+    if (!(go(PIN_FAN_PWM) && go(PIN_FAN_TACHOMETER))) return false;
+    if (!go(PIN_NEOPIXEL_DATA_IN)) return false;
+
+    return true;
+}
+
+template <typename F>
+constexpr bool pin_exists(F&& go) {
+    return !pins_forall([&](auto p) { return !go(p); });
+}
