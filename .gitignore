@@ -1,0 +1,8 @@
+# clangd caches
+/.cache
+# build artifact
+/build
+/compile_commands.json
+# debugger artifacts
+/.vscode/.cortex-debug.peripherals.state.json
+/.vscode/.cortex-debug.registers.state.json
