@@ -81,7 +81,7 @@ bool sgp40_exists(i2c_inst_t* bus) {
     return sgp4x_heater_off(bus);  // could
 }
 
-struct SGP40 : SensorDelayedResponse {
+struct SGP40 final : SensorDelayedResponse {
     i2c_inst_t* bus;
     Sensor::Data data;  // tiny bit wasteful, but terser to manage
     GasIndexAlgorithmParams gas_index_algorithm{};

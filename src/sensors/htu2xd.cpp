@@ -96,7 +96,7 @@ std::optional<std::tuple<HTU2xD_Measure, double>> htu2xd_read_compensated(
     return std::tuple{HTU2xD_Measure::Temperature, -46.85 + 175.72 * datum_f};
 }
 
-struct HTU2xDSensor : SensorPeriodic {
+struct HTU2xDSensor final : SensorPeriodic {
     i2c_inst_t* bus;
     Sensor::Data data;  // tiny bit wasteful, but terser to manage
 
