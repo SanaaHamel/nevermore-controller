@@ -24,10 +24,8 @@ constexpr uint8_t TACHOMETER_PULSE_PER_REVOLUTION = 2;
 constexpr uint32_t FAN_PWN_HZ = 25'000;
 
 constexpr auto SLICE_PWM = pwm_gpio_to_slice_num_(PIN_FAN_PWM);
-constexpr auto CHANNEL_PWM = pwm_gpio_to_channel_(PIN_FAN_PWM);
 constexpr auto SLICE_TACHOMETER = pwm_gpio_to_slice_num_(PIN_FAN_TACHOMETER);
-constexpr auto CHANNEL_TACHOMETER = pwm_gpio_to_channel_(PIN_FAN_TACHOMETER);
-static_assert(CHANNEL_TACHOMETER == PWM_CHAN_B, "can only read from B channel");
+static_assert(pwm_gpio_to_channel_(PIN_FAN_TACHOMETER) == PWM_CHAN_B, "can only read from B channel");
 
 BLE::Percentage8 g_fan_pwm_percent = 0;
 
