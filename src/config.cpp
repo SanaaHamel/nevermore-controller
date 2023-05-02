@@ -22,6 +22,11 @@ constexpr bool pins_forall(F&& go) {
     return true;
 }
 
+template <typename F>
+constexpr bool pin_exists(F&& go) {
+    return !pins_forall([&](auto p) { return !go(p); });
+}
+
 constexpr bool all_pins_valid() {
     return pins_forall([](GPIO_Pin pin) { return pin < PIN_MAX; });
 }
@@ -38,8 +43,7 @@ constexpr bool all_pins_unique() {
 
 constexpr bool all_pins_available() {
     return pins_forall([](GPIO_Pin pin) {
-        return std::find(PINS_RESERVED_PICO_W.begin(), PINS_RESERVED_PICO_W.end(), pin) ==
-               PINS_RESERVED_PICO_W.end();
+        return find(begin(PINS_RESERVED_PICO_W), end(PINS_RESERVED_PICO_W), pin) == end(PINS_RESERVED_PICO_W);
     });
 }
 

@@ -44,4 +44,9 @@ constexpr uint32_t I2C_BAUD_RATE_HZ = 400 * 1000;
 static_assert(100 * 1000 <= I2C_BAUD_RATE_HZ, "I2C_BAUD_RATE_HZ minimum is 100 kHz");
 static_assert(I2C_BAUD_RATE_HZ <= 400 * 1000, "I2C_BAUD_RATE_HZ too high for some sensors");
 
+////////////////////////////////////////////////////
+//         End of Configurable Settings.
+// Everything below is not of interest to end users.
+////////////////////////////////////////////////////
+
 constexpr GPIO_Pin PIN_MAX = 30;  // DO NOT ALTER.
