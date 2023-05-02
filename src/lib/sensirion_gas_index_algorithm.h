@@ -32,6 +32,10 @@
 #ifndef GASINDEXALGORITHM_H_
 #define GASINDEXALGORITHM_H_
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include <stdint.h>
 
 /* The fixed point arithmetic parts of this code were originally created by
@@ -266,4 +270,7 @@ void GasIndexAlgorithm_get_tuning_parameters(const GasIndexAlgorithmParams* para
  */
 void GasIndexAlgorithm_process(GasIndexAlgorithmParams* params, int32_t sraw, int32_t* gas_index);
 
+#ifdef __cplusplus
+}
+#endif
 #endif /* GASINDEXALGORITHM_H_ */

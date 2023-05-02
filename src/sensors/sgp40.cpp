@@ -1,5 +1,6 @@
 #include "sgp40.hpp"
 #include "async_sensor.hpp"
+#include "lib/sensirion_gas_index_algorithm.h"
 #include "sdk/ble_data_types.hpp"
 #include "sdk/i2c.hpp"
 #include "sdk/timer.hpp"
@@ -8,10 +9,6 @@
 #include "utility/packed_tuple.hpp"
 #include <cstdint>
 #include <utility>
-
-extern "C" {
-#include "utility/sensirion_gas_index_algorithm.h"
-}
 
 namespace {
 
