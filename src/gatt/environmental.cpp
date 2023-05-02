@@ -50,7 +50,11 @@ const ESM ESM_VOC_INDEX{
         .application = ESM::Application::Supplementary,
 };
 
-const BLE::ValidRange<uint16_t> VALID_RANGE_VOC_INDEX{.min = 0, .max = 500};
+// NB: nRF Connect incorrectly reads this as a big-endian structure.
+// GATT supplementary spec section 2.4 explicitly says everything is little
+// endian unless otherwise noted. Section 4.1 describes `Valid Range` and has
+// nothing to say regarding its endianness.
+const BLE::ValidRange<EnvironmentService::VOCIndex> VALID_RANGE_VOC_INDEX{.min = 0, .max = 500};
 
 }  // namespace
 
