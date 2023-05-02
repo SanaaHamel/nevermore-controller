@@ -26,7 +26,6 @@ using namespace std::literals;
 
 namespace {
 
-constexpr uint32_t LED = CYW43_WL_GPIO_LED_PIN;
 constexpr uint32_t I2C_INTAKE_SCL = 0;
 constexpr uint32_t I2C_INTAKE_SDA = 0;
 constexpr uint32_t I2C_EXHAUST_SCL = 0;
@@ -47,11 +46,13 @@ AdvertiseData g_advertise_data;
 
 namespace {
 
+constexpr uint32_t PIN_PICO_W_LED = CYW43_WL_GPIO_LED_PIN;
+
 bool g_led_on = true;
 
 void sensor_update_handler(btstack_timer_source_t* ts) {
     g_led_on = !g_led_on;
-    cyw43_arch_gpio_put(LED, g_led_on);
+    cyw43_arch_gpio_put(PIN_PICO_W_LED, g_led_on);
 
     btstack_run_loop_set_timer(ts, SENSOR_UPDATE_PERIOD / 1ms);
     btstack_run_loop_add_timer(ts);
