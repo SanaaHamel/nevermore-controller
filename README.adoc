@@ -10,7 +10,7 @@ to interact with the controller.
 Features
 --------
 
-* [ ] Klipper Compatibity Module
+* [ ] Klipper Compatibility Module
 * [x] BLE - Advertisement of environmental sensors state
 * [x] Fan - Tachometer
 * [ ] Fan - PWM Control - Automatic
