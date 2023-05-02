@@ -40,7 +40,6 @@ void fan_pwm_update(BLE::Percentage8 percent) {
 }  // namespace
 
 bool FanService::init(async_context& ctx_async) {
-
     // setup PWM configurations for fan PWM and fan tachometer
     auto cfg_pwm = pwm_get_default_config();
     pwm_config_set_freq_hz(cfg_pwm, FAN_PWN_HZ);
