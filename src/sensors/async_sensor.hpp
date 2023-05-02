@@ -18,7 +18,7 @@ struct Sensor {
 // Useful for sensors that take a long time (10ms+) to measure/respond.
 struct SensorPeriodic : Sensor {
     [[nodiscard]] virtual std::chrono::milliseconds update_period() const {
-        return std::chrono::duration_cast<std::chrono::milliseconds>(SENSOR_UPDATE_PERIOD);
+        return SENSOR_UPDATE_PERIOD;
     }
 
     void register_(async_context_t& context) {
