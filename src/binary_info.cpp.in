@@ -1,5 +1,6 @@
-#include "pico/binary_info.h"  // IWYU pragma: keep
 #include "config.hpp"
+#include "pico/binary_info.h"  // IWYU pragma: keep
+#include "pico/binary_info/code.h"
 #include "sdk/i2c.hpp"
 
 namespace {
@@ -18,6 +19,7 @@ constexpr GPIO_Pin first_i2c_pin(uint8_t bus, I2C_Pin kind) {
 
 bi_decl(bi_program_description("Nevermore Controller"));
 bi_decl(bi_program_url("https://github.com/SanaaHamel/nevermore-controller"));
+bi_decl(bi_program_version_string("@GIT_DESCRIPTION@ " CMAKE_BUILD_TYPE));
 
 // clang-format off
 bi_decl(bi_4pins_with_names(

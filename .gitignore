@@ -6,3 +6,5 @@
 # debugger artifacts
 /.vscode/.cortex-debug.peripherals.state.json
 /.vscode/.cortex-debug.registers.state.json
+# derived from cfg file
+/src/binary_info.cpp

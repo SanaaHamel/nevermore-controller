@@ -1,5 +1,6 @@
 cmake_minimum_required(VERSION 3.13)
 
+include(cmake/GetGitRevisionDescription.cmake)
 include(cmake/pico_sdk_import.cmake)
 
 project(nevermore-ble C CXX ASM)
@@ -17,11 +18,17 @@ file(GLOB_RECURSE SRC_H ${SRC_DIR}/*.h)
 file(GLOB_RECURSE SRC_C ${SRC_DIR}/*.c)
 file(GLOB_RECURSE SRC_HPP ${SRC_DIR}/*.hpp)
 file(GLOB_RECURSE SRC_CPP ${SRC_DIR}/*.cpp)
+
+git_describe_working_tree(GIT_DESCRIPTION --always)
+configure_file("${SRC_DIR}/binary_info.cpp.in" "${SRC_DIR}/binary_info.cpp" @ONLY)
+list(APPEND SRC_CPP "${SRC_DIR}/binary_info.cpp")
+
 set(SRC_FILES ${SRC_H} ${SRC_C} ${SRC_HPP} ${SRC_CPP})
 
 # `psabi` is a useless warning for our purposes
 add_compile_options(-Wall -Wno-psabi)
 add_compile_definitions(PARAM_ASSERTIONS_ENABLE_ALL=1)
+add_compile_definitions(CMAKE_BUILD_TYPE="${CMAKE_BUILD_TYPE}")
 
 add_executable(nevermore-ble
   ${SRC_FILES}
