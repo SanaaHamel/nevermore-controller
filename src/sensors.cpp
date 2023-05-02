@@ -18,7 +18,7 @@ using EnvironmentService::VOCIndex;
 
 namespace {
 
-constexpr uint32_t ADC_CHANNEL_TEMPSENSOR = 4;
+constexpr uint32_t ADC_CHANNEL_TEMP_SENSOR = 4;
 
 constexpr auto SENSOR_POWER_ON_DELAY = std::max({HTU21D_POWER_ON_DELAY, SGP40_POWER_ON_DELAY});
 
@@ -27,22 +27,32 @@ using VecSensors = std::vector<std::unique_ptr<Sensor>>;
 VecSensors g_sensors_intake;
 VecSensors g_sensors_exhaust;
 
-double mcu_temperature() {
-    // ref https://github.com/raspberrypi/pico-micropython-examples/blob/master/adc/temperature.py
-    constexpr auto SCALE_COEFFICIENT = 3.3 / 65535;
-    constexpr uint32_t BITS = 12;
+struct McuTemperature final : SensorPeriodic {
+    [[nodiscard]] char const* name() const override {
+        return "MCU Temperature";
+    }
 
-    adc_select_input(ADC_CHANNEL_TEMPSENSOR);
-    uint32_t raw32 = adc_read();
-    // Scale raw reading to 16 bit value using a Taylor expansion (for 8 <= bits <= 16)
-    uint16_t raw16 = raw32 << (16 - BITS) | raw32 >> (2 * BITS - 16);
-    auto reading = raw16 * SCALE_COEFFICIENT;
-    // The temperature sensor measures the Vbe voltage of a biased bipolar diode, connected to the fifth ADC
-    // channel Typically, Vbe = 0.706V at 27 degrees C, with a slope of -1.721mV (0.001721) per degree.
-    auto deg_c = 27 - (reading - 0.706) / 0.001721;
-    // printf("MCU temp = %f\n", deg_c);
-    return deg_c;
-}
+    void read() override {
+        g_advertise_data.environment_service_data.temperature_mcu = measure();
+    }
+
+private:
+    static double measure() {
+        // ref https://github.com/raspberrypi/pico-micropython-examples/blob/master/adc/temperature.py
+        constexpr auto SCALE_COEFFICIENT = 3.3 / 65535;
+        constexpr uint32_t BITS = 12;
+
+        adc_select_input(ADC_CHANNEL_TEMP_SENSOR);
+        uint32_t raw32 = adc_read();
+        // Scale raw reading to 16 bit value using a Taylor expansion (for 8 <= bits <= 16)
+        uint16_t raw16 = raw32 << (16 - BITS) | raw32 >> (2 * BITS - 16);
+        auto reading = raw16 * SCALE_COEFFICIENT;
+        // The temp sensor measures the Vbe voltage of a biased bipolar diode, connected to ADC channel 4.
+        // Typically, Vbe = 0.706V at 27c, with a slope of -1.721mV (0.001721) per degree.
+        auto deg_c = 27 - (reading - 0.706) / 0.001721;
+        return deg_c;
+    }
+} g_mcu_temperature_sensor;
 
 VecSensors sensors_init_bus(async_context_t& ctx_async, i2c_inst_t* bus, Sensor::Data state) {
     VecSensors sensors;
@@ -64,8 +74,9 @@ VecSensors sensors_init_bus(async_context_t& ctx_async, i2c_inst_t* bus, Sensor:
 }  // namespace
 
 bool sensors_init(async_context_t& ctx_async, EnvironmentService::ServiceData& state) {
-    adc_select_input(ADC_CHANNEL_TEMPSENSOR);
+    adc_select_input(ADC_CHANNEL_TEMP_SENSOR);
     adc_set_temp_sensor_enabled(true);
+    g_mcu_temperature_sensor.register_(ctx_async);
 
     printf("Waiting %u ms for sensor init\n", unsigned(SENSOR_POWER_ON_DELAY / 1ms));
     busy_wait(SENSOR_POWER_ON_DELAY);
