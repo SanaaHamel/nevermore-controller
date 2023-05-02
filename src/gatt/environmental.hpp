@@ -1,6 +1,6 @@
 #pragma once
 
-#include "btstack.h"
+#include "bluetooth.h"
 #include "sdk/ble_data_types.hpp"
 #include <cstdint>
 #include <optional>

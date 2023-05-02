@@ -1,4 +1,5 @@
-#include "btstack.h"
+
+#include "bluetooth_data_types.h"
 #include "gatt/environmental.hpp"
 #include <cstdint>
 #include <cstring>

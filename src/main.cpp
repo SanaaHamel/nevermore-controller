@@ -1,4 +1,6 @@
 #include "ble/att_db.h"
+#include "ble/att_server.h"
+#include "ble/sm.h"
 #include "boards/pico_w.h"
 #include "btstack_event.h"
 #include "config.hpp"
@@ -10,13 +12,11 @@
 #include "hardware/adc.h"
 #include "hardware/gpio.h"
 #include "hardware/i2c.h"
+#include "l2cap.h"
 #include "nevermore.h"
-#include "pico/binary_info.h"
-#include "pico/btstack_cyw43.h"
+#include "pico/binary_info.h"  // IWYU pragma: keep
 #include "pico/cyw43_arch.h"
 #include "pico/stdio.h"
-#include "pico/stdlib.h"
-#include "sdk/btstack.hpp"
 #include "sensors.hpp"
 #include <array>
 #include <cstdint>

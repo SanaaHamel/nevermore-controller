@@ -2,16 +2,12 @@
 #include "config.hpp"
 #include "gatt.hpp"
 #include "handler_helpers.hpp"
-#include "hardware/clocks.h"
 #include "nevermore.h"
-#include "pico/stdlib.h"
 #include "sdk/ble_data_types.hpp"
 #include "sdk/btstack.hpp"
 #include "sdk/pwm.hpp"
-#include "sdk/timer.hpp"
 #include "sensors/tachometer.hpp"
 #include <cstdint>
-#include <cstdio>
 #include <limits>
 #include <utility>
 

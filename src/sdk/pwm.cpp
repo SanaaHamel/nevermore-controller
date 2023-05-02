@@ -1,4 +1,5 @@
 #include "pwm.hpp"
+#include "hardware/clocks.h"
 #include "hardware/pwm.h"
 
 namespace {

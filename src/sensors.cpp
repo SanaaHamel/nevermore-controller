@@ -2,13 +2,11 @@
 #include "gatt.hpp"
 #include "hardware/adc.h"
 #include "hardware/i2c.h"
-#include "pico/stdlib.h"
 #include "sdk/ble_data_types.hpp"
 #include "sdk/timer.hpp"
 #include "sensors/async_sensor.hpp"
 #include "sensors/htu2xd.hpp"
 #include "sensors/sgp40.hpp"
-#include "utility/misc.hpp"
 #include <algorithm>
 #include <array>
 #include <cstdio>

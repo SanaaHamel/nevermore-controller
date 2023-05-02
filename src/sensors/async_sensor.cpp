@@ -1,5 +1,4 @@
 #include "async_sensor.hpp"
-#include "config.hpp"
 #include "sdk/async.hpp"
 #include <chrono>
 #include <cstdio>

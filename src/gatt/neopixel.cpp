@@ -1,9 +1,7 @@
 #include "neopixel.hpp"
-#include "config.hpp"
 #include "gatt.hpp"
 #include "handler_helpers.hpp"
 #include "nevermore.h"
-#include "sdk/ble_data_types.hpp"
 #include "sdk/btstack.hpp"
 #include "ws2812.hpp"
 #include <cstdint>
