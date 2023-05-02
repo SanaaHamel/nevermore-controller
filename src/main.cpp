@@ -28,18 +28,6 @@ AdvertiseData g_advertise_data;
 
 namespace {
 
-constexpr uint32_t PIN_PICO_W_LED = CYW43_WL_GPIO_LED_PIN;
-
-bool g_led_on = true;
-
-void sensor_update_handler(btstack_timer_source_t* ts) {
-    g_led_on = !g_led_on;
-    cyw43_arch_gpio_put(PIN_PICO_W_LED, g_led_on);
-
-    btstack_run_loop_set_timer(ts, SENSOR_UPDATE_PERIOD / 1ms);
-    btstack_run_loop_add_timer(ts);
-}
-
 void packet_handler(uint8_t packet_type, uint16_t channel, uint8_t* packet, uint16_t size) {
     UNUSED(size);
     UNUSED(channel);
@@ -173,15 +161,21 @@ int main() {
     att_server_init(profile_data, attr_read, attr_write);
     att_server_register_packet_handler(packet_handler);
 
-    btstack_timer_source_t sensor_timer{.process = &sensor_update_handler};
-    btstack_run_loop_set_timer(&sensor_timer, SENSOR_UPDATE_PERIOD / 1ms);
-    btstack_run_loop_add_timer(&sensor_timer);
-
     // turn on bluetooth
     if (auto err = hci_power_control(HCI_POWER_ON)) {
         printf("hci_power_control failed = 0x%08x\n", err);
         return -1;
     }
+
+    btstack_timer_source_t led_blink{.process = [](btstack_timer_source_t* timer) {
+        static bool led_on = false;
+        led_on = !led_on;
+        cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, led_on);
+
+        btstack_run_loop_set_timer(timer, SENSOR_UPDATE_PERIOD / 1ms);
+        btstack_run_loop_add_timer(timer);
+    }};
+    led_blink.process(&led_blink);
 
     btstack_run_loop_execute();  // !! NO-RETURN
     return 0;
