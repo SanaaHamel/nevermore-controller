@@ -35,8 +35,6 @@ void packet_handler(uint8_t packet_type, uint16_t channel, uint8_t* packet, uint
 
     auto const event_type = hci_event_packet_get_type(packet);
     switch (event_type) {
-        case HCI_EVENT_DISCONNECTION_COMPLETE: break;  // TODO: spin-down fans & shutdown LEDs?
-
         case BTSTACK_EVENT_STATE: {
             if (btstack_event_state_get_state(packet) != HCI_STATE_WORKING) break;
 
