@@ -2,9 +2,9 @@
 #include "gatt.hpp"
 #include "hardware/adc.h"
 #include "hardware/i2c.h"
-#include "hardware/timer.h"
 #include "pico/stdlib.h"
 #include "sdk/ble_data_types.hpp"
+#include "sdk/timer.hpp"
 #include "sensors/async_sensor.hpp"
 #include "sensors/htu2xd.hpp"
 #include "sensors/sgp40.hpp"
@@ -95,7 +95,7 @@ bool sensors_init(async_context_t& ctx_async, EnvironmentService::ServiceData& s
     adc_set_temp_sensor_enabled(true);
 
     printf("Waiting %u ms for sensor init\n", unsigned(SENSOR_POWER_ON_DELAY / 1ms));
-    busy_wait_us(SENSOR_POWER_ON_DELAY / 1us);
+    busy_wait(SENSOR_POWER_ON_DELAY);
 
     DBG_i2c_scan(i2c0);
 
@@ -108,7 +108,7 @@ bool sensors_init(async_context_t& ctx_async, EnvironmentService::ServiceData& s
                     state.voc_index_exhaust});
 
     // wait again b/c probing might be implemented by sending a reset command to the sensor
-    busy_wait_us(SENSOR_POWER_ON_DELAY / 1us);
+    busy_wait(SENSOR_POWER_ON_DELAY);
 
     return true;
 }
