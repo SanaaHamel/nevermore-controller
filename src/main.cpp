@@ -14,7 +14,6 @@
 #include "hardware/i2c.h"
 #include "l2cap.h"
 #include "nevermore.h"
-#include "pico/binary_info.h"  // IWYU pragma: keep
 #include "pico/cyw43_arch.h"
 #include "pico/stdio.h"
 #include "sensors.hpp"
@@ -24,24 +23,6 @@
 #include <cstdio>
 
 using namespace std::literals;
-
-namespace {
-
-constexpr uint32_t I2C_INTAKE_SCL = 0;
-constexpr uint32_t I2C_INTAKE_SDA = 0;
-constexpr uint32_t I2C_EXHAUST_SCL = 0;
-constexpr uint32_t I2C_EXHAUST_SDA = 0;
-
-}  // namespace
-
-bi_decl(bi_program_description("Nevermore BLE Controller"));
-// clang-format off
-bi_decl(bi_4pins_with_names(
-    I2C_INTAKE_SCL , "Intake I2C SCL",
-    I2C_INTAKE_SDA , "Intake I2C SDA",
-    I2C_EXHAUST_SCL, "Exhaust I2C SCL",
-    I2C_EXHAUST_SDA, "Exhaust I2C SDA"));
-// clang-format on
 
 AdvertiseData g_advertise_data;
 
