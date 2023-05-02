@@ -1,7 +1,7 @@
 #pragma once
 
 #include "hardware/i2c.h"
-#include "utility/misc.hpp"
+#include "utility/crc.hpp"
 #include "utility/packed_tuple.hpp"
 #include <optional>
 #include <type_traits>
