@@ -3,7 +3,7 @@ cmake_minimum_required(VERSION 3.13)
 include(cmake/GetGitRevisionDescription.cmake)
 include(cmake/pico_sdk_import.cmake)
 
-project(nevermore-ble C CXX ASM)
+project(nevermore-controller C CXX ASM)
 
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_CXX_STANDARD 20)
@@ -30,15 +30,15 @@ set(SRC_FILES ${SRC_H} ${SRC_C} ${SRC_HPP} ${SRC_CPP})
 add_compile_options(-Wall -Wno-psabi)
 add_compile_definitions(PARAM_ASSERTIONS_ENABLE_ALL=1)
 
-add_executable(nevermore-ble
+add_executable(nevermore-controller
   ${SRC_FILES}
 )
 
-target_include_directories(nevermore-ble PRIVATE
+target_include_directories(nevermore-controller PRIVATE
   ${SRC_DIR}
 )
 
-target_link_libraries(nevermore-ble
+target_link_libraries(nevermore-controller
   pico_stdlib
   pico_cyw43_arch_none
   pico_btstack_ble
@@ -51,14 +51,14 @@ target_link_libraries(nevermore-ble
 
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")
   # Specify source files explicitly b/c some SDK sources trigger warnings.
-  # target_compile_options(nevermore-ble PRIVATE -Werror)
+  # target_compile_options(nevermore-controller PRIVATE -Werror)
   set_source_files_properties(${SRC_FILES} PROPERTIES COMPILE_FLAGS -Werror)
 endif()
 
-pico_enable_stdio_usb(nevermore-ble 1)
-pico_enable_stdio_uart(nevermore-ble 1)
-pico_add_extra_outputs(nevermore-ble)
-pico_btstack_make_gatt_header(nevermore-ble PRIVATE ${SRC_DIR}/nevermore.gatt)
+pico_enable_stdio_usb(nevermore-controller 1)
+pico_enable_stdio_uart(nevermore-controller 1)
+pico_add_extra_outputs(nevermore-controller)
+pico_btstack_make_gatt_header(nevermore-controller PRIVATE ${SRC_DIR}/nevermore.gatt)
 
 # TODO: implement and test
-# pico_generate_pio_header(nevermore-ble ${SRC_DIR}/ws2812.pio)
+# pico_generate_pio_header(nevermore-controller ${SRC_DIR}/ws2812.pio)
