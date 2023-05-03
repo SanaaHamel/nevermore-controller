@@ -1,3 +1,5 @@
+// NOLINTBEGIN
+// clang-format off
 /*
  * Copyright (c) 2022, Sensirion AG
  * All rights reserved.
@@ -30,7 +32,7 @@
  */
 
 #include "sensirion_gas_index_algorithm.h"
-// NOLINTBEGIN
+
 /*!< the maximum value of fix16_t */
 #define FIX16_MAXIMUM 0x7FFFFFFF
 /*!< the minimum value of fix16_t */
@@ -85,16 +87,19 @@ static fix16_t fix16_mul(fix16_t inArg0, fix16_t inArg1) {
     // Handle carry from lower 32 bits to upper part of result.
     uint32_t ad_cb_temp = AD_CB << 16;
     uint32_t product_lo = BD + ad_cb_temp;
-    if (product_lo < BD) product_hi++;
+    if (product_lo < BD)
+        product_hi++;
 
 #ifndef FIXMATH_NO_OVERFLOW
     // The upper 17 bits should all be zero.
-    if (product_hi >> 15) return (fix16_t)FIX16_OVERFLOW;
+    if (product_hi >> 15)
+        return (fix16_t)FIX16_OVERFLOW;
 #endif
 
 #ifdef FIXMATH_NO_ROUNDING
     fix16_t result = (fix16_t)((product_hi << 16) | (product_lo >> 16));
-    if ((inArg0 < 0) != (inArg1 < 0)) result = -result;
+    if ((inArg0 < 0) != (inArg1 < 0))
+        result = -result;
     return result;
 #else
     // Adding 0x8000 (= 0.5) and then using right shift
@@ -102,11 +107,13 @@ static fix16_t fix16_mul(fix16_t inArg0, fix16_t inArg1) {
     // Handle carry from lower to upper part.
     uint32_t product_lo_tmp = product_lo;
     product_lo += 0x8000;
-    if (product_lo < product_lo_tmp) product_hi++;
+    if (product_lo < product_lo_tmp)
+        product_hi++;
 
     // Discard the lowest 16 bits and convert back to signed result.
     fix16_t result = (fix16_t)((product_hi << 16) | (product_lo >> 16));
-    if ((inArg0 < 0) != (inArg1 < 0)) result = -result;
+    if ((inArg0 < 0) != (inArg1 < 0))
+        result = -result;
     return result;
 #endif
 }
@@ -117,7 +124,8 @@ static fix16_t fix16_div(fix16_t a, fix16_t b) {
     // trying to compose a 64-bit divide out of 32-bit divisions on
     // platforms without hardware divide.
 
-    if (b == 0) return (fix16_t)FIX16_MINIMUM;
+    if (b == 0)
+        return (fix16_t)FIX16_MINIMUM;
 
     uint32_t remainder = (uint32_t)((a >= 0) ? a : (-a));
     uint32_t divider = (uint32_t)((b >= 0) ? b : (-b));
@@ -132,7 +140,8 @@ static fix16_t fix16_div(fix16_t a, fix16_t b) {
     }
 
 #ifndef FIXMATH_NO_OVERFLOW
-    if (!bit) return (fix16_t)FIX16_OVERFLOW;
+    if (!bit)
+        return (fix16_t)FIX16_OVERFLOW;
 #endif
 
     if (divider & 0x80000000) {
@@ -168,7 +177,8 @@ static fix16_t fix16_div(fix16_t a, fix16_t b) {
     /* Figure out the sign of result */
     if ((a < 0) != (b < 0)) {
 #ifndef FIXMATH_NO_OVERFLOW
-        if (result == (fix16_t)FIX16_MINIMUM) return (fix16_t)FIX16_OVERFLOW;
+        if (result == (fix16_t)FIX16_MINIMUM)
+            return (fix16_t)FIX16_OVERFLOW;
 #endif
 
         result = -result;
@@ -240,16 +250,18 @@ static fix16_t fix16_exp(fix16_t x) {
     // exp(x) for x = +/- {1, 1/8, 1/64, 1/512}
 #define NUM_EXP_VALUES 4
     static const fix16_t exp_pos_values[NUM_EXP_VALUES] = {
-            F16(2.7182818), F16(1.1331485), F16(1.0157477), F16(1.0019550)};
+        F16(2.7182818), F16(1.1331485), F16(1.0157477), F16(1.0019550)};
     static const fix16_t exp_neg_values[NUM_EXP_VALUES] = {
-            F16(0.3678794), F16(0.8824969), F16(0.9844964), F16(0.9980488)};
+        F16(0.3678794), F16(0.8824969), F16(0.9844964), F16(0.9980488)};
     const fix16_t* exp_values;
 
     fix16_t res, arg;
     uint16_t i;
 
-    if (x >= F16(10.3972)) return FIX16_MAXIMUM;
-    if (x <= F16(-11.7835)) return 0;
+    if (x >= F16(10.3972))
+        return FIX16_MAXIMUM;
+    if (x <= F16(-11.7835))
+        return 0;
 
     if (x < 0) {
         x = -x;
@@ -270,30 +282,26 @@ static fix16_t fix16_exp(fix16_t x) {
     return res;
 }
 
-static void GasIndexAlgorithm__init_instances(GasIndexAlgorithmParams* params);
-static void GasIndexAlgorithm__mean_variance_estimator__set_parameters(GasIndexAlgorithmParams* params);
-static void GasIndexAlgorithm__mean_variance_estimator__set_states(
-        GasIndexAlgorithmParams* params, fix16_t mean, fix16_t std, fix16_t uptime_gamma);
-static fix16_t GasIndexAlgorithm__mean_variance_estimator__get_std(const GasIndexAlgorithmParams* params);
-static fix16_t GasIndexAlgorithm__mean_variance_estimator__get_mean(const GasIndexAlgorithmParams* params);
-static bool GasIndexAlgorithm__mean_variance_estimator__is_initialized(GasIndexAlgorithmParams* params);
-static void GasIndexAlgorithm__mean_variance_estimator___calculate_gamma(GasIndexAlgorithmParams* params);
-static void GasIndexAlgorithm__mean_variance_estimator__process(
-        GasIndexAlgorithmParams* params, fix16_t sraw);
-static void GasIndexAlgorithm__mean_variance_estimator___sigmoid__set_parameters(
-        GasIndexAlgorithmParams* params, fix16_t X0, fix16_t K);
-static fix16_t GasIndexAlgorithm__mean_variance_estimator___sigmoid__process(
-        GasIndexAlgorithmParams* params, fix16_t sample);
-static void GasIndexAlgorithm__mox_model__set_parameters(
-        GasIndexAlgorithmParams* params, fix16_t SRAW_STD, fix16_t SRAW_MEAN);
-static fix16_t GasIndexAlgorithm__mox_model__process(GasIndexAlgorithmParams* params, fix16_t sraw);
-static void GasIndexAlgorithm__sigmoid_scaled__set_parameters(
-        GasIndexAlgorithmParams* params, fix16_t X0, fix16_t K, fix16_t offset_default);
-static fix16_t GasIndexAlgorithm__sigmoid_scaled__process(GasIndexAlgorithmParams* params, fix16_t sample);
-static void GasIndexAlgorithm__adaptive_lowpass__set_parameters(GasIndexAlgorithmParams* params);
-static fix16_t GasIndexAlgorithm__adaptive_lowpass__process(GasIndexAlgorithmParams* params, fix16_t sample);
 
-void GasIndexAlgorithm_init(GasIndexAlgorithmParams* params, int32_t algorithm_type) {
+static void GasIndexAlgorithm__init_instances(GasIndexAlgorithmParams *params);
+static void GasIndexAlgorithm__mean_variance_estimator__set_parameters(GasIndexAlgorithmParams *params);
+static void GasIndexAlgorithm__mean_variance_estimator__set_states(GasIndexAlgorithmParams *params, fix16_t mean, fix16_t std, fix16_t uptime_gamma);
+static fix16_t GasIndexAlgorithm__mean_variance_estimator__get_std(const GasIndexAlgorithmParams *params);
+static fix16_t GasIndexAlgorithm__mean_variance_estimator__get_mean(const GasIndexAlgorithmParams *params);
+static bool GasIndexAlgorithm__mean_variance_estimator__is_initialized(GasIndexAlgorithmParams *params);
+static void GasIndexAlgorithm__mean_variance_estimator___calculate_gamma(GasIndexAlgorithmParams *params);
+static void GasIndexAlgorithm__mean_variance_estimator__process(GasIndexAlgorithmParams *params, fix16_t sraw);
+static void GasIndexAlgorithm__mean_variance_estimator___sigmoid__set_parameters(GasIndexAlgorithmParams *params, fix16_t X0, fix16_t K);
+static fix16_t GasIndexAlgorithm__mean_variance_estimator___sigmoid__process(GasIndexAlgorithmParams *params, fix16_t sample);
+static void GasIndexAlgorithm__mox_model__set_parameters(GasIndexAlgorithmParams *params, fix16_t SRAW_STD, fix16_t SRAW_MEAN);
+static fix16_t GasIndexAlgorithm__mox_model__process(GasIndexAlgorithmParams *params, fix16_t sraw);
+static void GasIndexAlgorithm__sigmoid_scaled__set_parameters(GasIndexAlgorithmParams *params, fix16_t X0, fix16_t K, fix16_t offset_default);
+static fix16_t GasIndexAlgorithm__sigmoid_scaled__process(GasIndexAlgorithmParams *params, fix16_t sample);
+static void GasIndexAlgorithm__adaptive_lowpass__set_parameters(GasIndexAlgorithmParams *params);
+static fix16_t GasIndexAlgorithm__adaptive_lowpass__process(GasIndexAlgorithmParams *params, fix16_t sample);
+
+void  GasIndexAlgorithm_init(GasIndexAlgorithmParams *params, int32_t algorithm_type) {
+
     params->mAlgorithm_Type = algorithm_type;
     if ((algorithm_type == GasIndexAlgorithm_ALGORITHM_TYPE_NOX)) {
         params->mIndex_Offset = F16(GasIndexAlgorithm_NOX_INDEX_OFFSET_DEFAULT);
@@ -302,7 +310,8 @@ void GasIndexAlgorithm_init(GasIndexAlgorithmParams* params, int32_t algorithm_t
         params->mInit_Duration_Mean = F16(GasIndexAlgorithm_INIT_DURATION_MEAN_NOX);
         params->mInit_Duration_Variance = F16(GasIndexAlgorithm_INIT_DURATION_VARIANCE_NOX);
         params->mGating_Threshold = F16(GasIndexAlgorithm_GATING_THRESHOLD_NOX);
-    } else {
+    }
+    else {
         params->mIndex_Offset = F16(GasIndexAlgorithm_VOC_INDEX_OFFSET_DEFAULT);
         params->mSraw_Minimum = GasIndexAlgorithm_VOC_SRAW_MINIMUM;
         params->mGating_Max_Duration_Minutes = F16(GasIndexAlgorithm_GATING_VOC_MAX_DURATION_MINUTES);
@@ -317,46 +326,42 @@ void GasIndexAlgorithm_init(GasIndexAlgorithmParams* params, int32_t algorithm_t
     GasIndexAlgorithm_reset(params);
 }
 
-void GasIndexAlgorithm_reset(GasIndexAlgorithmParams* params) {
+void  GasIndexAlgorithm_reset(GasIndexAlgorithmParams *params) {
     params->mUptime = F16(0.);
     params->mSraw = F16(0.);
     params->mGas_Index = 0;
     GasIndexAlgorithm__init_instances(params);
 }
 
-static void GasIndexAlgorithm__init_instances(GasIndexAlgorithmParams* params) {
+static void  GasIndexAlgorithm__init_instances(GasIndexAlgorithmParams *params) {
+
     GasIndexAlgorithm__mean_variance_estimator__set_parameters(params);
-    GasIndexAlgorithm__mox_model__set_parameters(params,
-            GasIndexAlgorithm__mean_variance_estimator__get_std(params),
-            GasIndexAlgorithm__mean_variance_estimator__get_mean(params));
+    GasIndexAlgorithm__mox_model__set_parameters(params, GasIndexAlgorithm__mean_variance_estimator__get_std(params), GasIndexAlgorithm__mean_variance_estimator__get_mean(params));
     if ((params->mAlgorithm_Type == GasIndexAlgorithm_ALGORITHM_TYPE_NOX)) {
-        GasIndexAlgorithm__sigmoid_scaled__set_parameters(params, F16(GasIndexAlgorithm_SIGMOID_X0_NOX),
-                F16(GasIndexAlgorithm_SIGMOID_K_NOX), F16(GasIndexAlgorithm_NOX_INDEX_OFFSET_DEFAULT));
-    } else {
-        GasIndexAlgorithm__sigmoid_scaled__set_parameters(params, F16(GasIndexAlgorithm_SIGMOID_X0_VOC),
-                F16(GasIndexAlgorithm_SIGMOID_K_VOC), F16(GasIndexAlgorithm_VOC_INDEX_OFFSET_DEFAULT));
+        GasIndexAlgorithm__sigmoid_scaled__set_parameters(params, F16(GasIndexAlgorithm_SIGMOID_X0_NOX), F16(GasIndexAlgorithm_SIGMOID_K_NOX), F16(GasIndexAlgorithm_NOX_INDEX_OFFSET_DEFAULT));
+    }
+    else {
+        GasIndexAlgorithm__sigmoid_scaled__set_parameters(params, F16(GasIndexAlgorithm_SIGMOID_X0_VOC), F16(GasIndexAlgorithm_SIGMOID_K_VOC), F16(GasIndexAlgorithm_VOC_INDEX_OFFSET_DEFAULT));
     }
     GasIndexAlgorithm__adaptive_lowpass__set_parameters(params);
 }
 
-void GasIndexAlgorithm_get_states(const GasIndexAlgorithmParams* params, int32_t* state0, int32_t* state1) {
+void  GasIndexAlgorithm_get_states(const GasIndexAlgorithmParams *params, int32_t *state0, int32_t *state1) {
+
     *state0 = GasIndexAlgorithm__mean_variance_estimator__get_mean(params);
     *state1 = GasIndexAlgorithm__mean_variance_estimator__get_std(params);
-    return;
+    return ;
 }
 
-void GasIndexAlgorithm_set_states(GasIndexAlgorithmParams* params, int32_t state0, int32_t state1) {
-    GasIndexAlgorithm__mean_variance_estimator__set_states(
-            params, state0, state1, F16(GasIndexAlgorithm_PERSISTENCE_UPTIME_GAMMA));
-    GasIndexAlgorithm__mox_model__set_parameters(params,
-            GasIndexAlgorithm__mean_variance_estimator__get_std(params),
-            GasIndexAlgorithm__mean_variance_estimator__get_mean(params));
+void  GasIndexAlgorithm_set_states(GasIndexAlgorithmParams *params, int32_t state0, int32_t state1) {
+
+    GasIndexAlgorithm__mean_variance_estimator__set_states(params, state0, state1, F16(GasIndexAlgorithm_PERSISTENCE_UPTIME_GAMMA));
+    GasIndexAlgorithm__mox_model__set_parameters(params, GasIndexAlgorithm__mean_variance_estimator__get_std(params), GasIndexAlgorithm__mean_variance_estimator__get_mean(params));
     params->mSraw = state0;
 }
 
-void GasIndexAlgorithm_set_tuning_parameters(GasIndexAlgorithmParams* params, int32_t index_offset,
-        int32_t learning_time_offset_hours, int32_t learning_time_gain_hours,
-        int32_t gating_max_duration_minutes, int32_t std_initial, int32_t gain_factor) {
+void  GasIndexAlgorithm_set_tuning_parameters(GasIndexAlgorithmParams *params, int32_t index_offset, int32_t learning_time_offset_hours, int32_t learning_time_gain_hours, int32_t gating_max_duration_minutes, int32_t std_initial, int32_t gain_factor) {
+
     params->mIndex_Offset = (fix16_from_int(index_offset));
     params->mTau_Mean_Hours = (fix16_from_int(learning_time_offset_hours));
     params->mTau_Variance_Hours = (fix16_from_int(learning_time_gain_hours));
@@ -366,35 +371,37 @@ void GasIndexAlgorithm_set_tuning_parameters(GasIndexAlgorithmParams* params, in
     GasIndexAlgorithm__init_instances(params);
 }
 
-void GasIndexAlgorithm_get_tuning_parameters(const GasIndexAlgorithmParams* params, int32_t* index_offset,
-        int32_t* learning_time_offset_hours, int32_t* learning_time_gain_hours,
-        int32_t* gating_max_duration_minutes, int32_t* std_initial, int32_t* gain_factor) {
+void  GasIndexAlgorithm_get_tuning_parameters(const GasIndexAlgorithmParams *params, int32_t *index_offset, int32_t *learning_time_offset_hours, int32_t *learning_time_gain_hours, int32_t *gating_max_duration_minutes, int32_t *std_initial, int32_t *gain_factor) {
+
     *index_offset = (fix16_cast_to_int(params->mIndex_Offset));
     *learning_time_offset_hours = (fix16_cast_to_int(params->mTau_Mean_Hours));
     *learning_time_gain_hours = (fix16_cast_to_int(params->mTau_Variance_Hours));
     *gating_max_duration_minutes = (fix16_cast_to_int(params->mGating_Max_Duration_Minutes));
     *std_initial = (fix16_cast_to_int(params->mSraw_Std_Initial));
     *gain_factor = (fix16_cast_to_int(params->mIndex_Gain));
-    return;
+    return ;
 }
 
-void GasIndexAlgorithm_process(GasIndexAlgorithmParams* params, int32_t sraw, int32_t* gas_index) {
+void  GasIndexAlgorithm_process(GasIndexAlgorithmParams *params, int32_t sraw, int32_t *gas_index) {
+
     if ((params->mUptime <= F16(GasIndexAlgorithm_INITIAL_BLACKOUT))) {
         params->mUptime = (params->mUptime + F16(GasIndexAlgorithm_SAMPLING_INTERVAL));
-    } else {
+    }
+    else {
         if (((sraw > 0) && (sraw < 65000))) {
             if ((sraw < (params->mSraw_Minimum + 1))) {
                 sraw = (params->mSraw_Minimum + 1);
-            } else if ((sraw > (params->mSraw_Minimum + 32767))) {
+            }
+            else if ((sraw > (params->mSraw_Minimum + 32767))) {
                 sraw = (params->mSraw_Minimum + 32767);
             }
             params->mSraw = (fix16_from_int((sraw - params->mSraw_Minimum)));
         }
-        if (((params->mAlgorithm_Type == GasIndexAlgorithm_ALGORITHM_TYPE_VOC) ||
-                    GasIndexAlgorithm__mean_variance_estimator__is_initialized(params))) {
+        if (((params->mAlgorithm_Type == GasIndexAlgorithm_ALGORITHM_TYPE_VOC) || GasIndexAlgorithm__mean_variance_estimator__is_initialized(params))) {
             params->mGas_Index = GasIndexAlgorithm__mox_model__process(params, params->mSraw);
             params->mGas_Index = GasIndexAlgorithm__sigmoid_scaled__process(params, params->mGas_Index);
-        } else {
+        }
+        else {
             params->mGas_Index = params->mIndex_Offset;
         }
         params->mGas_Index = GasIndexAlgorithm__adaptive_lowpass__process(params, params->mGas_Index);
@@ -403,45 +410,28 @@ void GasIndexAlgorithm_process(GasIndexAlgorithmParams* params, int32_t sraw, in
         }
         if ((params->mSraw > F16(0.))) {
             GasIndexAlgorithm__mean_variance_estimator__process(params, params->mSraw);
-            GasIndexAlgorithm__mox_model__set_parameters(params,
-                    GasIndexAlgorithm__mean_variance_estimator__get_std(params),
-                    GasIndexAlgorithm__mean_variance_estimator__get_mean(params));
+            GasIndexAlgorithm__mox_model__set_parameters(params, GasIndexAlgorithm__mean_variance_estimator__get_std(params), GasIndexAlgorithm__mean_variance_estimator__get_mean(params));
         }
     }
     *gas_index = (fix16_cast_to_int((params->mGas_Index + F16(0.5))));
-    return;
+    return ;
 }
 
-static void GasIndexAlgorithm__mean_variance_estimator__set_parameters(GasIndexAlgorithmParams* params) {
+static void  GasIndexAlgorithm__mean_variance_estimator__set_parameters(GasIndexAlgorithmParams *params) {
+
     params->m_Mean_Variance_Estimator___Initialized = false;
     params->m_Mean_Variance_Estimator___Mean = F16(0.);
     params->m_Mean_Variance_Estimator___Sraw_Offset = F16(0.);
     params->m_Mean_Variance_Estimator___Std = params->mSraw_Std_Initial;
-    params->m_Mean_Variance_Estimator___Gamma_Mean =
-            (fix16_div(F16(((GasIndexAlgorithm_MEAN_VARIANCE_ESTIMATOR__ADDITIONAL_GAMMA_MEAN_SCALING *
-                                    GasIndexAlgorithm_MEAN_VARIANCE_ESTIMATOR__GAMMA_SCALING) *
-                               (GasIndexAlgorithm_SAMPLING_INTERVAL / 3600.))),
-                    (params->mTau_Mean_Hours + F16((GasIndexAlgorithm_SAMPLING_INTERVAL / 3600.)))));
-    params->m_Mean_Variance_Estimator___Gamma_Variance =
-            (fix16_div(F16((GasIndexAlgorithm_MEAN_VARIANCE_ESTIMATOR__GAMMA_SCALING *
-                               (GasIndexAlgorithm_SAMPLING_INTERVAL / 3600.))),
-                    (params->mTau_Variance_Hours + F16((GasIndexAlgorithm_SAMPLING_INTERVAL / 3600.)))));
+    params->m_Mean_Variance_Estimator___Gamma_Mean = (fix16_div(F16(((GasIndexAlgorithm_MEAN_VARIANCE_ESTIMATOR__ADDITIONAL_GAMMA_MEAN_SCALING * GasIndexAlgorithm_MEAN_VARIANCE_ESTIMATOR__GAMMA_SCALING) * (GasIndexAlgorithm_SAMPLING_INTERVAL / 3600.))), (params->mTau_Mean_Hours + F16((GasIndexAlgorithm_SAMPLING_INTERVAL / 3600.)))));
+    params->m_Mean_Variance_Estimator___Gamma_Variance = (fix16_div(F16((GasIndexAlgorithm_MEAN_VARIANCE_ESTIMATOR__GAMMA_SCALING * (GasIndexAlgorithm_SAMPLING_INTERVAL / 3600.))), (params->mTau_Variance_Hours + F16((GasIndexAlgorithm_SAMPLING_INTERVAL / 3600.)))));
     if ((params->mAlgorithm_Type == GasIndexAlgorithm_ALGORITHM_TYPE_NOX)) {
-        params->m_Mean_Variance_Estimator___Gamma_Initial_Mean =
-                F16((((GasIndexAlgorithm_MEAN_VARIANCE_ESTIMATOR__ADDITIONAL_GAMMA_MEAN_SCALING *
-                              GasIndexAlgorithm_MEAN_VARIANCE_ESTIMATOR__GAMMA_SCALING) *
-                             GasIndexAlgorithm_SAMPLING_INTERVAL) /
-                        (GasIndexAlgorithm_TAU_INITIAL_MEAN_NOX + GasIndexAlgorithm_SAMPLING_INTERVAL)));
-    } else {
-        params->m_Mean_Variance_Estimator___Gamma_Initial_Mean =
-                F16((((GasIndexAlgorithm_MEAN_VARIANCE_ESTIMATOR__ADDITIONAL_GAMMA_MEAN_SCALING *
-                              GasIndexAlgorithm_MEAN_VARIANCE_ESTIMATOR__GAMMA_SCALING) *
-                             GasIndexAlgorithm_SAMPLING_INTERVAL) /
-                        (GasIndexAlgorithm_TAU_INITIAL_MEAN_VOC + GasIndexAlgorithm_SAMPLING_INTERVAL)));
+        params->m_Mean_Variance_Estimator___Gamma_Initial_Mean = F16((((GasIndexAlgorithm_MEAN_VARIANCE_ESTIMATOR__ADDITIONAL_GAMMA_MEAN_SCALING * GasIndexAlgorithm_MEAN_VARIANCE_ESTIMATOR__GAMMA_SCALING) * GasIndexAlgorithm_SAMPLING_INTERVAL) / (GasIndexAlgorithm_TAU_INITIAL_MEAN_NOX + GasIndexAlgorithm_SAMPLING_INTERVAL)));
     }
-    params->m_Mean_Variance_Estimator___Gamma_Initial_Variance = F16((
-            (GasIndexAlgorithm_MEAN_VARIANCE_ESTIMATOR__GAMMA_SCALING * GasIndexAlgorithm_SAMPLING_INTERVAL) /
-            (GasIndexAlgorithm_TAU_INITIAL_VARIANCE + GasIndexAlgorithm_SAMPLING_INTERVAL)));
+    else {
+        params->m_Mean_Variance_Estimator___Gamma_Initial_Mean = F16((((GasIndexAlgorithm_MEAN_VARIANCE_ESTIMATOR__ADDITIONAL_GAMMA_MEAN_SCALING * GasIndexAlgorithm_MEAN_VARIANCE_ESTIMATOR__GAMMA_SCALING) * GasIndexAlgorithm_SAMPLING_INTERVAL) / (GasIndexAlgorithm_TAU_INITIAL_MEAN_VOC + GasIndexAlgorithm_SAMPLING_INTERVAL)));
+    }
+    params->m_Mean_Variance_Estimator___Gamma_Initial_Variance = F16(((GasIndexAlgorithm_MEAN_VARIANCE_ESTIMATOR__GAMMA_SCALING * GasIndexAlgorithm_SAMPLING_INTERVAL) / (GasIndexAlgorithm_TAU_INITIAL_VARIANCE + GasIndexAlgorithm_SAMPLING_INTERVAL)));
     params->m_Mean_Variance_Estimator__Gamma_Mean = F16(0.);
     params->m_Mean_Variance_Estimator__Gamma_Variance = F16(0.);
     params->m_Mean_Variance_Estimator___Uptime_Gamma = F16(0.);
@@ -449,27 +439,31 @@ static void GasIndexAlgorithm__mean_variance_estimator__set_parameters(GasIndexA
     params->m_Mean_Variance_Estimator___Gating_Duration_Minutes = F16(0.);
 }
 
-static void GasIndexAlgorithm__mean_variance_estimator__set_states(
-        GasIndexAlgorithmParams* params, fix16_t mean, fix16_t std, fix16_t uptime_gamma) {
+static void  GasIndexAlgorithm__mean_variance_estimator__set_states(GasIndexAlgorithmParams *params, fix16_t mean, fix16_t std, fix16_t uptime_gamma) {
+
     params->m_Mean_Variance_Estimator___Mean = mean;
     params->m_Mean_Variance_Estimator___Std = std;
     params->m_Mean_Variance_Estimator___Uptime_Gamma = uptime_gamma;
     params->m_Mean_Variance_Estimator___Initialized = true;
 }
 
-static fix16_t GasIndexAlgorithm__mean_variance_estimator__get_std(const GasIndexAlgorithmParams* params) {
+static fix16_t  GasIndexAlgorithm__mean_variance_estimator__get_std(const GasIndexAlgorithmParams *params) {
+
     return params->m_Mean_Variance_Estimator___Std;
 }
 
-static fix16_t GasIndexAlgorithm__mean_variance_estimator__get_mean(const GasIndexAlgorithmParams* params) {
+static fix16_t  GasIndexAlgorithm__mean_variance_estimator__get_mean(const GasIndexAlgorithmParams *params) {
+
     return (params->m_Mean_Variance_Estimator___Mean + params->m_Mean_Variance_Estimator___Sraw_Offset);
 }
 
-static bool GasIndexAlgorithm__mean_variance_estimator__is_initialized(GasIndexAlgorithmParams* params) {
+static bool  GasIndexAlgorithm__mean_variance_estimator__is_initialized(GasIndexAlgorithmParams *params) {
+
     return params->m_Mean_Variance_Estimator___Initialized;
 }
 
-static void GasIndexAlgorithm__mean_variance_estimator___calculate_gamma(GasIndexAlgorithmParams* params) {
+static void  GasIndexAlgorithm__mean_variance_estimator___calculate_gamma(GasIndexAlgorithmParams *params) {
+
     fix16_t uptime_limit;
     fix16_t sigmoid_gamma_mean;
     fix16_t gamma_mean;
@@ -480,70 +474,38 @@ static void GasIndexAlgorithm__mean_variance_estimator___calculate_gamma(GasInde
     fix16_t gating_threshold_variance;
     fix16_t sigmoid_gating_variance;
 
-    uptime_limit =
-            F16((GasIndexAlgorithm_MEAN_VARIANCE_ESTIMATOR__FIX16_MAX - GasIndexAlgorithm_SAMPLING_INTERVAL));
+    uptime_limit = F16((GasIndexAlgorithm_MEAN_VARIANCE_ESTIMATOR__FIX16_MAX - GasIndexAlgorithm_SAMPLING_INTERVAL));
     if ((params->m_Mean_Variance_Estimator___Uptime_Gamma < uptime_limit)) {
-        params->m_Mean_Variance_Estimator___Uptime_Gamma =
-                (params->m_Mean_Variance_Estimator___Uptime_Gamma + F16(GasIndexAlgorithm_SAMPLING_INTERVAL));
+        params->m_Mean_Variance_Estimator___Uptime_Gamma = (params->m_Mean_Variance_Estimator___Uptime_Gamma + F16(GasIndexAlgorithm_SAMPLING_INTERVAL));
     }
     if ((params->m_Mean_Variance_Estimator___Uptime_Gating < uptime_limit)) {
-        params->m_Mean_Variance_Estimator___Uptime_Gating =
-                (params->m_Mean_Variance_Estimator___Uptime_Gating +
-                        F16(GasIndexAlgorithm_SAMPLING_INTERVAL));
+        params->m_Mean_Variance_Estimator___Uptime_Gating = (params->m_Mean_Variance_Estimator___Uptime_Gating + F16(GasIndexAlgorithm_SAMPLING_INTERVAL));
     }
-    GasIndexAlgorithm__mean_variance_estimator___sigmoid__set_parameters(
-            params, params->mInit_Duration_Mean, F16(GasIndexAlgorithm_INIT_TRANSITION_MEAN));
-    sigmoid_gamma_mean = GasIndexAlgorithm__mean_variance_estimator___sigmoid__process(
-            params, params->m_Mean_Variance_Estimator___Uptime_Gamma);
-    gamma_mean = (params->m_Mean_Variance_Estimator___Gamma_Mean +
-                  (fix16_mul((params->m_Mean_Variance_Estimator___Gamma_Initial_Mean -
-                                     params->m_Mean_Variance_Estimator___Gamma_Mean),
-                          sigmoid_gamma_mean)));
-    gating_threshold_mean =
-            (params->mGating_Threshold +
-                    (fix16_mul((F16(GasIndexAlgorithm_GATING_THRESHOLD_INITIAL) - params->mGating_Threshold),
-                            GasIndexAlgorithm__mean_variance_estimator___sigmoid__process(
-                                    params, params->m_Mean_Variance_Estimator___Uptime_Gating))));
-    GasIndexAlgorithm__mean_variance_estimator___sigmoid__set_parameters(
-            params, gating_threshold_mean, F16(GasIndexAlgorithm_GATING_THRESHOLD_TRANSITION));
-    sigmoid_gating_mean =
-            GasIndexAlgorithm__mean_variance_estimator___sigmoid__process(params, params->mGas_Index);
+    GasIndexAlgorithm__mean_variance_estimator___sigmoid__set_parameters(params, params->mInit_Duration_Mean, F16(GasIndexAlgorithm_INIT_TRANSITION_MEAN));
+    sigmoid_gamma_mean = GasIndexAlgorithm__mean_variance_estimator___sigmoid__process(params, params->m_Mean_Variance_Estimator___Uptime_Gamma);
+    gamma_mean = (params->m_Mean_Variance_Estimator___Gamma_Mean + (fix16_mul((params->m_Mean_Variance_Estimator___Gamma_Initial_Mean - params->m_Mean_Variance_Estimator___Gamma_Mean), sigmoid_gamma_mean)));
+    gating_threshold_mean = (params->mGating_Threshold + (fix16_mul((F16(GasIndexAlgorithm_GATING_THRESHOLD_INITIAL) - params->mGating_Threshold), GasIndexAlgorithm__mean_variance_estimator___sigmoid__process(params, params->m_Mean_Variance_Estimator___Uptime_Gating))));
+    GasIndexAlgorithm__mean_variance_estimator___sigmoid__set_parameters(params, gating_threshold_mean, F16(GasIndexAlgorithm_GATING_THRESHOLD_TRANSITION));
+    sigmoid_gating_mean = GasIndexAlgorithm__mean_variance_estimator___sigmoid__process(params, params->mGas_Index);
     params->m_Mean_Variance_Estimator__Gamma_Mean = (fix16_mul(sigmoid_gating_mean, gamma_mean));
-    GasIndexAlgorithm__mean_variance_estimator___sigmoid__set_parameters(
-            params, params->mInit_Duration_Variance, F16(GasIndexAlgorithm_INIT_TRANSITION_VARIANCE));
-    sigmoid_gamma_variance = GasIndexAlgorithm__mean_variance_estimator___sigmoid__process(
-            params, params->m_Mean_Variance_Estimator___Uptime_Gamma);
-    gamma_variance = (params->m_Mean_Variance_Estimator___Gamma_Variance +
-                      (fix16_mul((params->m_Mean_Variance_Estimator___Gamma_Initial_Variance -
-                                         params->m_Mean_Variance_Estimator___Gamma_Variance),
-                              (sigmoid_gamma_variance - sigmoid_gamma_mean))));
-    gating_threshold_variance =
-            (params->mGating_Threshold +
-                    (fix16_mul((F16(GasIndexAlgorithm_GATING_THRESHOLD_INITIAL) - params->mGating_Threshold),
-                            GasIndexAlgorithm__mean_variance_estimator___sigmoid__process(
-                                    params, params->m_Mean_Variance_Estimator___Uptime_Gating))));
-    GasIndexAlgorithm__mean_variance_estimator___sigmoid__set_parameters(
-            params, gating_threshold_variance, F16(GasIndexAlgorithm_GATING_THRESHOLD_TRANSITION));
-    sigmoid_gating_variance =
-            GasIndexAlgorithm__mean_variance_estimator___sigmoid__process(params, params->mGas_Index);
+    GasIndexAlgorithm__mean_variance_estimator___sigmoid__set_parameters(params, params->mInit_Duration_Variance, F16(GasIndexAlgorithm_INIT_TRANSITION_VARIANCE));
+    sigmoid_gamma_variance = GasIndexAlgorithm__mean_variance_estimator___sigmoid__process(params, params->m_Mean_Variance_Estimator___Uptime_Gamma);
+    gamma_variance = (params->m_Mean_Variance_Estimator___Gamma_Variance + (fix16_mul((params->m_Mean_Variance_Estimator___Gamma_Initial_Variance - params->m_Mean_Variance_Estimator___Gamma_Variance), (sigmoid_gamma_variance - sigmoid_gamma_mean))));
+    gating_threshold_variance = (params->mGating_Threshold + (fix16_mul((F16(GasIndexAlgorithm_GATING_THRESHOLD_INITIAL) - params->mGating_Threshold), GasIndexAlgorithm__mean_variance_estimator___sigmoid__process(params, params->m_Mean_Variance_Estimator___Uptime_Gating))));
+    GasIndexAlgorithm__mean_variance_estimator___sigmoid__set_parameters(params, gating_threshold_variance, F16(GasIndexAlgorithm_GATING_THRESHOLD_TRANSITION));
+    sigmoid_gating_variance = GasIndexAlgorithm__mean_variance_estimator___sigmoid__process(params, params->mGas_Index);
     params->m_Mean_Variance_Estimator__Gamma_Variance = (fix16_mul(sigmoid_gating_variance, gamma_variance));
-    params->m_Mean_Variance_Estimator___Gating_Duration_Minutes =
-            (params->m_Mean_Variance_Estimator___Gating_Duration_Minutes +
-                    (fix16_mul(F16((GasIndexAlgorithm_SAMPLING_INTERVAL / 60.)),
-                            ((fix16_mul((F16(1.) - sigmoid_gating_mean),
-                                     F16((1. + GasIndexAlgorithm_GATING_MAX_RATIO)))) -
-                                    F16(GasIndexAlgorithm_GATING_MAX_RATIO)))));
+    params->m_Mean_Variance_Estimator___Gating_Duration_Minutes = (params->m_Mean_Variance_Estimator___Gating_Duration_Minutes + (fix16_mul(F16((GasIndexAlgorithm_SAMPLING_INTERVAL / 60.)), ((fix16_mul((F16(1.) - sigmoid_gating_mean), F16((1. + GasIndexAlgorithm_GATING_MAX_RATIO)))) - F16(GasIndexAlgorithm_GATING_MAX_RATIO)))));
     if ((params->m_Mean_Variance_Estimator___Gating_Duration_Minutes < F16(0.))) {
         params->m_Mean_Variance_Estimator___Gating_Duration_Minutes = F16(0.);
     }
-    if ((params->m_Mean_Variance_Estimator___Gating_Duration_Minutes >
-                params->mGating_Max_Duration_Minutes)) {
+    if ((params->m_Mean_Variance_Estimator___Gating_Duration_Minutes > params->mGating_Max_Duration_Minutes)) {
         params->m_Mean_Variance_Estimator___Uptime_Gating = F16(0.);
     }
 }
 
-static void GasIndexAlgorithm__mean_variance_estimator__process(
-        GasIndexAlgorithmParams* params, fix16_t sraw) {
+static void  GasIndexAlgorithm__mean_variance_estimator__process(GasIndexAlgorithmParams *params, fix16_t sraw) {
+
     fix16_t delta_sgp;
     fix16_t c;
     fix16_t additional_scaling;
@@ -552,133 +514,112 @@ static void GasIndexAlgorithm__mean_variance_estimator__process(
         params->m_Mean_Variance_Estimator___Initialized = true;
         params->m_Mean_Variance_Estimator___Sraw_Offset = sraw;
         params->m_Mean_Variance_Estimator___Mean = F16(0.);
-    } else {
-        if (((params->m_Mean_Variance_Estimator___Mean >= F16(100.)) ||
-                    (params->m_Mean_Variance_Estimator___Mean <= F16(-100.)))) {
-            params->m_Mean_Variance_Estimator___Sraw_Offset =
-                    (params->m_Mean_Variance_Estimator___Sraw_Offset +
-                            params->m_Mean_Variance_Estimator___Mean);
+    }
+    else {
+        if (((params->m_Mean_Variance_Estimator___Mean >= F16(100.)) || (params->m_Mean_Variance_Estimator___Mean <= F16(-100.)))) {
+            params->m_Mean_Variance_Estimator___Sraw_Offset = (params->m_Mean_Variance_Estimator___Sraw_Offset + params->m_Mean_Variance_Estimator___Mean);
             params->m_Mean_Variance_Estimator___Mean = F16(0.);
         }
         sraw = (sraw - params->m_Mean_Variance_Estimator___Sraw_Offset);
         GasIndexAlgorithm__mean_variance_estimator___calculate_gamma(params);
-        delta_sgp = (fix16_div((sraw - params->m_Mean_Variance_Estimator___Mean),
-                F16(GasIndexAlgorithm_MEAN_VARIANCE_ESTIMATOR__GAMMA_SCALING)));
+        delta_sgp = (fix16_div((sraw - params->m_Mean_Variance_Estimator___Mean), F16(GasIndexAlgorithm_MEAN_VARIANCE_ESTIMATOR__GAMMA_SCALING)));
         if ((delta_sgp < F16(0.))) {
             c = (params->m_Mean_Variance_Estimator___Std - delta_sgp);
-        } else {
+        }
+        else {
             c = (params->m_Mean_Variance_Estimator___Std + delta_sgp);
         }
         additional_scaling = F16(1.);
         if ((c > F16(1440.))) {
             additional_scaling = (fix16_mul((fix16_div(c, F16(1440.))), (fix16_div(c, F16(1440.)))));
         }
-        params->m_Mean_Variance_Estimator___Std = (fix16_mul(
-                fix16_sqrt((fix16_mul(
-                        additional_scaling, (F16(GasIndexAlgorithm_MEAN_VARIANCE_ESTIMATOR__GAMMA_SCALING) -
-                                                    params->m_Mean_Variance_Estimator__Gamma_Variance)))),
-                fix16_sqrt((
-                        (fix16_mul(params->m_Mean_Variance_Estimator___Std,
-                                (fix16_div(params->m_Mean_Variance_Estimator___Std,
-                                        (fix16_mul(
-                                                F16(GasIndexAlgorithm_MEAN_VARIANCE_ESTIMATOR__GAMMA_SCALING),
-                                                additional_scaling)))))) +
-                        (fix16_mul((fix16_div((fix16_mul(params->m_Mean_Variance_Estimator__Gamma_Variance,
-                                                      delta_sgp)),
-                                           additional_scaling)),
-                                delta_sgp))))));
-        params->m_Mean_Variance_Estimator___Mean =
-                (params->m_Mean_Variance_Estimator___Mean +
-                        (fix16_div((fix16_mul(params->m_Mean_Variance_Estimator__Gamma_Mean, delta_sgp)),
-                                F16(GasIndexAlgorithm_MEAN_VARIANCE_ESTIMATOR__ADDITIONAL_GAMMA_MEAN_SCALING))));
+        params->m_Mean_Variance_Estimator___Std = (fix16_mul(fix16_sqrt((fix16_mul(additional_scaling, (F16(GasIndexAlgorithm_MEAN_VARIANCE_ESTIMATOR__GAMMA_SCALING) - params->m_Mean_Variance_Estimator__Gamma_Variance)))), fix16_sqrt(((fix16_mul(params->m_Mean_Variance_Estimator___Std, (fix16_div(params->m_Mean_Variance_Estimator___Std, (fix16_mul(F16(GasIndexAlgorithm_MEAN_VARIANCE_ESTIMATOR__GAMMA_SCALING), additional_scaling)))))) + (fix16_mul((fix16_div((fix16_mul(params->m_Mean_Variance_Estimator__Gamma_Variance, delta_sgp)), additional_scaling)), delta_sgp))))));
+        params->m_Mean_Variance_Estimator___Mean = (params->m_Mean_Variance_Estimator___Mean + (fix16_div((fix16_mul(params->m_Mean_Variance_Estimator__Gamma_Mean, delta_sgp)), F16(GasIndexAlgorithm_MEAN_VARIANCE_ESTIMATOR__ADDITIONAL_GAMMA_MEAN_SCALING))));
     }
 }
 
-static void GasIndexAlgorithm__mean_variance_estimator___sigmoid__set_parameters(
-        GasIndexAlgorithmParams* params, fix16_t X0, fix16_t K) {
+static void  GasIndexAlgorithm__mean_variance_estimator___sigmoid__set_parameters(GasIndexAlgorithmParams *params, fix16_t X0, fix16_t K) {
+
     params->m_Mean_Variance_Estimator___Sigmoid__K = K;
     params->m_Mean_Variance_Estimator___Sigmoid__X0 = X0;
 }
 
-static fix16_t GasIndexAlgorithm__mean_variance_estimator___sigmoid__process(
-        GasIndexAlgorithmParams* params, fix16_t sample) {
+static fix16_t  GasIndexAlgorithm__mean_variance_estimator___sigmoid__process(GasIndexAlgorithmParams *params, fix16_t sample) {
+
     fix16_t x;
 
-    x = (fix16_mul(params->m_Mean_Variance_Estimator___Sigmoid__K,
-            (sample - params->m_Mean_Variance_Estimator___Sigmoid__X0)));
+    x = (fix16_mul(params->m_Mean_Variance_Estimator___Sigmoid__K, (sample - params->m_Mean_Variance_Estimator___Sigmoid__X0)));
     if ((x < F16(-50.))) {
         return F16(1.);
-    } else if ((x > F16(50.))) {
+    }
+    else if ((x > F16(50.))) {
         return F16(0.);
-    } else {
+    }
+    else {
         return (fix16_div(F16(1.), (F16(1.) + fix16_exp(x))));
     }
 }
 
-static void GasIndexAlgorithm__mox_model__set_parameters(
-        GasIndexAlgorithmParams* params, fix16_t SRAW_STD, fix16_t SRAW_MEAN) {
+static void  GasIndexAlgorithm__mox_model__set_parameters(GasIndexAlgorithmParams *params, fix16_t SRAW_STD, fix16_t SRAW_MEAN) {
+
     params->m_Mox_Model__Sraw_Std = SRAW_STD;
     params->m_Mox_Model__Sraw_Mean = SRAW_MEAN;
 }
 
-static fix16_t GasIndexAlgorithm__mox_model__process(GasIndexAlgorithmParams* params, fix16_t sraw) {
+static fix16_t  GasIndexAlgorithm__mox_model__process(GasIndexAlgorithmParams *params, fix16_t sraw) {
+
     if ((params->mAlgorithm_Type == GasIndexAlgorithm_ALGORITHM_TYPE_NOX)) {
-        return (fix16_mul(
-                (fix16_div((sraw - params->m_Mox_Model__Sraw_Mean), F16(GasIndexAlgorithm_SRAW_STD_NOX))),
-                params->mIndex_Gain));
-    } else {
-        return (fix16_mul(
-                (fix16_div((sraw - params->m_Mox_Model__Sraw_Mean),
-                        (-(params->m_Mox_Model__Sraw_Std + F16(GasIndexAlgorithm_SRAW_STD_BONUS_VOC))))),
-                params->mIndex_Gain));
+        return (fix16_mul((fix16_div((sraw - params->m_Mox_Model__Sraw_Mean), F16(GasIndexAlgorithm_SRAW_STD_NOX))), params->mIndex_Gain));
+    }
+    else {
+        return (fix16_mul((fix16_div((sraw - params->m_Mox_Model__Sraw_Mean), (-(params->m_Mox_Model__Sraw_Std + F16(GasIndexAlgorithm_SRAW_STD_BONUS_VOC))))), params->mIndex_Gain));
     }
 }
 
-static void GasIndexAlgorithm__sigmoid_scaled__set_parameters(
-        GasIndexAlgorithmParams* params, fix16_t X0, fix16_t K, fix16_t offset_default) {
+static void  GasIndexAlgorithm__sigmoid_scaled__set_parameters(GasIndexAlgorithmParams *params, fix16_t X0, fix16_t K, fix16_t offset_default) {
+
     params->m_Sigmoid_Scaled__K = K;
     params->m_Sigmoid_Scaled__X0 = X0;
     params->m_Sigmoid_Scaled__Offset_Default = offset_default;
 }
 
-static fix16_t GasIndexAlgorithm__sigmoid_scaled__process(GasIndexAlgorithmParams* params, fix16_t sample) {
+static fix16_t  GasIndexAlgorithm__sigmoid_scaled__process(GasIndexAlgorithmParams *params, fix16_t sample) {
+
     fix16_t x;
     fix16_t shift;
 
     x = (fix16_mul(params->m_Sigmoid_Scaled__K, (sample - params->m_Sigmoid_Scaled__X0)));
     if ((x < F16(-50.))) {
         return F16(GasIndexAlgorithm_SIGMOID_L);
-    } else if ((x > F16(50.))) {
+    }
+    else if ((x > F16(50.))) {
         return F16(0.);
-    } else {
+    }
+    else {
         if ((sample >= F16(0.))) {
             if ((params->m_Sigmoid_Scaled__Offset_Default == F16(1.))) {
                 shift = (fix16_mul(F16((500. / 499.)), (F16(1.) - params->mIndex_Offset)));
-            } else {
-                shift = (fix16_div(
-                        (F16(GasIndexAlgorithm_SIGMOID_L) - (fix16_mul(F16(5.), params->mIndex_Offset))),
-                        F16(4.)));
             }
-            return ((fix16_div((F16(GasIndexAlgorithm_SIGMOID_L) + shift), (F16(1.) + fix16_exp(x)))) -
-                    shift);
-        } else {
-            return (fix16_mul((fix16_div(params->mIndex_Offset, params->m_Sigmoid_Scaled__Offset_Default)),
-                    (fix16_div(F16(GasIndexAlgorithm_SIGMOID_L), (F16(1.) + fix16_exp(x))))));
+            else {
+                shift = (fix16_div((F16(GasIndexAlgorithm_SIGMOID_L) - (fix16_mul(F16(5.), params->mIndex_Offset))), F16(4.)));
+            }
+            return ((fix16_div((F16(GasIndexAlgorithm_SIGMOID_L) + shift), (F16(1.) + fix16_exp(x)))) - shift);
+        }
+        else {
+            return (fix16_mul((fix16_div(params->mIndex_Offset, params->m_Sigmoid_Scaled__Offset_Default)), (fix16_div(F16(GasIndexAlgorithm_SIGMOID_L), (F16(1.) + fix16_exp(x))))));
         }
     }
 }
 
-static void GasIndexAlgorithm__adaptive_lowpass__set_parameters(GasIndexAlgorithmParams* params) {
-    params->m_Adaptive_Lowpass__A1 =
-            F16((GasIndexAlgorithm_SAMPLING_INTERVAL /
-                    (GasIndexAlgorithm_LP_TAU_FAST + GasIndexAlgorithm_SAMPLING_INTERVAL)));
-    params->m_Adaptive_Lowpass__A2 =
-            F16((GasIndexAlgorithm_SAMPLING_INTERVAL /
-                    (GasIndexAlgorithm_LP_TAU_SLOW + GasIndexAlgorithm_SAMPLING_INTERVAL)));
+static void  GasIndexAlgorithm__adaptive_lowpass__set_parameters(GasIndexAlgorithmParams *params) {
+
+    params->m_Adaptive_Lowpass__A1 = F16((GasIndexAlgorithm_SAMPLING_INTERVAL / (GasIndexAlgorithm_LP_TAU_FAST + GasIndexAlgorithm_SAMPLING_INTERVAL)));
+    params->m_Adaptive_Lowpass__A2 = F16((GasIndexAlgorithm_SAMPLING_INTERVAL / (GasIndexAlgorithm_LP_TAU_SLOW + GasIndexAlgorithm_SAMPLING_INTERVAL)));
     params->m_Adaptive_Lowpass___Initialized = false;
 }
 
-static fix16_t GasIndexAlgorithm__adaptive_lowpass__process(GasIndexAlgorithmParams* params, fix16_t sample) {
+static fix16_t  GasIndexAlgorithm__adaptive_lowpass__process(GasIndexAlgorithmParams *params, fix16_t sample) {
+
     fix16_t abs_delta;
     fix16_t F1;
     fix16_t tau_a;
@@ -690,23 +631,17 @@ static fix16_t GasIndexAlgorithm__adaptive_lowpass__process(GasIndexAlgorithmPar
         params->m_Adaptive_Lowpass___X3 = sample;
         params->m_Adaptive_Lowpass___Initialized = true;
     }
-    params->m_Adaptive_Lowpass___X1 =
-            ((fix16_mul((F16(1.) - params->m_Adaptive_Lowpass__A1), params->m_Adaptive_Lowpass___X1)) +
-                    (fix16_mul(params->m_Adaptive_Lowpass__A1, sample)));
-    params->m_Adaptive_Lowpass___X2 =
-            ((fix16_mul((F16(1.) - params->m_Adaptive_Lowpass__A2), params->m_Adaptive_Lowpass___X2)) +
-                    (fix16_mul(params->m_Adaptive_Lowpass__A2, sample)));
+    params->m_Adaptive_Lowpass___X1 = ((fix16_mul((F16(1.) - params->m_Adaptive_Lowpass__A1), params->m_Adaptive_Lowpass___X1)) + (fix16_mul(params->m_Adaptive_Lowpass__A1, sample)));
+    params->m_Adaptive_Lowpass___X2 = ((fix16_mul((F16(1.) - params->m_Adaptive_Lowpass__A2), params->m_Adaptive_Lowpass___X2)) + (fix16_mul(params->m_Adaptive_Lowpass__A2, sample)));
     abs_delta = (params->m_Adaptive_Lowpass___X1 - params->m_Adaptive_Lowpass___X2);
     if ((abs_delta < F16(0.))) {
         abs_delta = (-abs_delta);
     }
     F1 = fix16_exp((fix16_mul(F16(GasIndexAlgorithm_LP_ALPHA), abs_delta)));
-    tau_a = ((fix16_mul(F16((GasIndexAlgorithm_LP_TAU_SLOW - GasIndexAlgorithm_LP_TAU_FAST)), F1)) +
-             F16(GasIndexAlgorithm_LP_TAU_FAST));
-    a3 = (fix16_div(
-            F16(GasIndexAlgorithm_SAMPLING_INTERVAL), (F16(GasIndexAlgorithm_SAMPLING_INTERVAL) + tau_a)));
-    params->m_Adaptive_Lowpass___X3 =
-            ((fix16_mul((F16(1.) - a3), params->m_Adaptive_Lowpass___X3)) + (fix16_mul(a3, sample)));
+    tau_a = ((fix16_mul(F16((GasIndexAlgorithm_LP_TAU_SLOW - GasIndexAlgorithm_LP_TAU_FAST)), F1)) + F16(GasIndexAlgorithm_LP_TAU_FAST));
+    a3 = (fix16_div(F16(GasIndexAlgorithm_SAMPLING_INTERVAL), (F16(GasIndexAlgorithm_SAMPLING_INTERVAL) + tau_a)));
+    params->m_Adaptive_Lowpass___X3 = ((fix16_mul((F16(1.) - a3), params->m_Adaptive_Lowpass___X3)) + (fix16_mul(a3, sample)));
     return params->m_Adaptive_Lowpass___X3;
 }
+// clang-format on
 // NOLINTEND

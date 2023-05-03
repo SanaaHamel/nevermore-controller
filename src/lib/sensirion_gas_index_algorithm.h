@@ -1,3 +1,5 @@
+// NOLINTBEGIN
+// clang-format off
 /*
  * Copyright (c) 2022, Sensirion AG
  * All rights reserved.
@@ -44,7 +46,8 @@ extern "C" {
 
 typedef int32_t fix16_t;
 
-#define F16(x) ((fix16_t)(((x) >= 0) ? ((x)*65536.0 + 0.5) : ((x)*65536.0 - 0.5)))
+#define F16(x) \
+    ((fix16_t)(((x) >= 0) ? ((x)*65536.0 + 0.5) : ((x)*65536.0 - 0.5)))
 
 #ifndef __cplusplus
 
@@ -119,7 +122,8 @@ typedef int32_t fix16_t;
 #define GasIndexAlgorithm_TUNING_GAIN_FACTOR_MIN (1)
 #define GasIndexAlgorithm_TUNING_GAIN_FACTOR_MAX (1000)
 #define GasIndexAlgorithm_MEAN_VARIANCE_ESTIMATOR__GAMMA_SCALING (64.)
-#define GasIndexAlgorithm_MEAN_VARIANCE_ESTIMATOR__ADDITIONAL_GAMMA_MEAN_SCALING (8.)
+#define GasIndexAlgorithm_MEAN_VARIANCE_ESTIMATOR__ADDITIONAL_GAMMA_MEAN_SCALING \
+    (8.)
 #define GasIndexAlgorithm_MEAN_VARIANCE_ESTIMATOR__FIX16_MAX (32767.)
 
 /**
@@ -168,6 +172,7 @@ typedef struct {
     fix16_t m_Adaptive_Lowpass___X3;
 } GasIndexAlgorithmParams;
 
+
 /**
  * Initialize the gas index algorithm parameters for the specified algorithm
  * type and reset its internal states. Call this once at the beginning.
@@ -175,7 +180,7 @@ typedef struct {
  * @param algorithm_type    0 (GasIndexAlgorithm_ALGORITHM_TYPE_VOC) for VOC or
  *                          1 (GasIndexAlgorithm_ALGORITHM_TYPE_NOX) for NOx
  */
-void GasIndexAlgorithm_init(GasIndexAlgorithmParams* params, int32_t algorithm_type);
+void GasIndexAlgorithm_init(GasIndexAlgorithmParams *params, int32_t algorithm_type);
 
 /**
  * Reset the internal states of the gas index algorithm. Previously set tuning
@@ -195,7 +200,8 @@ void GasIndexAlgorithm_reset(GasIndexAlgorithmParams* params);
  * @param state0    State0 to be stored
  * @param state1    State1 to be stored
  */
-void GasIndexAlgorithm_get_states(const GasIndexAlgorithmParams* params, int32_t* state0, int32_t* state1);
+void GasIndexAlgorithm_get_states(const GasIndexAlgorithmParams* params,
+                                  int32_t* state0, int32_t* state1);
 
 /**
  * Set previously retrieved algorithm states to resume operation after a short
@@ -209,7 +215,8 @@ void GasIndexAlgorithm_get_states(const GasIndexAlgorithmParams* params, int32_t
  * @param state0    State0 to be restored
  * @param state1    State1 to be restored
  */
-void GasIndexAlgorithm_set_states(GasIndexAlgorithmParams* params, int32_t state0, int32_t state1);
+void GasIndexAlgorithm_set_states(GasIndexAlgorithmParams* params,
+                                  int32_t state0, int32_t state1);
 
 /**
  * Set parameters to customize the gas index algorithm. Call this once after
@@ -247,18 +254,22 @@ void GasIndexAlgorithm_set_states(GasIndexAlgorithmParams* params, int32_t state
  *                                    when calculating gas index. Range 1..1000,
  *                                    default 230
  */
-void GasIndexAlgorithm_set_tuning_parameters(GasIndexAlgorithmParams* params, int32_t index_offset,
-        int32_t learning_time_offset_hours, int32_t learning_time_gain_hours,
-        int32_t gating_max_duration_minutes, int32_t std_initial, int32_t gain_factor);
+void GasIndexAlgorithm_set_tuning_parameters(
+    GasIndexAlgorithmParams* params, int32_t index_offset,
+    int32_t learning_time_offset_hours, int32_t learning_time_gain_hours,
+    int32_t gating_max_duration_minutes, int32_t std_initial,
+    int32_t gain_factor);
 
 /**
  * Get current parameters to customize the gas index algorithm.
  * Refer to GasIndexAlgorithm_set_tuning_parameters() for description of the
  * parameters.
  */
-void GasIndexAlgorithm_get_tuning_parameters(const GasIndexAlgorithmParams* params, int32_t* index_offset,
-        int32_t* learning_time_offset_hours, int32_t* learning_time_gain_hours,
-        int32_t* gating_max_duration_minutes, int32_t* std_initial, int32_t* gain_factor);
+void GasIndexAlgorithm_get_tuning_parameters(
+    const GasIndexAlgorithmParams* params, int32_t* index_offset,
+    int32_t* learning_time_offset_hours, int32_t* learning_time_gain_hours,
+    int32_t* gating_max_duration_minutes, int32_t* std_initial,
+    int32_t* gain_factor);
 
 /**
  * Calculate the gas index value from the raw sensor value.
@@ -268,9 +279,13 @@ void GasIndexAlgorithm_get_tuning_parameters(const GasIndexAlgorithmParams* para
  * @param gas_index   Calculated gas index value from the raw sensor value. Zero
  *                    during initial blackout period and 1..500 afterwards
  */
-void GasIndexAlgorithm_process(GasIndexAlgorithmParams* params, int32_t sraw, int32_t* gas_index);
+void GasIndexAlgorithm_process(GasIndexAlgorithmParams* params, int32_t sraw,
+                               int32_t* gas_index);
 
 #ifdef __cplusplus
 }
 #endif
+
 #endif /* GASINDEXALGORITHM_H_ */
+// clang-format on
+// NOLINTEND
