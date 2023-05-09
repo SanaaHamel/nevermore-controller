@@ -1,4 +1,5 @@
 #include "htu2xd.hpp"
+#include "config.hpp"
 #include "sdk/ble_data_types.hpp"
 #include "sdk/i2c.hpp"
 #include "sdk/timer.hpp"
@@ -9,6 +10,10 @@
 #include <cstdio>
 #include <tuple>
 #include <utility>
+
+// HTU21D supports "up to 400 kbits/s"
+static_assert(
+        I2C_BAUD_RATE <= 400 * 1000, "`config.hpp`'s `I2C_BAUD_RATE` is too high for SGP40 (max 400 kbit/s)");
 
 namespace {
 

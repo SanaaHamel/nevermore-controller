@@ -4,9 +4,13 @@
 #include <array>
 #include <cstdint>
 
+using namespace std;
+
 static_assert(PIN_MAX == 30, "Told you not to alter this!");
 
-using namespace std;
+static_assert(
+        (I2C_BAUD_RATE == 100 * 1000) || (I2C_BAUD_RATE == 400 * 1000) || (I2C_BAUD_RATE == 1000 * 1000),
+        "`config.hpp`'s `I2C_BAUD_RATE` isn't a valid mode (100 kbit/s, 400 kbit/s, or 1000 kbit/s)");
 
 namespace {
 

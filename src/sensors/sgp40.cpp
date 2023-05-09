@@ -1,5 +1,6 @@
 #include "sgp40.hpp"
 #include "async_sensor.hpp"
+#include "config.hpp"
 #include "lib/sensirion_gas_index_algorithm.h"
 #include "sdk/ble_data_types.hpp"
 #include "sdk/i2c.hpp"
@@ -9,6 +10,10 @@
 #include "utility/packed_tuple.hpp"
 #include <cstdint>
 #include <utility>
+
+// SGP40 supports std-mode 100 kbits/s and fast mode 400 kbits/s
+static_assert(
+        I2C_BAUD_RATE <= 400 * 1000, "`config.hpp`'s `I2C_BAUD_RATE` is too high for SGP40 (max 400 kbit/s)");
 
 namespace {
 

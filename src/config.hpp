@@ -39,11 +39,9 @@ constexpr auto ADVERTISE_INTERVAL_MIN = 1000ms;
 constexpr auto ADVERTISE_INTERVAL_MAX = 1000ms;
 static_assert(ADVERTISE_INTERVAL_MIN <= ADVERTISE_INTERVAL_MAX);
 
-// SGP40 supports std-mode 100 kHz and fast mode 400 kHz
-// HTU21D supports "up to 400 kHz"
-constexpr uint32_t I2C_BAUD_RATE_HZ = 400 * 1000;
-static_assert(100 * 1000 <= I2C_BAUD_RATE_HZ, "I2C_BAUD_RATE_HZ minimum is 100 kHz");
-static_assert(I2C_BAUD_RATE_HZ <= 400 * 1000, "I2C_BAUD_RATE_HZ too high for some sensors");
+// Set to desired baud rate. Most sensors support 400 kbit/s.
+// Compile time error checks will trigger if set too high for included sensors.
+constexpr uint32_t I2C_BAUD_RATE = 400 * 1000;
 
 ////////////////////////////////////////////////////
 //         End of Configurable Settings.
