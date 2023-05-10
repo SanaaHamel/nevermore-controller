@@ -16,6 +16,7 @@
 #include "nevermore.h"
 #include "pico/cyw43_arch.h"
 #include "pico/stdio.h"
+#include "sdk/gap.hpp"
 #include "sensors.hpp"
 #include "utility/square_wave.hpp"
 #include <array>
@@ -43,11 +44,7 @@ void packet_handler(uint8_t packet_type, uint16_t channel, uint8_t* packet, uint
             printf("BTstack up and running on %s.\n", bd_addr_to_str(local_addr));
 
             // setup advertisements
-            bd_addr_t null_addr{};
-            // 0.625ms seems to be a standard constant for scaling advertising interval.
-            // Why? IDK. Haven't found the spot in the spec.
-            gap_advertisements_set_params(ADVERTISE_INTERVAL_MIN / 0.625ms, ADVERTISE_INTERVAL_MAX / 0.625ms,
-                    0, 0, null_addr, 0x07, 0x00);
+            gap_advertisements_set_params(ADVERTISE_INTERVAL_MIN, ADVERTISE_INTERVAL_MAX);
             gap_advertisements_set_data(
                     sizeof(g_advertise_data), reinterpret_cast<uint8_t*>(&g_advertise_data));
             gap_advertisements_enable(1);

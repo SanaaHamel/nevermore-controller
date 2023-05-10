@@ -37,7 +37,6 @@ static_assert(0.5s <= SENSOR_UPDATE_PERIOD,
 
 constexpr auto ADVERTISE_INTERVAL_MIN = 1000ms;
 constexpr auto ADVERTISE_INTERVAL_MAX = 1000ms;
-static_assert(ADVERTISE_INTERVAL_MIN <= ADVERTISE_INTERVAL_MAX);
 
 // Set to desired baud rate. Most sensors support 400 kbit/s.
 // Compile time error checks will trigger if set too high for included sensors.

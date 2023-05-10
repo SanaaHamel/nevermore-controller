@@ -1,4 +1,5 @@
 #include "config.hpp"
+#include "sdk/gap.hpp"
 #include "sdk/i2c.hpp"
 #include "sdk/pwm.hpp"
 #include <array>
@@ -7,6 +8,11 @@
 using namespace std;
 
 static_assert(PIN_MAX == 30, "Told you not to alter this!");
+
+static_assert(ADVERTISE_INTERVAL_MIN <= ADVERTISE_INTERVAL_MAX,
+        "`config.hpp`'s `ADVERTISE_INTERVAL_MIN` must be <= `ADVERTISE_INTERVAL_MAX`");
+static_assert(BT_ADVERTISEMENT_INTERVAL_MIN <= ADVERTISE_INTERVAL_MIN,
+        "`config.hpp`'s `ADVERTISE_INTERVAL_MIN` is set too low. Minimum is 100ms.");
 
 static_assert(
         (I2C_BAUD_RATE == 100 * 1000) || (I2C_BAUD_RATE == 400 * 1000) || (I2C_BAUD_RATE == 1000 * 1000),
