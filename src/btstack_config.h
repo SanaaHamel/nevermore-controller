@@ -11,10 +11,6 @@
 #define ENABLE_LOG_ERROR
 #define ENABLE_PRINTF_HEXDUMP
 
-// TODO: use extended advertising for broadcast
-//       for now this seems broken/not supported by chipset?
-// #define ENABLE_LE_EXTENDED_ADVERTISING
-
 // for the client
 #if RUNNING_AS_CLIENT
 #define ENABLE_LE_CENTRAL
