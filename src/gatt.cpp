@@ -15,6 +15,11 @@
 #include <cstdint>
 #include <cstdio>
 
+#if CMAKE_BLUETOOTH_LOW_LEVEL_DEBUG
+#include "hci_dump.h"
+#include "hci_dump_embedded_stdout.h"
+#endif
+
 using namespace std;
 
 AdvertiseData g_advertise_data;
@@ -95,6 +100,11 @@ btstack_timer_source_t g_led_blink{.process = [](auto* timer) {
 }  // namespace
 
 bool gatt_init(async_context_t& ctx_async) {
+#if CMAKE_BLUETOOTH_LOW_LEVEL_DEBUG
+    // must explicitly set, otherwise we get no error/info/debug msgs from btstack
+    hci_dump_init(hci_dump_embedded_stdout_get_instance());
+#endif
+
     l2cap_init();
     sm_init();  // FUTURE WORK: do we even need a security manager? can we ditch this?
 
