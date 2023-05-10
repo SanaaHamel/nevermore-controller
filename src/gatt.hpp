@@ -1,6 +1,7 @@
 
 #include "bluetooth_data_types.h"
 #include "gatt/environmental.hpp"
+#include "pico/async_context.h"
 #include <cstdint>
 #include <cstring>
 
@@ -32,3 +33,7 @@ extern AdvertiseData g_advertise_data;
 // Apparently HCI keeps reporting extended-advert as unsupported. (Maybe related to lack of BR/EDR?)
 static_assert(
         sizeof(AdvertiseData) <= 31, "DO NOT EXCEED 31 OCTETS! BTSTACK WILL SMASH THE STACK IF YOU DO.");
+
+// Setup bluetooth and GATT services.
+// Caller is responsible for subsequently calling `btstack_run_loop_execute`.
+bool gatt_init(async_context_t&);
