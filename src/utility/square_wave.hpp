@@ -1,4 +1,3 @@
-
 #pragma once
 
 // Generate a square wave of a given freq on some arbitrary pin.

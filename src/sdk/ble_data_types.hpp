@@ -1,4 +1,3 @@
-
 #pragma once
 
 #include <array>
@@ -194,25 +193,25 @@ struct [[gnu::packed]] Scalar {
 template <typename Unit, typename Raw, int32_t M, int32_t D, int32_t B>
 constexpr Scalar<Unit, Raw, M, D, B>::Scalar(struct NOT_KNOWN const&)
     requires has_not_known<Scalar>
-{
-    *this = NOT_KNOWN_VALUE<Scalar>::value;
-}
+    {
+        *this = NOT_KNOWN_VALUE<Scalar>::value;
+    }
 
 template <typename Unit, typename Raw, int32_t M, int32_t D, int32_t B>
 constexpr Scalar<Unit, Raw, M, D, B>::operator double() const {
-    if constexpr (has_not_known<Scalar>) {
-        if (*this == NOT_KNOWN) return std::numeric_limits<double>::signaling_NaN();
-    }
+        if constexpr (has_not_known<Scalar>) {
+            if (*this == NOT_KNOWN) return std::numeric_limits<double>::signaling_NaN();
+        }
 
-    return raw_value * scale;
-}
+        return raw_value * scale;
+    }
 
 template <typename Unit, typename Raw, int32_t M, int32_t D, int32_t B>
 constexpr double Scalar<Unit, Raw, M, D, B>::value_or(double x) const
     requires has_not_known<Scalar>
-{
-    return *this == NOT_KNOWN ? x : double(*this);
-}
+    {
+        return *this == NOT_KNOWN ? x : double(*this);
+    }
 
 template <typename Unit, typename Raw, int32_t M, int32_t D, int32_t B>
 constexpr auto operator<(Scalar<Unit, Raw, M, D, B> const& lhs, Scalar<Unit, Raw, M, D, B> const& rhs) {
@@ -305,7 +304,7 @@ struct [[gnu::packed]] EnvironmentalSensorMeasurementDesc {
 
     BLE_DECLARE_SCALAR_TYPE(Seconds, uint24_t, 1, 0, 0);
 
-    uint16_t flags = 0;  // reserved, must be zero
+    uint16_t flags = 0;           // reserved, must be zero
     Sampling sampling = Sampling::Unspecified;
     Seconds measure_period = 0;   // 0 -> unused/instant
     Seconds update_interval = 0;  // 0 -> not in use

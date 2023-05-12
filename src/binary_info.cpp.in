@@ -1,6 +1,5 @@
-#include "config.hpp"
 #include "pico/binary_info.h"  // IWYU pragma: keep
-#include "pico/binary_info/code.h"
+#include "config.hpp"
 #include "sdk/i2c.hpp"
 
 namespace {

@@ -1,4 +1,3 @@
-
 #pragma once
 
 #include "ble/att_server.h"
