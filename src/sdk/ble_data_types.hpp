@@ -178,27 +178,13 @@ struct [[gnu::packed]] Scalar {
     Raw raw_value{};
     constexpr Scalar() = default;
     constexpr Scalar(struct NOT_KNOWN const&)
-        requires has_not_known<Scalar>;
-    constexpr Scalar(double value) : raw_value(static_cast<Raw>(value / scale)) {}
-
-    constexpr explicit operator double() const;
-
-    [[nodiscard]] constexpr double value_or(double x) const
-        requires has_not_known<Scalar>;
-
-    // sadly, because we're not doing `<=> = default`, we don't get the free definitions for <, ==, etc..
-    constexpr bool operator==(Scalar const&) const = default;
-};
-
-template <typename Unit, typename Raw, int32_t M, int32_t D, int32_t B>
-constexpr Scalar<Unit, Raw, M, D, B>::Scalar(struct NOT_KNOWN const&)
-    requires has_not_known<Scalar>
+    // requires has_not_known<Scalar> /* require disable b/c of GCC 11+ bug */
     {
         *this = NOT_KNOWN_VALUE<Scalar>::value;
     }
+    constexpr Scalar(double value) : raw_value(static_cast<Raw>(value / scale)) {}
 
-template <typename Unit, typename Raw, int32_t M, int32_t D, int32_t B>
-constexpr Scalar<Unit, Raw, M, D, B>::operator double() const {
+    constexpr explicit operator double() const {
         if constexpr (has_not_known<Scalar>) {
             if (*this == NOT_KNOWN) return std::numeric_limits<double>::signaling_NaN();
         }
@@ -206,12 +192,15 @@ constexpr Scalar<Unit, Raw, M, D, B>::operator double() const {
         return raw_value * scale;
     }
 
-template <typename Unit, typename Raw, int32_t M, int32_t D, int32_t B>
-constexpr double Scalar<Unit, Raw, M, D, B>::value_or(double x) const
-    requires has_not_known<Scalar>
+    [[nodiscard]] constexpr double value_or(double x) const
+    // requires has_not_known<Scalar> /* require disable b/c of GCC 11+ bug */
     {
         return *this == NOT_KNOWN ? x : double(*this);
     }
+
+    // sadly, because we're not doing `<=> = default`, we don't get the free definitions for <, ==, etc..
+    constexpr bool operator==(Scalar const&) const = default;
+};
 
 template <typename Unit, typename Raw, int32_t M, int32_t D, int32_t B>
 constexpr auto operator<(Scalar<Unit, Raw, M, D, B> const& lhs, Scalar<Unit, Raw, M, D, B> const& rhs) {
