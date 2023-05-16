@@ -170,18 +170,26 @@ struct [[gnu::packed]] Scalar {
     static constexpr double scale = raw_to_repr_coeff(M, d, b);
 
     static constexpr Scalar from_raw(Raw raw) {
-        Scalar x;
+        Scalar x{0};  // zero init to avoid default ctor & constexpr lifetime ordering issue
         x.raw_value = raw;
         return x;
     }
 
-    Raw raw_value{};
-    constexpr Scalar() = default;
+    Raw raw_value;
+
+    constexpr Scalar() {
+        if constexpr (has_not_known<Scalar>)
+            raw_value = NOT_KNOWN_VALUE<Scalar>::value.raw_value;
+        else
+            raw_value = {};
+    }
+
     constexpr Scalar(struct NOT_KNOWN const&)
     // requires has_not_known<Scalar> /* require disable b/c of GCC 11+ bug */
     {
         *this = NOT_KNOWN_VALUE<Scalar>::value;
     }
+
     constexpr Scalar(double value) : raw_value(static_cast<Raw>(value / scale)) {}
 
     constexpr explicit operator double() const {
