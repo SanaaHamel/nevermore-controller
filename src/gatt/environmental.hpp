@@ -23,9 +23,9 @@ struct [[gnu::packed]] ServiceData {
     BLE::Temperature temperature_mcu;
     BLE::Humidity humidity_intake;
     BLE::Humidity humidity_exhaust;
-    // sadly there is no official way of reporting not-a-valid-value
-    BLE::Pressure pressure_intake = BLE::PRESSURE_1_ATMOSPHERE;
-    BLE::Pressure pressure_exhaust = BLE::PRESSURE_1_ATMOSPHERE;
+    // Officially there's no not-known constant for pressure. We define an unofficial one in BLE data types.
+    BLE::Pressure pressure_intake;
+    BLE::Pressure pressure_exhaust;
     VOCIndex voc_index_intake;
     VOCIndex voc_index_exhaust;
 };

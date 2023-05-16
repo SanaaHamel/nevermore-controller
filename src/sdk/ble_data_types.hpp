@@ -257,6 +257,10 @@ BLE_DECLARE_SCALAR_TYPE(Temperature, int16_t, 1, -2, 0);  // range [-273.15, 327
 BLE_DECLARE_NOT_KNOWN_VALUE_FROM_RAW(Count16, 0xFFFFu);
 BLE_DECLARE_NOT_KNOWN_VALUE_FROM_RAW(Humidity, 0xFFFFu);
 BLE_DECLARE_NOT_KNOWN_VALUE_FROM_RAW(Percentage8, 0xFFu);
+// NB:  Not standards compliant! Officially `Pressure` does not have a defined constant for `NOT_KNOWN`.
+//      However, that's a massive hassle and a clear oversight.
+//      Use `UINT32_MAX` for consistency with other unsigned types.
+BLE_DECLARE_NOT_KNOWN_VALUE_FROM_RAW(Pressure, 0xFFFF'FFFFu);
 BLE_DECLARE_NOT_KNOWN_VALUE_FROM_RAW(Temperature, 0x8000);
 
 constexpr Pressure PRESSURE_1_ATMOSPHERE{101.325 * 1000};  // 101.325 kPa
