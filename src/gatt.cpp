@@ -116,6 +116,8 @@ bool gatt_init(async_context_t& ctx_async) {
     // not interested in attribute events for now, we have no indicator/notify attributes
     // att_server_register_packet_handler(att_handler);
 
+    gap_set_max_number_peripheral_connections(MAX_NR_HCI_CONNECTIONS);
+
     // turn on bluetooth
     if (auto err = hci_power_control(HCI_POWER_ON)) {
         printf("hci_power_control failed = 0x%08x\n", err);
