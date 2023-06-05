@@ -5,7 +5,8 @@ include(cmake/pico_sdk_import.cmake)
 
 project(nevermore-controller C CXX ASM)
 
-option(BLUETOOTH_LOW_LEVEL_DEBUG "enable bluetooth low level debug logging (noisy)")
+option(BLUETOOTH_DEBUG "enable bluetooth debug logging (noisy)")
+option(BLUETOOTH_LOW_LEVEL_DEBUG "enable bluetooth low level debug logging (very noisy)")
 
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_CXX_STANDARD 20)
@@ -31,6 +32,10 @@ set(SRC_FILES ${SRC_H} ${SRC_C} ${SRC_HPP} ${SRC_CPP})
 # `psabi` is a useless warning for our purposes
 add_compile_options(-Wall -Wno-psabi)
 add_compile_definitions(PARAM_ASSERTIONS_ENABLE_ALL=1)
+
+if(BLUETOOTH_DEBUG)
+  add_compile_definitions(CMAKE_BLUETOOTH_DEBUG=1)
+endif()
 
 if(BLUETOOTH_LOW_LEVEL_DEBUG)
   add_compile_definitions(CMAKE_BLUETOOTH_LOW_LEVEL_DEBUG=1)

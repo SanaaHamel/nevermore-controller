@@ -8,11 +8,14 @@
 // BTstack features that can be enabled
 #define ENABLE_LE_PERIPHERAL
 #define ENABLE_PRINTF_HEXDUMP
+#define ENABLE_LOG_ERROR
+
+#if CMAKE_BLUETOOTH_DEBUG || CMAKE_BLUETOOTH_LOW_LEVEL_DEBUG
+#define ENABLE_LOG_INFO
+#endif
 
 #if CMAKE_BLUETOOTH_LOW_LEVEL_DEBUG
 #define ENABLE_LOG_DEBUG
-#define ENABLE_LOG_INFO
-#define ENABLE_LOG_ERROR
 #endif
 
 // for the client

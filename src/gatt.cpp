@@ -7,6 +7,8 @@
 #include "gatt/environmental.hpp"
 #include "gatt/fan.hpp"
 #include "gatt/neopixel.hpp"
+#include "hci_dump.h"
+#include "hci_dump_embedded_stdout.h"
 #include "l2cap.h"
 #include "nevermore.h"
 #include "pico/cyw43_arch.h"
@@ -14,11 +16,6 @@
 #include <array>
 #include <cstdint>
 #include <cstdio>
-
-#if CMAKE_BLUETOOTH_LOW_LEVEL_DEBUG
-#include "hci_dump.h"
-#include "hci_dump_embedded_stdout.h"
-#endif
 
 using namespace std;
 
@@ -100,9 +97,11 @@ btstack_timer_source_t g_led_blink{.process = [](auto* timer) {
 }  // namespace
 
 bool gatt_init(async_context_t& ctx_async) {
-#if CMAKE_BLUETOOTH_LOW_LEVEL_DEBUG
     // must explicitly set, otherwise we get no error/info/debug msgs from btstack
     hci_dump_init(hci_dump_embedded_stdout_get_instance());
+
+#ifndef ENABLE_LOG_DEBUG
+    hci_dump_enable_packet_log(false);  // don't spam out packet logs unless we're low level debugging
 #endif
 
     l2cap_init();
