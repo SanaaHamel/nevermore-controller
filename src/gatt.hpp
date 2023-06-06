@@ -1,3 +1,4 @@
+#pragma once
 
 #include "pico/async_context.h"
 
