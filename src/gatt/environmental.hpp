@@ -30,6 +30,8 @@ struct [[gnu::packed]] ServiceData {
     VOCIndex voc_index_exhaust;
 };
 
+extern ServiceData g_service_data;
+
 // returns none if not handled
 std::optional<uint16_t> attr_read(
         hci_con_handle_t, uint16_t att_handle, uint16_t offset, uint8_t* buffer, uint16_t buffer_size);

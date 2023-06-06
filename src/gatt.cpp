@@ -1,6 +1,7 @@
 #include "gatt.hpp"
 #include "ble/att_server.h"
 #include "ble/sm.h"
+#include "bluetooth_gatt.h"
 #include "boards/pico_w.h"
 #include "btstack_event.h"
 #include "config.hpp"
@@ -13,15 +14,27 @@
 #include "nevermore.h"
 #include "pico/cyw43_arch.h"
 #include "sdk/gap.hpp"
+#include "utility/bt_advert.hpp"
 #include <array>
 #include <cstdint>
 #include <cstdio>
+#include <tuple>
 
 using namespace std;
-
-AdvertiseData g_advertise_data;
+using namespace bt::advert;
 
 namespace {
+
+// coincidentally packed b/c all `bt::advert` funcs return only tuples of packed members
+constexpr std::tuple ADVERT{
+        flags({
+                Flag::LE_DISCOVERABLE,
+                Flag::EDR_NOT_SUPPORTED,
+        }),
+        shortened_local_name("Nevermore"),
+        services<ORG_BLUETOOTH_SERVICE_GENERIC_ACCESS, ORG_BLUETOOTH_SERVICE_GENERIC_ATTRIBUTE,
+                ORG_BLUETOOTH_SERVICE_ENVIRONMENTAL_SENSING>(),
+};
 
 void hci_handler(uint8_t packet_type, uint16_t channel, uint8_t* packet, uint16_t size) {
     UNUSED(size);
@@ -38,9 +51,9 @@ void hci_handler(uint8_t packet_type, uint16_t channel, uint8_t* packet, uint16_
             printf("BTstack up and running on %s.\n", bd_addr_to_str(local_addr));
 
             // setup advertisements
+            static_assert(sizeof(ADVERT) <= 31, "too large for non-extended advertisement");
             gap_advertisements_set_params(ADVERTISE_INTERVAL_MIN, ADVERTISE_INTERVAL_MAX);
-            gap_advertisements_set_data(
-                    sizeof(g_advertise_data), reinterpret_cast<uint8_t*>(&g_advertise_data));
+            gap_advertisements_set_data(sizeof(ADVERT), (uint8_t*)&ADVERT);  // NOLINT
             gap_advertisements_enable(1);
         } break;
     }

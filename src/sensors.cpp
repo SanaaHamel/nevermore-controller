@@ -31,7 +31,7 @@ struct McuTemperature final : SensorPeriodic {
     }
 
     void read() override {
-        g_advertise_data.environment_service_data.temperature_mcu = measure();
+        EnvironmentService::g_service_data.temperature_mcu = measure();
     }
 
 private:

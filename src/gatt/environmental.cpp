@@ -58,6 +58,8 @@ const BLE::ValidRange<EnvironmentService::VOCIndex> VALID_RANGE_VOC_INDEX{.min =
 
 }  // namespace
 
+EnvironmentService::ServiceData EnvironmentService::g_service_data;
+
 std::optional<uint16_t> EnvironmentService::attr_read(
         hci_con_handle_t, uint16_t att_handle, uint16_t offset, uint8_t* buffer, uint16_t buffer_size) {
     auto readBlob = [&](auto&& datum) -> uint16_t {
@@ -65,20 +67,10 @@ std::optional<uint16_t> EnvironmentService::attr_read(
                 std::forward<decltype(datum)>(datum), offset, buffer, buffer_size);
     };
 
-    auto const& sensors = g_advertise_data.environment_service_data;
+    auto const& sensors = EnvironmentService::g_service_data;
 
     switch (att_handle) {
         // NOLINTBEGIN(bugprone-branch-clone)
-        SERVER_CFG_ALWAYS_BROADCAST(BT(TEMPERATURE_01))
-        SERVER_CFG_ALWAYS_BROADCAST(BT(TEMPERATURE_02))
-        SERVER_CFG_ALWAYS_BROADCAST(BT(TEMPERATURE_03))
-        SERVER_CFG_ALWAYS_BROADCAST(BT(HUMIDITY_01))
-        SERVER_CFG_ALWAYS_BROADCAST(BT(HUMIDITY_02))
-        SERVER_CFG_ALWAYS_BROADCAST(BT(PRESSURE_01))
-        SERVER_CFG_ALWAYS_BROADCAST(BT(PRESSURE_02))
-        SERVER_CFG_ALWAYS_BROADCAST(VOC_INDEX_01)
-        SERVER_CFG_ALWAYS_BROADCAST(VOC_INDEX_02)
-
         USER_DESCRIBE(BT(TEMPERATURE_01), "Intake Temperature")
         USER_DESCRIBE(BT(TEMPERATURE_02), "Exhaust Temperature")
         USER_DESCRIBE(BT(TEMPERATURE_03), "MCU Temperature")

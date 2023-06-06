@@ -68,7 +68,7 @@ int main() {
     auto& ctx_async = *cyw43_arch_async_context();
 
     pins_setup();
-    if (!sensors_init(ctx_async, g_advertise_data.environment_service_data)) return -1;
+    if (!sensors_init(ctx_async, EnvironmentService::g_service_data)) return -1;
     if (!gatt_init(ctx_async)) return -1;
 
     btstack_run_loop_execute();  // !! NO-RETURN
