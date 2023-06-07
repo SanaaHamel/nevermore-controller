@@ -8,8 +8,11 @@
 #include <utility>
 
 #define VOC_INDEX_UUID 216aa791_97d0_46ac_8752_60bbc00611e1
+#define ENV_AGGREGATE_UUID 75134bec_dd06_49b1_bac2_c15e05fd7199
+
 #define VOC_INDEX_01 216aa791_97d0_46ac_8752_60bbc00611e1_01
 #define VOC_INDEX_02 216aa791_97d0_46ac_8752_60bbc00611e1_02
+#define ENV_AGGREGATE_01 75134bec_dd06_49b1_bac2_c15e05fd7199_01
 
 namespace {
 
@@ -79,6 +82,7 @@ std::optional<uint16_t> EnvironmentService::attr_read(
         USER_DESCRIBE(BT(PRESSURE_02), "Exhaust Pressure")
         USER_DESCRIBE(VOC_INDEX_01, "Intake VOC Index")
         USER_DESCRIBE(VOC_INDEX_02, "Exhaust VOC Index")
+        USER_DESCRIBE(ENV_AGGREGATE_01, "Aggregated Service Data")
 
         ESM_DESCRIBE(BT(TEMPERATURE_01), ESM_TEMPERATURE)
         ESM_DESCRIBE(BT(TEMPERATURE_02), ESM_TEMPERATURE)
@@ -103,6 +107,7 @@ std::optional<uint16_t> EnvironmentService::attr_read(
         READ_VALUE(BT(PRESSURE_02), sensors.pressure_exhaust)
         READ_VALUE(VOC_INDEX_01, sensors.voc_index_intake)
         READ_VALUE(VOC_INDEX_02, sensors.voc_index_exhaust)
+        READ_VALUE(ENV_AGGREGATE_01, sensors)
 
         default: return {};
     }
