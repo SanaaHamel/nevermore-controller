@@ -60,9 +60,9 @@ int main() {
     // Fix by casting to unsigned instead of changing format specifier, this keeps clangd happy
     // since `clangd`, incorrectly, thinks that `unsigned != long unsigned int` on this platform.
     static_assert(sizeof(I2C_BAUD_RATE) == sizeof(unsigned));
-    printf("I2C bus 0 running at %u hz (requested %u hz)\n", i2c_init(i2c0, I2C_BAUD_RATE),
+    printf("I2C bus 0 running at %u baud/s (requested %u baud/s)\n", i2c_init(i2c0, I2C_BAUD_RATE),
             unsigned(I2C_BAUD_RATE));
-    printf("I2C bus 1 running at %u hz (requested %u hz)\n", i2c_init(i2c1, I2C_BAUD_RATE),
+    printf("I2C bus 1 running at %u baud/s (requested %u baud/s)\n", i2c_init(i2c1, I2C_BAUD_RATE),
             unsigned(I2C_BAUD_RATE));
 
     auto& ctx_async = *cyw43_arch_async_context();
