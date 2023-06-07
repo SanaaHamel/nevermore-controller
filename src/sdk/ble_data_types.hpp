@@ -247,11 +247,11 @@ using internal::has_not_known;
 #define BLE_DECLARE_NOT_KNOWN_VALUE_FROM_RAW(type, raw) \
     BLE_DECLARE_NOT_KNOWN_VALUE(type, type::from_raw(raw));
 
-BLE_DECLARE_SCALAR_TYPE(Count16, uint16_t, 1, 0, 0);    // range [0, 65534]
-BLE_DECLARE_SCALAR_TYPE(Humidity, uint16_t, 1, -2, 0);  // range [0.00, 100.00] %
+BLE_DECLARE_SCALAR_TYPE(Count16, uint16_t, 1, 0, 0);      // range [0, 65534]
+BLE_DECLARE_SCALAR_TYPE(Humidity, uint16_t, 1, -2, 0);    // range [0.00, 100.00] %
+BLE_DECLARE_SCALAR_TYPE(Percentage8, uint8_t, 1, 0, -1);  // range [0, 100] %, 0.5 % increment
 // why is this so big? who the hell is measuring 424 atmospheres of pressure on cheap BLE sensors?!
 BLE_DECLARE_SCALAR_TYPE(Pressure, uint32_t, 1, -1, 0);    // range [0, 429496729.5] Pa
-BLE_DECLARE_SCALAR_TYPE(Percentage8, uint8_t, 1, 0, -1);  // range [0, 100] %, 0.5 % increment
 BLE_DECLARE_SCALAR_TYPE(Temperature, int16_t, 1, -2, 0);  // range [-273.15, 327.67] c
 
 BLE_DECLARE_NOT_KNOWN_VALUE_FROM_RAW(Count16, 0xFFFFu);
