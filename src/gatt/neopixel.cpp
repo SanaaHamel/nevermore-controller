@@ -1,5 +1,4 @@
 #include "neopixel.hpp"
-#include "gatt.hpp"
 #include "handler_helpers.hpp"
 #include "nevermore.h"
 #include "sdk/btstack.hpp"
