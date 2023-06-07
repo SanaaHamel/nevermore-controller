@@ -54,7 +54,7 @@ int main() {
         return -1;
     }
 
-    // GCC 10.3.1 bug: -Werror=format reports that `I2C_BAUD_RATE` is a `long unsigned int`.
+    // GCC 12.2.1 bug: -Werror=format reports that `I2C_BAUD_RATE` is a `long unsigned int`.
     // This is technically true on this platform, see static-assert below, but it is benign since
     // `unsigned == long unsigned int` is also true on this platform. Pedant.
     // Fix by casting to unsigned instead of changing format specifier, this keeps clangd happy
