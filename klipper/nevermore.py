@@ -7,7 +7,6 @@
 import asyncio
 import dataclasses
 import logging
-import re
 import threading
 import weakref
 from dataclasses import dataclass
@@ -18,6 +17,7 @@ from typing import (
     Callable,
     Coroutine,
     Dict,
+    MutableMapping,
     Optional,
     Tuple,
     TypeVar,
@@ -26,8 +26,9 @@ from typing import (
 )
 from uuid import UUID
 
-import bleak
+from bleak import BleakClient, BleakError
 from bleak.backends.service import BleakGATTCharacteristic, BleakGATTService
+from bleak.exc import BleakDeviceNotFoundError
 from configfile import ConfigWrapper
 from gcode import GCodeCommand, GCodeDispatch
 from klippy import Printer
@@ -78,6 +79,15 @@ class ControllerState:
     exhaust: SensorState = SensorState()
     fan_power: float = 0
     fan_tacho: float = 0
+
+
+class LogAdaptorPrefixed(logging.LoggerAdapter):
+    def __init__(self, logger: logging.Logger, prefix: str):
+        super().__init__(logger)
+        self.prefix = prefix
+
+    def process(self, msg: Any, kwargs: MutableMapping[str, Any]):
+        return f"{self.prefix}{msg}", kwargs
 
 
 UUID_SERVICE_GAP = UUID("00001801-0000-1000-8000-00805f9b34fb")
@@ -228,7 +238,9 @@ class NevermoreBackgroundWorker:
         self._connected = threading.Event()
         self._loop_exit = asyncio.Event()  # not thread safe, unlike `threading.Event`
         self._loop = asyncio.new_event_loop()
-        self._thread = Thread(target=self._bg_thread)
+        self._thread = Thread(target=self._worker)
+        # `_set_fan_power` can refer to a dead conn if the worker died for whatever reason.
+        # This isn't great, but it won't be considered fatal and must not interrupt a print.
         self._set_fan_power: Optional[
             Callable[[float], Coroutine[Any, Any, None]]
         ] = None
@@ -246,74 +258,121 @@ class NevermoreBackgroundWorker:
         if self._set_fan_power is not None:
             asyncio.run_coroutine_threadsafe(self._set_fan_power(percent), self._loop)
 
-    def _bg_thread(self) -> None:
+    def _worker(self) -> None:
+        nevermore = self._nevermore()
+        if nevermore is None:
+            return  # Already dead and we didn't need to do anything...
+
+        self._thread.name = nevermore.name
+        nevermore = None  # release reference otherwise call frame keeps it alive
+
+        worker_log = LogAdaptorPrefixed(
+            LOG.getChild(f"worker"), f"{self._thread.name} - "
+        )
+
+        async def go() -> None:
+            # Attempt (re)connection. Might have to do this multiple times if we lose connection.
+            while not self._worker_should_exit():
+                try:
+                    async with BleakClient(
+                        self._address, timeout=TIMEOUT_CONNECT
+                    ) as client:
+                        await self._worker_using(worker_log, client)
+                except TimeoutError:
+                    pass  # ignore, keep trying to (re)connect
+                except BleakDeviceNotFoundError:
+                    pass  # ignore, keep trying to (re)connect
+                finally:
+                    # Not rigorous, but at least try to clean up a dead connection.
+                    self._set_fan_power = None
+
         try:
             asyncio.set_event_loop(self._loop)
-            self._loop.run_until_complete(self._bg_thread_inner())
+            self._loop.run_until_complete(go())
         except asyncio.CancelledError:
             raise
         except:  # TODO: ignore cancellation & interrupt exception
-            LOG.exception("nevermore bg worker failed")
+            worker_log.exception("worker failed")
 
-    async def _bg_thread_inner(self) -> None:
-        async with bleak.BleakClient(self._address) as client:
-            services = {
-                service.uuid: service for service in await client.get_services()
-            }
+    async def _worker_using(
+        self, log: Union[logging.Logger, logging.LoggerAdapter], client: BleakClient
+    ):
+        log.info("connected to controller")
 
-            def require(id: UUID):
-                x = services.get(str(id))
-                if x is None:
-                    raise Exception(f"{client} doesn't have required service {id}")
-                return x
+        await client.get_services()  # fetch and cache services
 
-            def require_char(service: BleakGATTService, id: UUID):
-                x = service.get_characteristic(str(id))
-                if x is None:
-                    raise Exception(f"{service} has no characteristic {id}")
-                return x
+        def require(id: UUID):
+            x = client.services.get_service(id)
+            if x is None:
+                raise Exception(f"{client} doesn't have required service {id}")
+            return x
 
-            service_env = require(UUID_SERVICE_ENVIRONMENTAL_SENSING)
-            service_fan = require(UUID_SERVICE_FAN)
-            service_ws2812 = require(UUID_SERVICE_WS2812)
+        def require_char(service: BleakGATTService, id: UUID):
+            x = service.get_characteristic(id)
+            if x is None:
+                raise Exception(f"{service} has no characteristic {id}")
+            return x
 
-            env_aggregate = require_char(service_env, UUID_CHAR_ENV_DATA_AGGREGATE)
-            fan_power = require_char(service_fan, UUID_CHAR_FAN_POWER)
-            fan_tacho = require_char(service_fan, UUID_CHAR_FAN_TACHO)
-            ws2812_update = require_char(service_ws2812, UUID_CHAR_WS2812_UPDATE)
+        service_env = require(UUID_SERVICE_ENVIRONMENTAL_SENSING)
+        service_fan = require(UUID_SERVICE_FAN)
+        service_ws2812 = require(UUID_SERVICE_WS2812)
 
-            async def set_fan_power(percent: float):
-                percent = _clamp(percent, 0, 1) * 100
+        env_aggregate = require_char(service_env, UUID_CHAR_ENV_DATA_AGGREGATE)
+        fan_power = require_char(service_fan, UUID_CHAR_FAN_POWER)
+        fan_tacho = require_char(service_fan, UUID_CHAR_FAN_TACHO)
+        ws2812_update = require_char(service_ws2812, UUID_CHAR_WS2812_UPDATE)
+
+        async def set_fan_power(percent: float):
+            percent = _clamp(percent, 0, 1) * 100
+            try:
                 await client.write_gatt_char(
                     fan_power, int(percent * 2).to_bytes(1, "little")
                 )
+            except BleakError:
+                # consider non-fatal. don't to abort due to potentially transient error
+                log.exception(f"failed to set fan-power={percent}")
 
-            self._set_fan_power = set_fan_power
-            self._connected.set()
+        self._set_fan_power = set_fan_power
+        self._connected.set()
 
-            async def read(char: BleakGATTCharacteristic):
-                return BleAttrReader(await client.read_gatt_char(char))
+        async def read(char: BleakGATTCharacteristic):
+            return BleAttrReader(await client.read_gatt_char(char))
 
-            # FUTURE WORK: replace w/ GATT notify/indicate mechanism.
-            while not self._loop_exit.is_set():
+        # FUTURE WORK: replace polling w/ GATT notify/indicate mechanism.
+        while not self._worker_should_exit():
+            try:
                 (intake, exhaust) = _parse_env_agg(await read(env_aggregate))
                 # normalise to [0,1] range
                 fan_power_ = ((await read(fan_power)).percentage8() or 0) / 100
                 fan_tacho_ = (await read(fan_tacho)).tachometer()
+            except BleakError as e:
+                # special case: lost connection -> wait and attempt reconnect
+                if e.args[0] == "Not connected":
+                    log.info("connection lost. attempting reconnection...")
+                    return
 
-                nevermore = self._nevermore()
-                if nevermore is None:
-                    break  # nevermore instance got GC'd at some point. we're done.
+                log.exception(f"failed to read controller status")
+                (intake, exhaust) = (SensorState(), SensorState())
+                fan_power_ = 0
+                fan_tacho_ = 0
 
-                # HACK: Abuse GIL to keep this thread-safe
-                nevermore.state = ControllerState(
-                    intake=intake,
-                    exhaust=exhaust,
-                    fan_power=fan_power_,
-                    fan_tacho=fan_tacho_,
-                )
+            nevermore = self._nevermore()
+            if nevermore is None:
+                break  # nevermore instance got GC'd at some point. we're done.
 
-                await asyncio.sleep(1 / NEVERMORE_POLL_HZ)
+            # HACK: Abuse GIL to keep this thread-safe
+            nevermore.state = ControllerState(
+                intake=intake,
+                exhaust=exhaust,
+                fan_power=fan_power_,
+                fan_tacho=fan_tacho_,
+            )
+            nevermore = None  # release reference b/c python doesn't have nice scoping
+
+            await asyncio.sleep(1 / NEVERMORE_POLL_HZ)
+
+    def _worker_should_exit(self):
+        return self._loop_exit.is_set() or self._nevermore() is None
 
 
 class Nevermore:
