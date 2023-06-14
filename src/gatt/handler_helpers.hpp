@@ -45,6 +45,6 @@ private:
         if (buffer_size < offset) return false;
 
         auto const available = size_t(buffer_size) - offset;
-        return available <= n;
+        return n <= available;
     }
 };
