@@ -34,8 +34,8 @@ struct WriteConsumer {
     std::span<A const> span(size_t length) const {
         if (!has_available(sizeof(A) * length)) return {};
 
-        auto* const ptr = reinterpret_cast<A const*>(
-                buffer + offset);  // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+        auto* const ptr = reinterpret_cast<A const*>(buffer + offset);
         offset += sizeof(A) * length;
         return {ptr, ptr + length};
     }
