@@ -10,6 +10,16 @@
 #define WS2812_UPDATE_SPAN_UUID 5d91b6ce_7db1_4e06_b8cb_d75e7dd49aae
 #define WS2812_UPDATE_SPAN_01 5d91b6ce_7db1_4e06_b8cb_d75e7dd49aae_01
 
+namespace {
+
+// Must be packed b/c we're directly reading it via BLE GATTs.
+struct [[gnu::packed]] UpdateSpanHeader {
+    uint8_t offset;
+    uint8_t length;
+};
+
+}  // namespace
+
 std::optional<uint16_t> NeoPixelService::attr_read(
         hci_con_handle_t, uint16_t att_handle, uint16_t offset, uint8_t* buffer, uint16_t buffer_size) {
     auto readBlob = [&](auto&& datum) -> uint16_t {
@@ -31,15 +41,15 @@ std::optional<int> NeoPixelService::attr_write(
 
     switch (att_handle) {
         case HANDLE_ATTR(WS2812_UPDATE_SPAN_01, VALUE): {
-            ws2812::UpdateSpanHeader const* header = consume;
+            UpdateSpanHeader const* header = consume;
             if (!header) return ATT_ERROR_INVALID_ATTRIBUTE_VALUE_LENGTH;
             if (header->length == 0) return 0;  // report trivial success
 
-            auto const payload = consume.span<uint8_t>(header->data_length());
+            auto const payload = consume.span<uint8_t>(header->length);
             // empty && 0 < length -> bad payload
             if (payload.empty()) return ATT_ERROR_INVALID_ATTRIBUTE_VALUE_LENGTH;
 
-            ws2812::update_span(*header, payload);
+            ws2812_update(header->offset, payload);
             return 0;
         }
 

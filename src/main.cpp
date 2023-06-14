@@ -8,6 +8,7 @@
 #include "pico/stdio.h"
 #include "sensors.hpp"
 #include "utility/square_wave.hpp"
+#include "ws2812.hpp"
 #include <cstdint>
 #include <cstdio>
 
@@ -68,6 +69,7 @@ int main() {
     auto& ctx_async = *cyw43_arch_async_context();
 
     pins_setup();
+    ws2812_init(ctx_async);
     if (!sensors_init(ctx_async, EnvironmentService::g_service_data)) return -1;
     if (!gatt_init(ctx_async)) return -1;
 
