@@ -40,6 +40,12 @@ struct WriteConsumer {
         return {ptr, ptr + length};
     }
 
+    [[nodiscard]] uint16_t remaining() const {
+        if (buffer_size < offset) return 0;
+
+        return buffer_size - offset;
+    }
+
 private:
     [[nodiscard]] constexpr bool has_available(size_t n) const {
         // Always return false, even for 0 byte reads, if beyond end of buffer.

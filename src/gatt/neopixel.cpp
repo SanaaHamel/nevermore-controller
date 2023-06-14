@@ -43,12 +43,11 @@ std::optional<int> NeoPixelService::attr_write(
         case HANDLE_ATTR(WS2812_UPDATE_SPAN_01, VALUE): {
             UpdateSpanHeader const* header = consume;
             if (!header) return ATT_ERROR_INVALID_ATTRIBUTE_VALUE_LENGTH;
+            if (header->length != consume.remaining()) return ATT_ERROR_INVALID_ATTRIBUTE_VALUE_LENGTH;
             if (header->length == 0) return 0;  // report trivial success
 
             auto const payload = consume.span<uint8_t>(header->length);
-            // empty && 0 < length -> bad payload
-            if (payload.empty()) return ATT_ERROR_INVALID_ATTRIBUTE_VALUE_LENGTH;
-
+            assert(!payload.empty() && "should have been able to read the requested span");
             ws2812_update(header->offset, payload);
             return 0;
         }
