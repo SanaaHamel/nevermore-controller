@@ -42,6 +42,8 @@ struct WriteConsumer {
 
 private:
     [[nodiscard]] constexpr bool has_available(size_t n) const {
+        // Always return false, even for 0 byte reads, if beyond end of buffer.
+        // This prevents creating pointers beyond the last of an array + 1 (which is UB).
         if (buffer_size < offset) return false;
 
         auto const available = size_t(buffer_size) - offset;
