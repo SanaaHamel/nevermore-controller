@@ -16,12 +16,9 @@ from typing import (
     Any,
     Callable,
     Coroutine,
-    Dict,
     MutableMapping,
     Optional,
-    Tuple,
     TypeVar,
-    Union,
     overload,
 )
 from uuid import UUID
@@ -65,7 +62,7 @@ class SensorState:
     pressure: Optional[float] = None  # hPa
     voc_index: Optional[int] = None  # [1, 500]
 
-    def as_dict(self) -> Dict[str, float | int]:
+    def as_dict(self) -> dict[str, float | int]:
         return {
             f.name: getattr(self, f.name)
             for f in dataclasses.fields(self)
@@ -160,7 +157,7 @@ class BleAttrReader:
 
     def _signed(
         self, sz: int, M: int, d: int, e: int, *, not_known: Optional[int] = None
-    ) -> Union[float, Optional[float]]:
+    ) -> float | Optional[float]:
         return self._consume(True, sz, M, d, e, not_known)
 
     @overload
@@ -175,7 +172,7 @@ class BleAttrReader:
 
     def _unsigned(
         self, sz: int, M: int, d: int, e: int, *, not_known: Optional[int] = None
-    ) -> Union[float, Optional[float]]:
+    ) -> float | Optional[float]:
         return self._consume(False, sz, M, d, e, not_known)
 
     def _consume(
@@ -206,7 +203,7 @@ class BleAttrReader:
         return None if x is None else int(x)
 
 
-def _parse_env_agg(reader: BleAttrReader) -> Tuple[SensorState, SensorState]:
+def _parse_env_agg(reader: BleAttrReader) -> tuple[SensorState, SensorState]:
     t_in = reader.temperature()
     t_out = reader.temperature()
     t_mcu = reader.temperature()  # unused/ignored
@@ -295,7 +292,7 @@ class NevermoreBackgroundWorker:
             worker_log.exception("worker failed")
 
     async def _worker_using(
-        self, log: Union[logging.Logger, logging.LoggerAdapter], client: BleakClient
+        self, log: logging.Logger | logging.LoggerAdapter, client: BleakClient
     ):
         log.info("connected to controller")
 
@@ -443,7 +440,7 @@ class NevermoreFan:
 
         self.printer.register_event_handler("klippy:connect", self._handle_connect)
 
-    def get_status(self, eventtime: float) -> Dict[str, float]:
+    def get_status(self, eventtime: float) -> dict[str, float]:
         return {
             "speed": 0 if self.nevermore is None else self.nevermore.state.fan_power,
             "rpm": 0 if self.nevermore is None else self.nevermore.state.fan_tacho,
@@ -492,7 +489,7 @@ class NevermoreSensor:
         else:
             return self.nevermore.state.exhaust
 
-    def get_status(self, eventtime: float) -> Dict[str, float]:
+    def get_status(self, eventtime: float) -> dict[str, float]:
         # HACK: can only plot on mainsail/fluidd if we pretend the VOC Index is a temperature
         if self.plot_voc:
             return {"temperature": self.state.voc_index or 0}
