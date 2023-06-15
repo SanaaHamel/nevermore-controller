@@ -31,5 +31,13 @@
         "Hamel",
         "klipper",
         "NEOPIXEL"
-    ]
+    ],
+    "python.autoComplete.extraPaths": [
+        "~/klipper/klippy",
+        "~/projects/klipper/klippy"
+    ],
+    "python.analysis.extraPaths": [
+        "~/klipper/klippy",
+        "~/projects/klipper/klippy"
+    ],
 }
