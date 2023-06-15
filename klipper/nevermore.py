@@ -6,6 +6,7 @@
 
 import asyncio
 import dataclasses
+import datetime
 import logging
 import threading
 import weakref
@@ -84,7 +85,10 @@ class LogAdaptorPrefixed(logging.LoggerAdapter):
         self.prefix = prefix
 
     def process(self, msg: Any, kwargs: MutableMapping[str, Any]):
-        return f"{self.prefix}{msg}", kwargs
+        return (
+            f"[{datetime.datetime.now().strftime('%H:%M:%S:%f')}] {self.prefix}{msg}",
+            kwargs,
+        )
 
 
 UUID_SERVICE_GAP = UUID("00001801-0000-1000-8000-00805f9b34fb")
