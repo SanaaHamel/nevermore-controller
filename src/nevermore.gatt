@@ -4,6 +4,7 @@
 // 216aa791-97d0-46ac-8752-60bbc00611e1 VOC Indexed
 // 75134bec-dd06-49b1-bac2-c15e05fd7199 Env Data Aggregation
 // 03f61fe0-9fe7-4516-98e6-056de551687f Tachometer
+// 3886216a-d971-4c71-afc4-19f8fba8fb92 WS2812 Config
 // 5d91b6ce-7db1-4e06-b8cb-d75e7dd49aae WS2812 Update Span
 
 
@@ -87,5 +88,9 @@ CHARACTERISTIC_FORMAT, tachometer-rpm, 06, 0, 27A8, 1, 0000
 /////////////////////////////
 
 PRIMARY_SERVICE, f62918ab-33b7-4f47-9fba-8ce9de9fecbb
-CHARACTERISTIC, 5d91b6ce-7db1-4e06-b8cb-d75e7dd49aae, WRITE | DYNAMIC
+// total # of components (i.e. octets) in the pixel chain
+CHARACTERISTIC, 2AEA, READ | WRITE | DYNAMIC
+CHARACTERISTIC_USER_DESCRIPTION, READ | DYNAMIC
+// support write w/o response for speed (vastly faster than awaiting a response)
+CHARACTERISTIC, 5d91b6ce-7db1-4e06-b8cb-d75e7dd49aae, WRITE | WRITE_WITHOUT_RESPONSE | DYNAMIC
 CHARACTERISTIC_USER_DESCRIPTION, READ | DYNAMIC

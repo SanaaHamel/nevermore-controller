@@ -28,7 +28,8 @@ using namespace std::literals::chrono_literals;
 namespace {
 
 // Fixed sized simplifies memory & error handling.
-constexpr size_t N_PIXEL_DATA_MAX = 64 * sizeof(int);
+// Must be a multiple of 4 for DMA transfer purposes.
+constexpr size_t N_PIXEL_COMPONENTS_MAX = 64 * sizeof(int);
 
 // WS2812 protocol ends a string of pixel data with a 'long' period of 0v
 constexpr auto WS2812_TIME_RESET = 50us;
@@ -41,7 +42,7 @@ constexpr auto WS2812_SM = 0;
 
 auto const g_dma_channel = dma_claim_unused_channel(true);
 
-array<uint8_t, N_PIXEL_DATA_MAX> g_pixel_data;
+array<uint8_t, N_PIXEL_COMPONENTS_MAX> g_pixel_data;
 size_t g_pixel_data_size = 0;  // INVARIANT(pixel_size_active <= g_pixel_data.size())
 
 bool g_update_requested = false;
@@ -124,28 +125,25 @@ void ws2812_init(async_context_t& ctx_async) {
     ws2812_program_init(WS2812_PIO, WS2812_SM, offset, PIN_NEOPIXEL_DATA_IN, 1s / WS2812_TIME_PER_BIT);
 
     // Initialise to max by default.
-    // Upside: Clients can skip setup (useful if they're toy implementations)
+    // Upside: Clients can skip setup (useful if we lose power and reset)
     // Downside: We waste time writing to pixels that don't exist.
-    static_assert((N_PIXEL_DATA_MAX / 2) <= UINT8_MAX);
-    ws2812_setup(uint8_t(N_PIXEL_DATA_MAX / 2), 2);
+    ws2812_setup(N_PIXEL_COMPONENTS_MAX);
 
 #if DEBUG_WS2812_PATTERN
     g_dbg_animate.process(&g_dbg_animate);
 #endif
 }
 
-bool ws2812_setup(uint8_t num_pixels, uint8_t components_per_pixel) {
-    size_t length = num_pixels * components_per_pixel;
-    if (N_PIXEL_DATA_MAX < length) {
-        printf("ERR - ws2812_setup - n_px=%d * n_per_px=%d exceeds compile-time specified max size\n",
-                num_pixels, components_per_pixel);
+bool ws2812_setup(size_t num_components_total) {
+    if (g_pixel_data.size() < num_components_total) {
+        printf("ERR - ws2812_setup - n=%u exceeds compile-time specified max size\n", num_components_total);
         return false;  // not enough space in fixed buffer for this setup
     }
 
     // FUTURE WORK: can tighten timing. only need to wait for DMA to finish, not for full update (DMA + delay)
     sem_acquire_blocking(&g_update_in_progress);  // block until all transfers are done
     {
-        g_pixel_data_size = length;
+        g_pixel_data_size = num_components_total;
         g_pixel_data = {};  // reset to zero for consistency
 
         auto c = dma_channel_get_default_config(g_dma_channel);
@@ -153,11 +151,12 @@ bool ws2812_setup(uint8_t num_pixels, uint8_t components_per_pixel) {
         channel_config_set_transfer_data_size(&c, DMA_SIZE_32);
         channel_config_set_bswap(&c, true);
         static_assert(CHAR_BIT == 8 && sizeof(int) == 4);
-        static_assert(N_PIXEL_DATA_MAX % 4 == 0, "`N_MAX_BYTES` must be a multiple of `sizeof(int)` for DMA");
+        static_assert(
+                N_PIXEL_COMPONENTS_MAX % 4 == 0, "`N_MAX_BYTES` must be a multiple of `sizeof(int)` for DMA");
         // This'll write up to 3 extra components (/w value 0) to the end of the sequence.
         // This is benign, and the extra data should be ignored/forwarded by the pixel chain.
-        dma_channel_configure(
-                g_dma_channel, &c, &WS2812_PIO->txf[WS2812_SM], nullptr, (length + 3) / 4, false);
+        dma_channel_configure(g_dma_channel, &c, &WS2812_PIO->txf[WS2812_SM], nullptr,
+                (num_components_total + 3) / 4, false);
     }
     sem_release(&g_update_in_progress);
 

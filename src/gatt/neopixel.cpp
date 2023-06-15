@@ -1,6 +1,7 @@
 #include "neopixel.hpp"
 #include "handler_helpers.hpp"
 #include "nevermore.h"
+#include "sdk/ble_data_types.hpp"
 #include "sdk/btstack.hpp"
 #include "ws2812.hpp"
 #include <cstdint>
@@ -8,15 +9,18 @@
 #include <utility>
 
 #define WS2812_UPDATE_SPAN_UUID 5d91b6ce_7db1_4e06_b8cb_d75e7dd49aae
+
 #define WS2812_UPDATE_SPAN_01 5d91b6ce_7db1_4e06_b8cb_d75e7dd49aae_01
+#define WS2812_TOTAL_COMPONENTS_01 2AEA_01
 
 namespace {
 
-// Must be packed b/c we're directly reading it via BLE GATTs.
 struct [[gnu::packed]] UpdateSpanHeader {
     uint8_t offset;
     uint8_t length;
 };
+
+BLE::Count16 g_num_components = 0;
 
 }  // namespace
 
@@ -28,7 +32,10 @@ std::optional<uint16_t> NeoPixelService::attr_read(
     };
 
     switch (att_handle) {
-        USER_DESCRIBE(WS2812_UPDATE_SPAN_01, "Updates a span of the WS2812 (aka NeoPixel) chain.")
+        USER_DESCRIBE(WS2812_TOTAL_COMPONENTS_01, "Total # of components (i.e. octets) in the WS2812 chain.")
+        USER_DESCRIBE(WS2812_UPDATE_SPAN_01, "Update a span of the WS2812 chain.")
+
+        READ_VALUE(WS2812_TOTAL_COMPONENTS_01, g_num_components)
 
         default: return {};
     }
@@ -40,6 +47,17 @@ std::optional<int> NeoPixelService::attr_write(
     WriteConsumer consume{offset, buffer, buffer_size};
 
     switch (att_handle) {
+        case HANDLE_ATTR(WS2812_TOTAL_COMPONENTS_01, VALUE): {
+            BLE::Count16 const* count = consume;
+            if (!count) return ATT_ERROR_INVALID_ATTRIBUTE_VALUE_LENGTH;
+            if (*count == BLE::NOT_KNOWN) return ATT_ERROR_VALUE_NOT_ALLOWED;
+            if (g_num_components == *count) return 0;  // same config-> no-op
+            if (!ws2812_setup(size_t(double(*count)))) return ATT_ERROR_VALUE_NOT_ALLOWED;
+
+            g_num_components = *count;
+            return 0;
+        }
+
         case HANDLE_ATTR(WS2812_UPDATE_SPAN_01, VALUE): {
             UpdateSpanHeader const* header = consume;
             if (!header) return ATT_ERROR_INVALID_ATTRIBUTE_VALUE_LENGTH;
