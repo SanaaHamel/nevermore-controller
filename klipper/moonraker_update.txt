@@ -1,0 +1,5 @@
+[update_manager nevermore]
+type: git_repo
+path: ~/nevermore-controller
+origin: https://github.com/sanaahamel/nevermore-controller.git
+is_system_service: False
