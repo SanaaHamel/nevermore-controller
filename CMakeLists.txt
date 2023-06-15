@@ -1,7 +1,21 @@
 cmake_minimum_required(VERSION 3.13)
 
+include(FetchContent)
 include(cmake/GetGitRevisionDescription.cmake)
 include(cmake/pico_sdk_import.cmake)
+
+FetchContent_Declare(lvgl
+  GIT_REPOSITORY git@github.com:lvgl/lvgl.git
+  GIT_TAG release/v8.3
+  GIT_SHALLOW ON
+)
+FetchContent_Declare(lv_drivers
+  GIT_REPOSITORY https://github.com/lvgl/lv_drivers
+  GIT_TAG release/v8.3
+  GIT_SHALLOW ON
+)
+
+FetchContent_MakeAvailable(lvgl lv_drivers)
 
 project(nevermore-controller C CXX ASM)
 
@@ -17,6 +31,19 @@ set(PICO_BOARD pico_w)
 pico_sdk_init()
 
 set(SRC_DIR ${CMAKE_SOURCE_DIR}/src)
+set(SRC_CONFIG_DIR ${SRC_DIR}/config) # HACK: libs often include a config header (e.g. lvgl, btstack, etc)
+
+# modify lvgl to add config header path & sdk dependencies
+target_include_directories(lvgl PRIVATE ${SRC_CONFIG_DIR})
+target_include_directories(lv_drivers PRIVATE ${SRC_CONFIG_DIR})
+target_link_libraries(lvgl pico_time) # add `pico_time` dependency so lvgl can get a millisecond tick
+
+# HACK: Also modify `lvgl_demos` & `lvgl_examples` for config include to suppress warnings/errors.
+# TODO: Find a way to completely exclude `lvgl_demos` & `lvgl_examples` from being built.
+# Even if they're not linked it's annoying.
+target_include_directories(lvgl_demos PRIVATE ${SRC_CONFIG_DIR})
+target_include_directories(lvgl_examples PRIVATE ${SRC_CONFIG_DIR})
+
 file(GLOB_RECURSE SRC_H ${SRC_DIR}/*.h)
 file(GLOB_RECURSE SRC_C ${SRC_DIR}/*.c)
 file(GLOB_RECURSE SRC_HPP ${SRC_DIR}/*.hpp)
@@ -47,9 +74,13 @@ add_executable(nevermore-controller
 
 target_include_directories(nevermore-controller PRIVATE
   ${SRC_DIR}
+  ${SRC_CONFIG_DIR}
 )
 
 target_link_libraries(nevermore-controller
+  PRIVATE
+  lvgl::lvgl
+  lvgl::drivers
   pico_stdlib
   pico_cyw43_arch_none
   pico_btstack_ble
@@ -58,6 +89,7 @@ target_link_libraries(nevermore-controller
   hardware_i2c
   hardware_pio
   hardware_pwm
+  hardware_spi
 )
 
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")

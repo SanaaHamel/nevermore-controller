@@ -6,7 +6,9 @@
 #include "hardware/i2c.h"
 #include "pico/cyw43_arch.h"
 #include "pico/stdio.h"
+#include "sdk/spi.hpp"
 #include "sensors.hpp"
+#include "ui.hpp"
 #include "utility/square_wave.hpp"
 #include "ws2812.hpp"
 #include <cstdint>
@@ -34,6 +36,14 @@ void pins_setup() {
 
     // we're setting up the WS2812 controller on PIO0
     gpio_set_function(PIN_NEOPIXEL_DATA_IN, GPIO_FUNC_PIO0);
+
+    for (auto pin : PINS_DISPLAY_SPI)
+        gpio_set_function(pin, GPIO_FUNC_SPI);
+
+    gpio_set_function(PINS_DISPLAY_CMD, GPIO_FUNC_SIO);
+    gpio_set_function(PINS_DISPLAY_RST, GPIO_FUNC_SIO);
+    gpio_set_dir(PINS_DISPLAY_CMD, true);
+    gpio_set_dir(PINS_DISPLAY_RST, true);
 
 #ifndef NDEBUG
     if (PIN_DBG_SQUARE_WAVE) {
@@ -66,10 +76,15 @@ int main() {
     printf("I2C bus 1 running at %u baud/s (requested %u baud/s)\n", i2c_init(i2c1, I2C_BAUD_RATE),
             unsigned(I2C_BAUD_RATE));
 
+    auto* spi = spi_gpio_bus(PINS_DISPLAY_SPI[0]);
+    printf("SPI bus %d running at %u baud/s (requested %u baud/s)\n", spi_gpio_bus_num(PINS_DISPLAY_SPI[0]),
+            spi_init(spi, SPI_BAUD_RATE_DISPLAY), unsigned(SPI_BAUD_RATE_DISPLAY));
+
     auto& ctx_async = *cyw43_arch_async_context();
 
     pins_setup();
     ws2812_init(ctx_async);
+    if (!ui_init_on_second_cpu(*spi)) return -1;
     if (!sensors_init(ctx_async, EnvironmentService::g_service_data)) return -1;
     if (!gatt_init(ctx_async)) return -1;
 

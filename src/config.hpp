@@ -24,6 +24,13 @@ constexpr GPIO_Pin PINS_I2C[] = {
         18, 19,  // I2C 1
 };
 
+// must all be on the same SPI, only need clock & TX
+constexpr GPIO_Pin PINS_DISPLAY_SPI[] = {6, 7};
+// cmd & rst can be any GPIO
+constexpr GPIO_Pin PINS_DISPLAY_CMD = 8;
+constexpr GPIO_Pin PINS_DISPLAY_RST = 9;
+// TODO: Option to control display brightness via pin? For now we just assume user shorts LED to 3.3v.
+
 ////////////////////////////
 // Other configurable stuff.
 ////////////////////////////
@@ -41,6 +48,9 @@ constexpr auto ADVERTISE_INTERVAL_MAX = 1000ms;
 // Set to desired baud rate. Most sensors support 400 kbit/s.
 // Compile time error checks will trigger if set too high for included sensors.
 constexpr uint32_t I2C_BAUD_RATE = 400 * 1000;
+// TODO:  Find what's the actual max baud rate for a GC9A01.
+//        So far I've ran all the way to max (125M).
+constexpr uint32_t SPI_BAUD_RATE_DISPLAY = 125'000'000 / 2;
 
 ////////////////////////////////////////////////////
 //         End of Configurable Settings.
@@ -54,6 +64,9 @@ constexpr bool pins_forall(F&& go) {
     if (!std::all_of(std::begin(PINS_I2C), std::end(PINS_I2C), go)) return false;
     if (!(go(PIN_FAN_PWM) && go(PIN_FAN_TACHOMETER))) return false;
     if (!go(PIN_NEOPIXEL_DATA_IN)) return false;
+    if (!std::all_of(std::begin(PINS_DISPLAY_SPI), std::end(PINS_DISPLAY_SPI), go)) return false;
+    if (!go(PINS_DISPLAY_CMD)) return false;
+    if (!go(PINS_DISPLAY_RST)) return false;
 
     return true;
 }

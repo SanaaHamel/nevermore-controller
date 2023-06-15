@@ -2,8 +2,13 @@
 #include "sdk/gap.hpp"
 #include "sdk/i2c.hpp"
 #include "sdk/pwm.hpp"
+#include "sdk/spi.hpp"
 #include <array>
+#include <bitset>
 #include <cstdint>
+#include <initializer_list>
+#include <iterator>
+#include <ranges>
 
 using namespace std;
 
@@ -55,6 +60,17 @@ constexpr uint8_t i2c_bus_pins_defined(uint8_t bus) {
     return defined;
 }
 
+constexpr uint8_t spi_has_at_least(std::span<GPIO_Pin const> pins, std::initializer_list<SPI_Pin> required) {
+    auto mask = [](SPI_Pin kind) { return 1 << uint8_t(kind); };
+    uint8_t missing = 0;
+    for (auto kind : required)
+        missing |= mask(kind);
+    for (auto pin : pins)
+        missing &= ~mask(spi_gpio_kind(pin));
+
+    return missing == 0;
+}
+
 static_assert(all_pins_valid(), "`config.hpp` uses a GPIO pin outside of range [0, 29].");
 static_assert(all_pins_unique(), "`config.hpp` uses duplicate pins. A pin can be used at most once.");
 static_assert(!pin_exists(contains(PINS_RESERVED_PICO_W)),
@@ -76,4 +92,12 @@ static_assert(pwm_gpio_to_channel_(PIN_FAN_TACHOMETER) == PWM_CHAN_B,
         "`config.hpp` specifies `PIN_FAN_TACHOMETER` on a A channel pin instead of a B channel pin . "
         "Move `PIN_FAN_TACHOMETER` to an odd # pin to fix this.");
 
+static_assert(
+        size(PINS_DISPLAY_SPI) == 2, "`config.hpp` doesn't specify exactly two pins for `PINS_DISPLAY_SPI`");
+static_assert(
+        ranges::all_of(PINS_DISPLAY_SPI,
+                [](auto pin) { return spi_gpio_bus_num(PINS_DISPLAY_SPI[0]) == spi_gpio_bus_num(pin); }),
+        "`config.hpp`'s `PINS_DISPLAY_SPI` aren't all on the same bus");
+static_assert(spi_has_at_least(PINS_DISPLAY_SPI, {SPI_Pin::CLOCK, SPI_Pin::SEND}),
+        "`config.hpp`'s `PINS_DISPLAY_SPI` doesn't specify at a clock and send pin");
 }  // namespace
