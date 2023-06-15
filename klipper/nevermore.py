@@ -335,7 +335,6 @@ class UNSAFE_LazyAsyncioEvent(asyncio.Event):
         self._set_in_ready_queue = False
 
     def set_threadsafe(self, loop: asyncio.AbstractEventLoop):
-        # abuse GIL
         if self._set_in_ready_queue:
             return
         self._set_in_ready_queue = True
@@ -422,7 +421,7 @@ class NevermoreBackgroundWorker:
             asyncio.set_event_loop(self._loop)
             self._loop.run_until_complete(go())
         except asyncio.CancelledError:
-            worker_log.exception("worker canceled")
+            worker_log.info("disconnecting")
             raise
         except:  # TODO: ignore cancellation & interrupt exception
             worker_log.exception("worker failed")
