@@ -323,6 +323,7 @@ class CmdWs2812MarkDirty(PseudoCommand):
 # An `asyncio.Event` that avoid spamming the `ready` queue of a loop.
 # Naively using `call_soon_threadsafe` creates an entry per call even if we're already set.
 # This is almost certainly subtly broken, but works for our limited use case.
+# Abuses the GIL for concurrent field access control (`_set_in_ready_queue`).
 class UNSAFE_LazyAsyncioEvent(asyncio.Event):
     def __init__(self):
         super().__init__()
