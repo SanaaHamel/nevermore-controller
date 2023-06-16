@@ -8,6 +8,17 @@
 #include <span>
 #include <utility>
 
+#define DEBUG_NEOPIXEL_UPDATE_RATE_LOG 0
+#if DEBUG_NEOPIXEL_UPDATE_RATE_LOG
+#include <chrono>
+#include <cstdio>
+#include <deque>
+#include <limits>
+#include <ratio>
+
+using namespace std::literals::chrono_literals;
+#endif
+
 using namespace std;
 
 #define WS2812_UPDATE_SPAN_UUID 5d91b6ce_7db1_4e06_b8cb_d75e7dd49aae
@@ -22,7 +33,29 @@ struct [[gnu::packed]] UpdateSpanHeader {
     uint8_t length;
 };
 
-BLE::Count16 g_num_components = 0;
+void DBG_update_rate_log() {
+#if DEBUG_NEOPIXEL_UPDATE_RATE_LOG
+    constexpr auto DBG_UPDATE_RATE_LOG_DELAY = 1s;
+    constexpr size_t DBG_N_UPDATE_TIME_ENTRIES = 100;
+    static_assert(0 < DBG_N_UPDATE_TIME_ENTRIES);  // sancheck. logic below depends on this.
+
+    static deque<chrono::system_clock::time_point> g_timestamps;
+    static chrono::system_clock::time_point g_prev_log;
+
+    if (g_timestamps.size() == DBG_N_UPDATE_TIME_ENTRIES) {
+        g_timestamps.pop_front();
+    }
+    g_timestamps.push_back(chrono::system_clock::now());
+
+    if (g_timestamps.size() < 2) return;                                       // not enough data
+    if (g_timestamps.back() < g_prev_log + DBG_UPDATE_RATE_LOG_DELAY) return;  // too soon
+    g_prev_log = g_timestamps.back();
+
+    chrono::duration<double, milli> dur = g_timestamps.back() - g_timestamps.front();
+    auto mean = dur / (g_timestamps.size() - 1);
+    printf("DBG - NeoPixel Update Rate - Mean FPS: %f\n", 1s / mean);
+#endif
+}
 
 }  // namespace
 
@@ -62,6 +95,8 @@ optional<int> NeoPixelService::attr_write(
         }
 
         case HANDLE_ATTR(WS2812_UPDATE_SPAN_01, VALUE): {
+            DBG_update_rate_log();
+
             UpdateSpanHeader const* header = consume;
             if (!header) return ATT_ERROR_INVALID_ATTRIBUTE_VALUE_LENGTH;
             if (header->length != consume.remaining()) return ATT_ERROR_INVALID_ATTRIBUTE_VALUE_LENGTH;

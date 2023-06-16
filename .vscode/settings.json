@@ -30,7 +30,8 @@
         "GPIO",
         "Hamel",
         "klipper",
-        "NEOPIXEL"
+        "NEOPIXEL",
+        "sancheck"
     ],
     "python.autoComplete.extraPaths": [
         "~/klipper/klippy",
