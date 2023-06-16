@@ -236,9 +236,14 @@ class LedUpdateSpan:
     num_dirty: int = 1
 
     def worth_extending_to(self, i: int):
-        MAX_LENGTH = 256  # can't send more than 256 octets
-        MIN_LENGTH = 32  # send at least a fair sized chunk due to comm overhead
-        MIN_DENSITY = 0.75
+        # Theoretically we should be able to do 512 (ATT maximum).
+        # Can't send more than 253 octets at once (tested).
+        # FUTURE WORK: Investigate. For now it's more than enough for our use case.
+        TX_MAX = 253
+        HEADER_SZ = 2  # 2 octets: 1 offset, 1 length
+        MAX_LENGTH = TX_MAX - HEADER_SZ
+        MIN_LENGTH = 20 - HEADER_SZ  # picked ad-hoc, amortise comm overhead
+        MIN_DENSITY = 0.5  # picked ad-hoc
 
         if i < self.end:
             return False  # already contains or can't extend `begin`
