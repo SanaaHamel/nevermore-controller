@@ -134,7 +134,13 @@ void ws2812_init(async_context_t& ctx_async) {
 #endif
 }
 
+size_t ws2812_components_total() {
+    return g_pixel_data_size;
+}
+
 bool ws2812_setup(size_t num_components_total) {
+    if (g_pixel_data_size == num_components_total) return true;  // no-op
+
     if (g_pixel_data.size() < num_components_total) {
         printf("ERR - ws2812_setup - n=%u exceeds compile-time specified max size\n", num_components_total);
         return false;  // not enough space in fixed buffer for this setup
