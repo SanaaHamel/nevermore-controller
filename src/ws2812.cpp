@@ -172,8 +172,8 @@ bool ws2812_setup(size_t num_components_total) {
 bool ws2812_update(size_t offset, std::span<uint8_t const> pixel_data) {
     size_t write_end;
     if (__builtin_add_overflow(offset, pixel_data.size(), &write_end) || g_pixel_data_size < write_end) {
-        printf("ERR - ws2812_update - offset=%u len=%u is not within declared bounds\n", offset,
-                pixel_data.size());
+        printf("ERR - ws2812_update - offset=%u len=%u is not within declared bounds max=%u\n", offset,
+                pixel_data.size(), g_pixel_data_size);
         return false;  // out of bounds
     }
 
