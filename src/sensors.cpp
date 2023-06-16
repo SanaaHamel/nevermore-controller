@@ -1,5 +1,4 @@
 #include "sensors.hpp"
-#include "gatt.hpp"
 #include "hardware/adc.h"
 #include "hardware/i2c.h"
 #include "sdk/ble_data_types.hpp"
