@@ -7,15 +7,94 @@ https://github.com/nevermore3d/StealthMax[StealthMax] filters.
 This controller is BlueTooth LE enabled, minimising required wiring and allowing multiple clients
 to interact with the controller.
 
+*BUILD REQUIRES PATCH FOR PICO SDK BUG - See below.*
+
 Features
 --------
 
-* [ ] Klipper Compatibility Module
-* [x] BLE - Advertisement of environmental sensors state
+* [x] Klipper Module
+* [x] BLE - Multiple Connections Supported
 * [x] Fan - Tachometer
 * [ ] Fan - PWM Control - Automatic
 * [x] Fan - PWM Control - Override (via BLE)
-* [ ] Sensor - BME280 (Temperature, Humidity, Pressure)
+* [x] Sensor - BME280 (Temperature, Humidity, Pressure)
 * [x] Sensor - HTU2xD (Temperature, Humidity)
 * [x] Sensor - SGP40 (Volatile Organic Compound Index)
-* [ ] WS2812 support
+* [x] WS2812 support
+* [ ] Display - GC9A01
+
+Klipper - Example Configuration
+-------------------------------
+
+```ini
+[nevermore]
+# example - `bt_address: 43:43:A2:12:1F:AC`
+bt_address: <REPLACE WITH YOUR BT DEVICE ADDRESS>
+# LED members are optional and generally behaves like the WS2812 klipper module
+# (e.g. supports heterogenous pixel chains)
+led_colour_order: GBR
+led_chain_count: 16
+
+[temperature_sensor nvm0_intake]
+sensor_type: NevermoreSensor
+sensor_kind: intake
+# If you do not wish to edit your mainsail installation to add `NevermoreSensor`,
+# to its list of known sensors, you can use an already recognised classname (e.g. `bme280`)
+class_name_override: bme280
+
+# If you wish the VOC index levels plotted, this can be hacked in by pretending the
+# VOC index is a temperature by using `plot_voc: true`
+[temperature_sensor nvm0_intake_VOC]
+sensor_type: NevermoreSensor
+sensor_kind: intake
+plot_voc: true
+
+[temperature_sensor nvm1_exhaust]
+sensor_type: NevermoreSensor
+sensor_kind: exhaust
+
+# led-effects are supported
+[led_effect panel_idle]
+autostart:              true
+frame_rate:             24
+leds:
+    nevermore
+layers:
+    comet  1 0.5 add (0.0, 0.0, 0.0),(1.0, 0.0, 0.0),(1.0, 1.0, 0.0),(1.0, 1.0, 1.0)
+    breathing  2 1 top (0,.25,0)
+```
+
+
+Build Requirements
+------------------
+
+* Recent Pico-W SDK
+* GCC 12+ (tested w/ 12.2.1, support for constexpr `std::bit_cast` required)
+* Patch for compile_gatt.py (see below)
+
+The Pico SDK's version of btstack contains a bug that generates malformed GATT databases.
+This has been fixed upstream, but until the SDK updates you'll have to apply the following diff to your installation.
+
+```diff
+diff --git ~/pico/pico-sdk/lib/btstack/tool/compile_gatt.py ~/pico/pico-sdk/lib/btstack/tool/compile_gatt.py
+index 167fb6701..8452c5f06 100755
+--- ~/pico/pico-sdk/lib/btstack/tool/compile_gatt.py
++++ ~/pico/pico-sdk/lib/btstack/tool/compile_gatt.py
+@@ -714,7 +714,7 @@ def parseGenericDynamicReadOnlyDescriptor(fout, parts, uuid, name):
+     write_16(fout, size)
+     write_16(fout, flags)
+     write_16(fout, handle)
+-    write_16(fout, 0x2903)
++    write_16(fout, uuid)
+     fout.write("\n")
+
+     database_hash_append_uint16(handle)
+```
+
+Credits
+-------
+
+* https://github.com/julianschill/klipper-led_effect[Julian Schill] - installation script (derived)
+* https://github.com/boschsensortec/BME280_driver[Bosch Sensors] - BME280 library (included)
+* https://github.com/Sensirion/gas-index-algorithm[Sensirion] - SGP40 gas index library (included)
+* https://github.com/0ndsk4[0ndsk4] - Donated hardware for testing
