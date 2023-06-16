@@ -22,6 +22,11 @@
 #include <cstring>
 #endif
 
+#define DEBUG_WS2812_UPDATE_DEFERRED_RATE 0
+#if DEBUG_WS2812_UPDATE_DEFERRED_RATE
+#include <bitset>
+#endif
+
 using namespace std;
 using namespace std::literals::chrono_literals;
 
@@ -48,6 +53,27 @@ size_t g_pixel_data_size = 0;  // INVARIANT(pixel_size_active <= g_pixel_data.si
 semaphore g_update_requested;
 semaphore g_update_in_progress;
 alarm_id_t g_update_delay_alarm_id = 0;
+
+void DBG_update_deferred_rate_log([[maybe_unused]] bool deferred) {
+#if DEBUG_WS2812_UPDATE_DEFERRED_RATE
+    constexpr auto LOG_DELAY = 1s;
+
+    static chrono::system_clock::time_point g_log_next;
+    static bitset<256> g_entries;
+    static size_t g_entry_next = 0;
+    static size_t g_entry_count = 0;
+
+    g_entries[g_entry_next++ % g_entries.size()] = deferred;
+    g_entry_count = min(g_entry_count + 1, g_entries.size());
+
+    auto now = chrono::system_clock::now();
+    if (now < g_log_next) return;  // too soon
+    g_log_next = now + LOG_DELAY;
+
+    printf("DBG - WS2812 Deferred Update Rate: %.2f%% (%u of last %u)\n",
+            (g_entries.count() / double(g_entry_count)) * 100, g_entries.count(), g_entry_count);
+#endif
+}
 
 // PRECONDITION: Caller is holding `g_update_in_progress`.
 void UNSAFE_update_launch_or_release() {
@@ -78,6 +104,7 @@ void update_or_defer() {
     // raise update-requested; alarm could fire and handle everything before we take update-in-progress
     sem_release(&g_update_requested);
     auto acquired = sem_try_acquire(&g_update_in_progress);
+    DBG_update_deferred_rate_log(!acquired);
     if (acquired) {
         UNSAFE_update_launch_or_release();
     }
