@@ -72,7 +72,7 @@ Build Requirements
 * GCC 12+ (tested w/ 12.2.1, support for constexpr `std::bit_cast` required)
 * Patch for compile_gatt.py (see below)
 
-The Pico SDK's version of btstack contains a bug that generates malformed GATT databases.
+The Pico SDK's version of btstack https://github.com/bluekitchen/btstack/pull/468[contains a bug that generates malformed GATT databases].
 This has been fixed upstream, but until the SDK updates you'll have to apply the following diff to your installation.
 
 ```diff
