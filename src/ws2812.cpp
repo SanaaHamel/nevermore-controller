@@ -11,7 +11,7 @@
 #include <chrono>
 #include <climits>
 #include <cstdint>
-#include <cstdlib>
+#include <cstdio>
 
 // Debugging helper for testing. Emits a simple animated pattern to the LEDs.
 // Useful for determining if a problem lies with DMA, the PIO program, or data layout.
@@ -45,18 +45,22 @@ auto const g_dma_channel = dma_claim_unused_channel(true);
 array<uint8_t, N_PIXEL_COMPONENTS_MAX> g_pixel_data;
 size_t g_pixel_data_size = 0;  // INVARIANT(pixel_size_active <= g_pixel_data.size())
 
-bool g_update_requested = false;
+semaphore g_update_requested;
 semaphore g_update_in_progress;
 alarm_id_t g_update_delay_alarm_id = 0;
 
-int64_t update_complete_handler(alarm_id_t id, void* user_data) {
-    g_update_delay_alarm_id = 0;
-    if (g_update_requested) {  // launch any pending update request
-        g_update_requested = false;
+// PRECONDITION: Caller is holding `g_update_in_progress`.
+void UNSAFE_update_launch_or_release() {
+    if (sem_try_acquire(&g_update_requested)) {  // launch any pending update request
         dma_channel_set_read_addr(g_dma_channel, g_pixel_data.data(), true);
     } else {
         sem_release(&g_update_in_progress);
     }
+}
+
+int64_t update_complete_handler(alarm_id_t id, void* user_data) {
+    g_update_delay_alarm_id = 0;
+    UNSAFE_update_launch_or_release();
 
     return 0;  // 0 -> no repeat
 }
@@ -68,6 +72,15 @@ void __isr dma_complete_handler() {
     if (g_update_delay_alarm_id) cancel_alarm(g_update_delay_alarm_id);
     g_update_delay_alarm_id =
             add_alarm_in_us(WS2812_TIME_RESET / 1us, update_complete_handler, nullptr, true);
+}
+
+void update_or_defer() {
+    // raise update-requested; alarm could fire and handle everything before we take update-in-progress
+    sem_release(&g_update_requested);
+    auto acquired = sem_try_acquire(&g_update_in_progress);
+    if (acquired) {
+        UNSAFE_update_launch_or_release();
+    }
 }
 
 #if DEBUG_WS2812_PATTERN
@@ -101,10 +114,7 @@ btstack_timer_source_t g_dbg_animate{.process = [](auto* timer) {
         pio_sm_put_blocking(WS2812_PIO, WS2812_SM, byteswap(xs[i]));
     }
 #else  // dump buffer to PIO via DMA
-    g_update_requested = !sem_try_acquire(&g_update_in_progress);
-    if (!g_update_requested) {  // got the lock, launch now
-        dma_channel_set_read_addr(g_dma_channel, g_pixel_data.data(), true);
-    }
+    update_or_defer();
 #endif
 
     btstack_run_loop_set_timer(timer, 100);
@@ -115,6 +125,7 @@ btstack_timer_source_t g_dbg_animate{.process = [](auto* timer) {
 }  // namespace
 
 void ws2812_init(async_context_t& ctx_async) {
+    sem_init(&g_update_requested, 0, 1);
     sem_init(&g_update_in_progress, 1, 1);
 
     irq_set_enabled(DMA_IRQ_0, true);
@@ -181,11 +192,6 @@ bool ws2812_update(size_t offset, std::span<uint8_t const> pixel_data) {
 
     // DATA RACE - Intentionally don't lock. We'll race with the DMA engine and accept spliced reads.
     copy_n(pixel_data.begin(), pixel_data.size(), g_pixel_data.begin() + offset);
-
-    g_update_requested = !sem_try_acquire(&g_update_in_progress);
-    if (!g_update_requested) {  // got the lock, launch now
-        dma_channel_set_read_addr(g_dma_channel, g_pixel_data.data(), true);
-    }
-
+    update_or_defer();
     return true;
 }
