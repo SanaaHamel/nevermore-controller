@@ -9,7 +9,8 @@ static_assert(std::endian::native == std::endian::little, "Blob helpers assume m
 template <typename T>
 uint8_t att_server_notify(hci_con_handle_t con_handle, uint16_t attribute_handle, T const& value) {
     static_assert(!std::is_pointer_v<T>);
-    return att_server_notify(con_handle, attribute_handle, static_cast<uint8_t const*>(&value), sizeof(T));
+    return att_server_notify(
+            con_handle, attribute_handle, reinterpret_cast<uint8_t const*>(&value), sizeof(T));
 };
 
 template <typename T>
