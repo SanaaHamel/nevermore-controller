@@ -60,7 +60,7 @@ const BLE::ValidRange<EnvironmentService::VOCIndex> VALID_RANGE_VOC_INDEX{.min =
 
 }  // namespace
 
-EnvironmentService::ServiceData EnvironmentService::g_service_data;
+void EnvironmentService::disconnected(hci_con_handle_t conn) {}
 
 std::optional<uint16_t> EnvironmentService::attr_read(
         hci_con_handle_t, uint16_t att_handle, uint16_t offset, uint8_t* buffer, uint16_t buffer_size) {

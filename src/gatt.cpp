@@ -57,6 +57,13 @@ void hci_handler(uint8_t packet_type, uint16_t channel, uint8_t* packet, uint16_
             gap_advertisements_set_data(sizeof(ADVERT), (uint8_t*)&ADVERT);  // NOLINT
             gap_advertisements_enable(1);
         } break;
+
+        case ATT_EVENT_DISCONNECTED: {
+            auto conn = att_event_disconnected_get_handle(packet);
+            EnvironmentService::disconnected(conn);
+            FanService::disconnected(conn);
+            NeoPixelService::disconnected(conn);
+        };
     }
 }
 

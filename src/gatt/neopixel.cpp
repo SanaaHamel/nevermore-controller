@@ -59,6 +59,8 @@ void DBG_update_rate_log() {
 
 }  // namespace
 
+void NeoPixelService::disconnected(hci_con_handle_t) {}
+
 optional<uint16_t> NeoPixelService::attr_read(
         hci_con_handle_t, uint16_t att_handle, uint16_t offset, uint8_t* buffer, uint16_t buffer_size) {
     auto readBlob = [&](auto&& datum) -> uint16_t {

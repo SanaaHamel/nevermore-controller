@@ -74,6 +74,8 @@ std::optional<uint16_t> FanService::attr_read(
     }
 }
 
+void FanService::disconnected(hci_con_handle_t) {}
+
 std::optional<int> FanService::attr_write(
         hci_con_handle_t, uint16_t att_handle, uint16_t offset, uint8_t const* buffer, uint16_t buffer_size) {
     if (buffer_size < offset) return ATT_ERROR_INVALID_OFFSET;
