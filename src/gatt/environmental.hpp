@@ -28,6 +28,8 @@ struct [[gnu::packed]] ServiceData {
     BLE::Pressure pressure_exhaust;
     VOCIndex voc_index_intake;
     VOCIndex voc_index_exhaust;
+
+    auto operator<=>(ServiceData const&) const = default;
 };
 
 extern ServiceData g_service_data;
@@ -39,6 +41,7 @@ std::optional<uint16_t> attr_read(
 std::optional<int> attr_write(
         hci_con_handle_t, uint16_t att_handle, uint16_t offset, uint8_t const* buffer, uint16_t buffer_size);
 
+void init();
 void disconnected(hci_con_handle_t);
 
 }  // namespace EnvironmentService

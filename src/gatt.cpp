@@ -132,6 +132,7 @@ bool gatt_init(async_context_t& ctx_async) {
     l2cap_init();
     sm_init();  // FUTURE WORK: do we even need a security manager? can we ditch this?
 
+    EnvironmentService::init();
     if (!FanService::init(ctx_async)) return false;
 
     hci_add_event_handler(&g_hci_handler);
