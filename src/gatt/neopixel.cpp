@@ -86,10 +86,9 @@ optional<int> NeoPixelService::attr_write(
 
     switch (att_handle) {
         case HANDLE_ATTR(WS2812_TOTAL_COMPONENTS_01, VALUE): {
-            BLE::Count16 const* count = consume;
-            if (!count) return ATT_ERROR_INVALID_ATTRIBUTE_VALUE_LENGTH;
-            if (*count == BLE::NOT_KNOWN) return ATT_ERROR_VALUE_NOT_ALLOWED;
-            if (!ws2812_setup(size_t(double(*count)))) return ATT_ERROR_VALUE_NOT_ALLOWED;
+            BLE::Count16 count = consume;
+            if (count == BLE::NOT_KNOWN) return ATT_ERROR_VALUE_NOT_ALLOWED;
+            if (!ws2812_setup(size_t(double(count)))) return ATT_ERROR_VALUE_NOT_ALLOWED;
 
             return 0;
         }
@@ -97,14 +96,13 @@ optional<int> NeoPixelService::attr_write(
         case HANDLE_ATTR(WS2812_UPDATE_SPAN_01, VALUE): {
             DBG_update_rate_log();
 
-            UpdateSpanHeader const* header = consume;
-            if (!header) return ATT_ERROR_INVALID_ATTRIBUTE_VALUE_LENGTH;
-            if (header->length != consume.remaining()) return ATT_ERROR_INVALID_ATTRIBUTE_VALUE_LENGTH;
-            if (header->length == 0) return 0;  // report trivial success
+            UpdateSpanHeader header = consume;
+            // be extra picky, reject any pending extra data
+            // FUTURE WORK: change attr to just assume any tailing data is the span?
+            if (header.length != consume.remaining()) return ATT_ERROR_INVALID_ATTRIBUTE_VALUE_LENGTH;
+            if (!ws2812_update(header.offset, consume.span(header.length)))
+                return ATT_ERROR_VALUE_NOT_ALLOWED;
 
-            auto const payload = consume.span<uint8_t>(header->length);
-            assert(!payload.empty() && "should have been able to read the requested span");
-            ws2812_update(header->offset, payload);
             return 0;
         }
 

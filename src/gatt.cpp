@@ -7,6 +7,7 @@
 #include "config.hpp"
 #include "gatt/environmental.hpp"
 #include "gatt/fan.hpp"
+#include "gatt/handler_helpers.hpp"
 #include "gatt/neopixel.hpp"
 #include "hci_dump.h"
 #include "hci_dump_embedded_stdout.h"
@@ -89,8 +90,12 @@ int attr_write(hci_con_handle_t conn, uint16_t attr, uint16_t transaction_mode, 
             NeoPixelService::attr_write,
     };
 
-    for (auto handler : HANDLERS)
-        if (auto r = handler(conn, attr, offset, buffer, buffer_size)) return *r;
+    try {
+        for (auto handler : HANDLERS)
+            if (auto r = handler(conn, attr, offset, buffer, buffer_size)) return *r;
+    } catch (AttrWriteException const& e) {
+        return e.error;
+    }
 
     printf("WARN - BLE GATT - attr_write unhandled attr 0x%04x\n", int(attr));
     return 0;

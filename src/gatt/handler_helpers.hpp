@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <span>
+#include <type_traits>
 
 #define BT(x) ORG_BLUETOOTH_CHARACTERISTIC_##x
 #define HANDLE_ATTR_(attr, kind) ATT_CHARACTERISTIC_##attr##_##kind##_HANDLE
@@ -15,29 +16,39 @@
 #define SERVER_CFG_ALWAYS_BROADCAST(attr) HANDLE_READ_BLOB(attr, SERVER_CONFIGURATION, uint16_t(0x0001))
 #define USER_DESCRIBE(attr, desc) HANDLE_READ_BLOB(attr, USER_DESCRIPTION, desc "")
 
+struct AttrWriteException {
+    int error;
+};
+
 struct WriteConsumer {
-    uint16_t& offset;
-    uint8_t const* const buffer;
-    uint16_t const buffer_size;
+    struct NotEnoughException {};
+
+    uint16_t offset;
+    uint8_t const* buffer;
+    uint16_t buffer_size;
 
     template <typename A>
-    operator A const*() const {
-        if (!has_available(sizeof(A))) return {};
+        requires(std::is_standard_layout_v<A> && !std::is_pointer_v<A> && !std::is_reference_v<A>)
+    operator A() {
+        if (!has_available(sizeof(A))) throw AttrWriteException(ATT_ERROR_INVALID_ATTRIBUTE_VALUE_LENGTH);
 
-        auto* const ptr = reinterpret_cast<A const*>(
-                buffer + offset);  // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+        // Ideally we'd like to just return a ptr within the buffer, but sadly
+        // ARM has stricter alignment requirements than x86's *ANYTHING-GOES!* approach.
+        A value;
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+        memcpy(&value, buffer + offset, sizeof(value));
         offset += sizeof(A);
-        return ptr;
+        return value;
     }
 
-    template <typename A>
-    std::span<A const> span(size_t length) const {
-        if (!has_available(sizeof(A) * length)) return {};
+    std::span<uint8_t const> span(size_t length) {
+        if (!has_available(sizeof(uint8_t) * length))
+            throw AttrWriteException(ATT_ERROR_INVALID_ATTRIBUTE_VALUE_LENGTH);
 
         // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic)
-        auto* const ptr = reinterpret_cast<A const*>(buffer + offset);
-        offset += sizeof(A) * length;
-        return {ptr, ptr + length};
+        auto const* ptr = buffer + offset;
+        offset += sizeof(uint8_t) * length;
+        return {ptr, ptr + length};  // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
     }
 
     [[nodiscard]] uint16_t remaining() const {

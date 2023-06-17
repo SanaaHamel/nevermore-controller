@@ -81,10 +81,7 @@ std::optional<int> FanService::attr_write(
 
     switch (att_handle) {
         case HANDLE_ATTR(PWM_01, VALUE): {
-            BLE::Percentage8 const* percent = consume;
-            if (!percent) return ATT_ERROR_INVALID_ATTRIBUTE_VALUE_LENGTH;
-
-            g_fan_pwm_percent = *percent;
+            g_fan_pwm_percent = consume;
             fan_pwm_update(g_fan_pwm_percent);
             return 0;
         }
