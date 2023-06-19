@@ -61,8 +61,7 @@ const ESM ESM_VOC_INDEX{
 const BLE::ValidRange<EnvironmentService::VOCIndex> VALID_RANGE_VOC_INDEX{.min = 0, .max = 500};
 
 auto g_notify_aggregate = NotifyState<[](hci_con_handle_t conn) {
-    att_server_notify(conn, ATT_CHARACTERISTIC_75134bec_dd06_49b1_bac2_c15e05fd7199_01_VALUE_HANDLE,
-            EnvironmentService::g_service_data);
+    att_server_notify(conn, HANDLE_ATTR(ENV_AGGREGATE_01, VALUE), EnvironmentService::g_service_data);
 }>();
 
 // HACK:  We'd like to notify on write changes, but the code base isn't setup
