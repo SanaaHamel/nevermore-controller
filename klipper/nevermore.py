@@ -553,12 +553,12 @@ class NevermoreBackgroundWorker:
         if nm is None:
             return  # frontend is dead -> nothing to do
 
+        if self._led_colour_data_old == nm.led_colour_data:
+            return  # fast-path bail
+
         # resize to accommodate. change of length -> just mark everything as dirty
         if len(self._led_colour_data_old) != len(nm.led_colour_data):
             self._led_colour_data_old = bytearray([x ^ 1 for x in nm.led_colour_data])
-
-        if self._led_colour_data_old == nm.led_colour_data:
-            return  # fast-path bail
 
         yield from LedUpdateSpan.compute_diffs(
             self._led_colour_data_old, nm.led_colour_data
