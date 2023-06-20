@@ -543,6 +543,8 @@ class NevermoreBackgroundWorker:
                 return
 
             raise  # any other kind of uncaught failure -> re-raise
+        except EOFError:  # consider non-fatal, potentially transient
+            return
         finally:
             tasks.cancel()  # kill off all active tasks if any fail
 
