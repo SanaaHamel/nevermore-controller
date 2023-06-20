@@ -36,7 +36,24 @@ _Float = TypeVar("_Float", bound=float)
 
 RGBW = tuple[float, float, float, float]
 
-LOG = logging.getLogger(__name__)
+
+class LogPrefixed(logging.LoggerAdapter):
+    def __init__(
+        self,
+        logger: logging.Logger | logging.LoggerAdapter,
+        format: Callable[[str], str],
+    ):
+        super().__init__(logger)
+        self.format = format
+
+    def process(self, msg: Any, kwargs: MutableMapping[str, Any]):
+        return self.format(msg), kwargs
+
+
+LOG = LogPrefixed(
+    logging.getLogger(__name__),
+    lambda str: f"[{datetime.datetime.now().strftime('%H:%M:%S:%f')}] {str}",
+)
 
 
 # How long to wait for a BLE connection to the controller (sec)
@@ -75,18 +92,6 @@ class ControllerState:
     exhaust: SensorState = SensorState()
     fan_power: float = 0
     fan_tacho: float = 0
-
-
-class LogAdaptorPrefixed(logging.LoggerAdapter):
-    def __init__(self, logger: logging.Logger, prefix: str):
-        super().__init__(logger)
-        self.prefix = prefix
-
-    def process(self, msg: Any, kwargs: MutableMapping[str, Any]):
-        return (
-            f"[{datetime.datetime.now().strftime('%H:%M:%S:%f')}] {self.prefix}{msg}",
-            kwargs,
-        )
 
 
 UUID_SERVICE_GAP = UUID("00001801-0000-1000-8000-00805f9b34fb")
@@ -393,9 +398,7 @@ class NevermoreBackgroundWorker:
         self._thread.name = nevermore.name
         nevermore = None  # release reference otherwise call frame keeps it alive
 
-        worker_log = LogAdaptorPrefixed(
-            LOG.getChild(f"worker"), f"{self._thread.name} - "
-        )
+        worker_log = LogPrefixed(LOG, lambda x: f"{self._thread.name} - {x}")
 
         async def handle_connection() -> None:
             # set this up ASAP once we're in an asyncio loop
