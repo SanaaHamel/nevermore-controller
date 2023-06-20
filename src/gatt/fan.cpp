@@ -78,7 +78,7 @@ btstack_timer_source_t g_fan_policy_update{.process = [](auto* timer) {
     btstack_run_loop_add_timer(timer);
 
     // ask the oracle what we should be doing
-    fan_power_set(fan_power_oracle());
+    fan_power_set(fan_power_oracle() * 100);
 }};
 
 void fan_automatic_start() {
