@@ -7,6 +7,7 @@
 import asyncio
 import dataclasses
 import datetime
+import enum
 import logging
 import threading
 import weakref
@@ -35,6 +36,16 @@ __all__ = [
 _Float = TypeVar("_Float", bound=float)
 
 RGBW = tuple[float, float, float, float]
+
+
+# Not actually provided by `bleak`. IDK why not.
+class CharacteristicProperty(enum.StrEnum):
+    BROADCAST = "broadcast"
+    INDICATE = "indicate"
+    NOTIFY = "notify"
+    READ = "read"
+    WRITE = "write"
+    WRITE_NO_RESPONSE = "write-without-response"
 
 
 class LogPrefixed(logging.LoggerAdapter):
@@ -86,7 +97,7 @@ class SensorState:
         }
 
 
-@dataclass(frozen=True)
+@dataclass
 class ControllerState:
     intake: SensorState = SensorState()
     exhaust: SensorState = SensorState()
@@ -94,15 +105,20 @@ class ControllerState:
     fan_tacho: float = 0
 
 
-UUID_SERVICE_GAP = UUID("00001801-0000-1000-8000-00805f9b34fb")
-UUID_SERVICE_ENVIRONMENTAL_SENSING = UUID("0000181a-0000-1000-8000-00805f9b34fb")
+def short_uuid(x: int):
+    assert 0 <= x <= 0xFFFF
+    return UUID(f"0000{x:04x}-0000-1000-8000-00805f9b34fb")
+
+
+UUID_SERVICE_GAP = short_uuid(0x1801)
+UUID_SERVICE_ENVIRONMENTAL_SENSING = short_uuid(0x181A)
 UUID_SERVICE_FAN = UUID("4553d138-1d00-4b6f-bc42-955a89cf8c36")
 UUID_SERVICE_WS2812 = UUID("f62918ab-33b7-4f47-9fba-8ce9de9fecbb")
 
-UUID_CHAR_ENV_DATA_AGGREGATE = UUID("75134bec-dd06-49b1-bac2-c15e05fd7199")
-UUID_CHAR_FAN_POWER = UUID("00002b04-0000-1000-8000-00805f9b34fb")
+UUID_CHAR_PERCENT8 = short_uuid(0x2B04)
+UUID_CHAR_COUNT16 = short_uuid(0x2AEA)
+UUID_CHAR_DATA_AGGREGATE = UUID("75134bec-dd06-49b1-bac2-c15e05fd7199")
 UUID_CHAR_FAN_TACHO = UUID("03f61fe0-9fe7-4516-98e6-056de551687f")
-UUID_CHAR_WS2812_COMPONENTS = UUID("00002AEA-0000-1000-8000-00805f9b34fb")
 UUID_CHAR_WS2812_UPDATE = UUID("5d91b6ce-7db1-4e06-b8cb-d75e7dd49aae")
 
 
@@ -211,7 +227,7 @@ class BleAttrReader:
         return None if x is None else int(x)
 
 
-def _parse_env_agg(reader: BleAttrReader) -> tuple[SensorState, SensorState]:
+def parse_agg_env(reader: BleAttrReader) -> tuple[SensorState, SensorState]:
     t_in = reader.temperature()
     t_out = reader.temperature()
     t_mcu = reader.temperature()  # unused/ignored
@@ -231,6 +247,25 @@ def _parse_env_agg(reader: BleAttrReader) -> tuple[SensorState, SensorState]:
     return (
         SensorState(t_in, h_in, p_in, voc_in),
         SensorState(t_out, h_out, p_out, voc_out),
+    )
+
+
+def require_char(
+    service: BleakGATTService,
+    id: UUID,
+    props: set[CharacteristicProperty] = {CharacteristicProperty.READ},
+):
+    xs = [
+        x
+        for x in service.characteristics
+        if x.uuid == str(id)
+        if all(prop.value in x.properties for prop in props)
+    ]
+    if len(xs) == 1:
+        return xs[0]
+
+    raise Exception(
+        f"{service} has {'no' if not xs else 'multiple'} characteristic {id} with properties {props}"
     )
 
 
@@ -305,9 +340,12 @@ class Command:
 
 @dataclass
 class CmdFanPower(Command):
-    percent: float
+    percent: Optional[float]
 
     def params(self):
+        if self.percent is None:
+            return bytearray([0xFF])  # 0xFF -> percent8 special value: not-known
+
         p = _clamp(self.percent, 0, 1) * 100
         return int(p * 2).to_bytes(1, "little")
 
@@ -447,64 +485,51 @@ class NevermoreBackgroundWorker:
                 raise Exception(f"{client} doesn't have required service {id}")
             return x
 
-        def require_char(service: BleakGATTService, id: UUID):
-            x = service.get_characteristic(id)
-            if x is None:
-                raise Exception(f"{service} has no characteristic {id}")
-            return x
-
         service_env = require(UUID_SERVICE_ENVIRONMENTAL_SENSING)
         service_fan = require(UUID_SERVICE_FAN)
         service_ws2812 = require(UUID_SERVICE_WS2812)
 
-        env_aggregate = require_char(service_env, UUID_CHAR_ENV_DATA_AGGREGATE)
-        fan_power = require_char(service_fan, UUID_CHAR_FAN_POWER)
-        fan_tacho = require_char(service_fan, UUID_CHAR_FAN_TACHO)
-        ws2812_length = require_char(service_ws2812, UUID_CHAR_WS2812_COMPONENTS)
-        ws2812_update = require_char(service_ws2812, UUID_CHAR_WS2812_UPDATE)
+        P = CharacteristicProperty
+        aggregate_env = require_char(service_env, UUID_CHAR_DATA_AGGREGATE, {P.NOTIFY})
+        aggregate_fan = require_char(service_fan, UUID_CHAR_DATA_AGGREGATE, {P.NOTIFY})
+        fan_power_override = require_char(service_fan, UUID_CHAR_PERCENT8, {P.WRITE})
+        ws2812_length = require_char(service_ws2812, UUID_CHAR_COUNT16, {P.WRITE})
+        ws2812_update = require_char(
+            service_ws2812, UUID_CHAR_WS2812_UPDATE, {P.WRITE_NO_RESPONSE}
+        )
 
         self._connected.set()
 
-        async def read(char: BleakGATTCharacteristic):
-            return BleAttrReader(await client.read_gatt_char(char))
+        async def notify(
+            char: BleakGATTCharacteristic,
+            callback: Callable[["Nevermore", BleAttrReader], Any],
+        ):
+            def go(_: BleakGATTCharacteristic, params: bytearray):
+                nevermore = self._nevermore()
+                if nevermore is not None:  # if frontend is dead -> nothing to do
+                    callback(nevermore, BleAttrReader(params))
 
-        # FUTURE WORK: replace polling w/ GATT notify/indicate mechanism.
-        async def poll_state():
-            try:
-                (intake, exhaust) = _parse_env_agg(await read(env_aggregate))
-                # normalise to [0,1] range
-                fan_power_ = ((await read(fan_power)).percentage8() or 0) / 100
-                fan_tacho_ = (await read(fan_tacho)).tachometer()
-            except BleakError as e:
-                # special case: lost connection -> wait and attempt reconnect
-                if e.args[0] == "Not connected":
-                    raise
+            await client.start_notify(char, go)
 
-                log.exception(f"failed to read controller status")
-                (intake, exhaust) = (SensorState(), SensorState())
-                fan_power_ = 0
-                fan_tacho_ = 0
-
-            nevermore = self._nevermore()
-            if nevermore is None:
-                return  # frontend is dead -> nothing to do
-
+        def notify_env(nevermore: "Nevermore", params: BleAttrReader):
+            (intake, exhaust) = parse_agg_env(params)
             # HACK: Abuse GIL to keep this thread-safe
-            nevermore.state = ControllerState(
-                intake=intake,
-                exhaust=exhaust,
-                fan_power=fan_power_,
-                fan_tacho=fan_tacho_,
-            )
+            nevermore.state.intake = intake
+            nevermore.state.exhaust = exhaust
 
-            await asyncio.sleep(1 / NEVERMORE_POLL_HZ)
+        def notify_fan(nevermore: "Nevermore", params: BleAttrReader):
+            # HACK: Abuse GIL to keep this thread-safe
+            # show the current fan power even if it isn't overridden
+            nevermore.state.fan_power = params.percentage8() / 100. # need it in [0,1] range
+            _ = params.percentage8()  # power-override
+            nevermore.state.fan_tacho = params.tachometer()
 
         async def handle_commands():
             cmd = await self._command_queue.async_q.get()
             try:
                 match cmd:
                     case CmdFanPower():
-                        await client.write_gatt_char(fan_power, cmd.params())
+                        await client.write_gatt_char(fan_power_override, cmd.params())
                     case CmdWs2812Length():
                         await client.write_gatt_char(ws2812_length, cmd.params())
                     case _:
@@ -529,11 +554,11 @@ class NevermoreBackgroundWorker:
             while True:
                 await go()
 
-        tasks = asyncio.gather(
-            *[forever(x) for x in [poll_state, handle_commands, handle_led]]
-        )
+        tasks = asyncio.gather(*[forever(x) for x in [handle_commands, handle_led]])
 
         try:
+            await notify(aggregate_env, notify_env)
+            await notify(aggregate_fan, notify_fan)
             await tasks
         except BleakError as e:
             # consider non-fatal. don't to abort due to potentially transient error
@@ -614,7 +639,7 @@ class Nevermore:
             "gcode:request_restart", self._handle_request_restart
         )
 
-    def set_fan_power(self, percent: float):
+    def set_fan_power(self, percent: Optional[float]):
         if self._interface is not None:
             self._interface.send_command(CmdFanPower(percent))
 
@@ -652,7 +677,9 @@ class Nevermore:
 
 # basically ripped from `extras/fan_generic.py`
 class NevermoreFan:
-    cmd_SET_FAN_SPEED_help = "Sets the speed of a fan"
+    cmd_SET_FAN_SPEED_help = (
+        "Sets the speed of a nevermore fan (omit `SPEED` for automatic control)"
+    )
 
     def __init__(self, nevermore: Nevermore) -> None:
         self.nevermore = nevermore
@@ -681,7 +708,8 @@ class NevermoreFan:
         assert isinstance(self.nevermore, Nevermore)
 
     def cmd_SET_FAN_SPEED(self, gcmd: GCodeCommand) -> None:
-        speed = gcmd.get_float("SPEED", 0.0)
+        # `None` to allow explicitly clearing override by not specifying a `SPEED` arg
+        speed: Optional[float] = gcmd.get_float("SPEED", None)
         self.nevermore.set_fan_power(speed)
 
 
