@@ -251,8 +251,14 @@ BLE_DECLARE_SCALAR_TYPE(Count16, uint16_t, 1, 0, 0);      // range [0, 65534]
 BLE_DECLARE_SCALAR_TYPE(Humidity, uint16_t, 1, -2, 0);    // range [0.00, 100.00] %
 BLE_DECLARE_SCALAR_TYPE(Percentage8, uint8_t, 1, 0, -1);  // range [0, 100] %, 0.5 % increment
 // why is this so big? who the hell is measuring 424 atmospheres of pressure on cheap BLE sensors?!
-BLE_DECLARE_SCALAR_TYPE(Pressure, uint32_t, 1, -1, 0);    // range [0, 429496729.5] Pa
-BLE_DECLARE_SCALAR_TYPE(Temperature, int16_t, 1, -2, 0);  // range [-273.15, 327.67] c
+BLE_DECLARE_SCALAR_TYPE(Pressure, uint32_t, 1, -1, 0);      // range [0, 429496729.5] Pa
+BLE_DECLARE_SCALAR_TYPE(Temperature, int16_t, 1, -2, 0);    // range [-273.15, 327.67] c
+BLE_DECLARE_SCALAR_TYPE(TimeDeciHour8, uint8_t, 1, -1, 0);  // range [0, 23.9]
+BLE_DECLARE_SCALAR_TYPE(TimeHour24, uint24_t, 1, 0, 0);     // range [0, 2^24 - 2]
+BLE_DECLARE_SCALAR_TYPE(TimeMilli24, uint24_t, 1, -3, 0);   // range [0, 16777.214]
+BLE_DECLARE_SCALAR_TYPE(TimeSecond8, uint8_t, 1, 0, 0);     // range [0, 2^8 - 2]
+BLE_DECLARE_SCALAR_TYPE(TimeSecond16, uint16_t, 1, 0, 0);   // range [0, 2^16 - 2]
+BLE_DECLARE_SCALAR_TYPE(TimeSecond32, uint32_t, 1, 0, 0);   // range [0, 2^32 - 2]
 
 BLE_DECLARE_NOT_KNOWN_VALUE_FROM_RAW(Count16, 0xFFFFu);
 BLE_DECLARE_NOT_KNOWN_VALUE_FROM_RAW(Humidity, 0xFFFFu);
@@ -262,6 +268,12 @@ BLE_DECLARE_NOT_KNOWN_VALUE_FROM_RAW(Percentage8, 0xFFu);
 //      Use `UINT32_MAX` for consistency with other unsigned types.
 BLE_DECLARE_NOT_KNOWN_VALUE_FROM_RAW(Pressure, 0xFFFF'FFFFu);
 BLE_DECLARE_NOT_KNOWN_VALUE_FROM_RAW(Temperature, 0x8000);
+BLE_DECLARE_NOT_KNOWN_VALUE_FROM_RAW(TimeDeciHour8, 0xFFu);
+BLE_DECLARE_NOT_KNOWN_VALUE_FROM_RAW(TimeHour24, (uint32_t)0xFFFF'FFu);
+BLE_DECLARE_NOT_KNOWN_VALUE_FROM_RAW(TimeMilli24, (uint32_t)0xFFFF'FFu);
+BLE_DECLARE_NOT_KNOWN_VALUE_FROM_RAW(TimeSecond8, 0xFFu);
+BLE_DECLARE_NOT_KNOWN_VALUE_FROM_RAW(TimeSecond16, 0xFFFFu);
+BLE_DECLARE_NOT_KNOWN_VALUE_FROM_RAW(TimeSecond32, 0xFFFF'FFFFu);
 
 constexpr Pressure PRESSURE_1_ATMOSPHERE{101.325 * 1000};  // 101.325 kPa
 
@@ -305,7 +317,7 @@ struct [[gnu::packed]] EnvironmentalSensorMeasurementDesc {
 
     BLE_DECLARE_SCALAR_TYPE(Seconds, uint24_t, 1, 0, 0);
 
-    uint16_t flags = 0;           // reserved, must be zero
+    uint16_t flags = 0;  // reserved, must be zero
     Sampling sampling = Sampling::Unspecified;
     Seconds measure_period = 0;   // 0 -> unused/instant
     Seconds update_interval = 0;  // 0 -> not in use
