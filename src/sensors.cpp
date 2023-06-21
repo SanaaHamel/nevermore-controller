@@ -12,19 +12,20 @@
 #include <cstdio>
 #include <vector>
 
+using namespace std;
 using EnvironmentService::VOCIndex;
 
 namespace {
 
 constexpr uint32_t ADC_CHANNEL_TEMP_SENSOR = 4;
 
-constexpr auto SENSOR_POWER_ON_DELAY = std::max({
+constexpr auto SENSOR_POWER_ON_DELAY = max({
         BME280_POWER_ON_DELAY,
         HTU21D_POWER_ON_DELAY,
         SGP40_POWER_ON_DELAY,
 });
 
-using VecSensors = std::vector<std::unique_ptr<Sensor>>;
+using VecSensors = vector<unique_ptr<Sensor>>;
 
 VecSensors g_sensors_intake;
 VecSensors g_sensors_exhaust;

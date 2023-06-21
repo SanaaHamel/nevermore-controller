@@ -27,7 +27,7 @@ using namespace bt::advert;
 namespace {
 
 // coincidentally packed b/c all `bt::advert` funcs return only tuples of packed members
-constexpr std::tuple ADVERT{
+constexpr tuple ADVERT{
         flags({
                 Flag::LE_DISCOVERABLE,
                 Flag::EDR_NOT_SUPPORTED,

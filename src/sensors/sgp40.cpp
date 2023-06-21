@@ -11,6 +11,8 @@
 #include <cstdint>
 #include <utility>
 
+using namespace std;
+
 // SGP40 supports std-mode 100 kbits/s and fast mode 400 kbits/s
 static_assert(
         I2C_BAUD_RATE <= 400 * 1000, "`config.hpp`'s `I2C_BAUD_RATE` is too high for SGP40 (max 400 kbit/s)");
@@ -71,7 +73,7 @@ bool sgp40_measure_issue(
     return sgp40_measure_issue(bus, temperature.value_or(25), humidity.value_or(50));
 }
 
-std::optional<uint16_t> sgp40_measure_read(i2c_inst_t* bus) {
+optional<uint16_t> sgp40_measure_read(i2c_inst_t* bus) {
     if (!bus) return {};
 
     auto response = i2c_read_blocking_crc<0xFF, uint16_t>(bus, SGP40_ADDRESS);
@@ -98,12 +100,12 @@ struct SGP40 final : SensorDelayedResponse {
         return "SGP40";
     }
 
-    [[nodiscard]] std::chrono::milliseconds read_delay() const override {
+    [[nodiscard]] chrono::milliseconds read_delay() const override {
         return 320ms;
     }
 
     bool issue() override {
-        return sgp40_measure_issue(bus, std::get<BLE::Temperature&>(data), std::get<BLE::Humidity&>(data));
+        return sgp40_measure_issue(bus, get<BLE::Temperature&>(data), get<BLE::Humidity&>(data));
     }
 
     void read() override {
@@ -119,18 +121,18 @@ struct SGP40 final : SensorDelayedResponse {
         assert(0 <= gas_index && gas_index <= 500 && "result out of range?");
         if (gas_index == 0) return;  // 0 -> index not available
 
-        std::get<EnvironmentService::VOCIndex&>(data) = gas_index;
+        get<EnvironmentService::VOCIndex&>(data) = gas_index;
     }
 };
 
 }  // namespace
 
-std::unique_ptr<SensorPeriodic> sgp40(i2c_inst_t* bus, Sensor::Data state) {
+unique_ptr<SensorPeriodic> sgp40(i2c_inst_t* bus, Sensor::Data state) {
     if (!sgp40_exists(bus)) return {};  // nothing found
     if (!sgp40_self_test(bus)) {
         printf("Found SGP40, but failed self-test\n");
         return {};
     }
 
-    return std::make_unique<SGP40>(bus, state);
+    return make_unique<SGP40>(bus, state);
 }

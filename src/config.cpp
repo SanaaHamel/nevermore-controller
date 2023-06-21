@@ -60,7 +60,7 @@ constexpr uint8_t i2c_bus_pins_defined(uint8_t bus) {
     return defined;
 }
 
-constexpr uint8_t spi_has_at_least(std::span<GPIO_Pin const> pins, std::initializer_list<SPI_Pin> required) {
+constexpr uint8_t spi_has_at_least(span<GPIO_Pin const> pins, initializer_list<SPI_Pin> required) {
     auto mask = [](SPI_Pin kind) { return 1 << uint8_t(kind); };
     uint8_t missing = 0;
     for (auto kind : required)

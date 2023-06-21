@@ -11,6 +11,8 @@
 #include <tuple>
 #include <utility>
 
+using namespace std;
+
 // HTU21D supports "up to 400 kbits/s"
 static_assert(
         I2C_BAUD_RATE <= 400 * 1000, "`config.hpp`'s `I2C_BAUD_RATE` is too high for SGP40 (max 400 kbit/s)");
@@ -45,9 +47,9 @@ constexpr CRC8_t htu2xd_crc(A&& x) {
 }
 
 // verify spec-provided test vectors
-static_assert(0x79 == htu2xd_crc(std::span{std::array<uint8_t const, 1>{0xDC}}));
-static_assert(0x7C == htu2xd_crc(std::span{std::array<uint8_t const, 2>{0x68, 0x3A}}));
-static_assert(0x6B == htu2xd_crc(std::span{std::array<uint8_t const, 2>{0x4E, 0x85}}));
+static_assert(0x79 == htu2xd_crc(span{array<uint8_t const, 1>{0xDC}}));
+static_assert(0x7C == htu2xd_crc(span{array<uint8_t const, 2>{0x68, 0x3A}}));
+static_assert(0x6B == htu2xd_crc(span{array<uint8_t const, 2>{0x4E, 0x85}}));
 
 double htu2xd_humidity_compensated(double humidity_uncompensated, double temperature) {
     auto bias = (HTU2xD_HUMIDITY_COMPENSATION_ZERO_POINT - temperature) *
@@ -77,7 +79,7 @@ bool htu2xd_issue(i2c_inst_t* bus, HTU2xD_Measure kind) {
     return true;
 }
 
-std::optional<std::tuple<HTU2xD_Measure, double>> htu2xd_read_compensated(
+optional<tuple<HTU2xD_Measure, double>> htu2xd_read_compensated(
         i2c_inst_t* bus, double temperature = HTU2xD_HUMIDITY_COMPENSATION_ZERO_POINT) {
     // in either case we're waiting for the same kind of payload
     auto response = i2c_read_blocking_crc<0, uint16_t>(bus, HTU1xD_I2C_ADDRESS);
@@ -96,11 +98,10 @@ std::optional<std::tuple<HTU2xD_Measure, double>> htu2xd_read_compensated(
     if (is_humidity) {
         // printf("HTY2xD temp = %f\n", temperature);
         // printf("HTU2xD compensated = %f\n", htu2xd_humidity_compensated(-6 + 125 * datum_f, temperature));
-        return std::tuple{
-                HTU2xD_Measure::Humidity, htu2xd_humidity_compensated(-6 + 125 * datum_f, temperature)};
+        return tuple{HTU2xD_Measure::Humidity, htu2xd_humidity_compensated(-6 + 125 * datum_f, temperature)};
     }
 
-    return std::tuple{HTU2xD_Measure::Temperature, -46.85 + 175.72 * datum_f};
+    return tuple{HTU2xD_Measure::Temperature, -46.85 + 175.72 * datum_f};
 }
 
 struct HTU2xDSensor final : SensorPeriodic {
@@ -147,8 +148,8 @@ bool htu2xd_exists(i2c_inst_t* bus) {
 
 }  // namespace
 
-std::unique_ptr<SensorPeriodic> htu2xd(i2c_inst_t* bus, Sensor::Data state) {
+unique_ptr<SensorPeriodic> htu2xd(i2c_inst_t* bus, Sensor::Data state) {
     if (!htu2xd_exists(bus)) return {};  // nothing found
 
-    return std::make_unique<HTU2xDSensor>(bus, state);
+    return make_unique<HTU2xDSensor>(bus, state);
 }

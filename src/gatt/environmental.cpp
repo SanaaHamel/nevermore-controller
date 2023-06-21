@@ -7,6 +7,8 @@
 #include <cstdint>
 #include <utility>
 
+using namespace std;
+
 #define VOC_INDEX_UUID 216aa791_97d0_46ac_8752_60bbc00611e1
 #define ENV_AGGREGATE_UUID 75134bec_dd06_49b1_bac2_c15e05fd7199
 
@@ -87,7 +89,7 @@ void EnvironmentService::disconnected(hci_con_handle_t conn) {
     g_notify_aggregate.unregister(conn);
 }
 
-std::optional<uint16_t> EnvironmentService::attr_read(
+optional<uint16_t> EnvironmentService::attr_read(
         hci_con_handle_t conn, uint16_t att_handle, uint16_t offset, uint8_t* buffer, uint16_t buffer_size) {
     auto readBlob = [&](auto&& datum) -> uint16_t {
         return att_read_callback_handle_blob(
@@ -141,7 +143,7 @@ std::optional<uint16_t> EnvironmentService::attr_read(
 }
 
 // No attrs are writable.
-std::optional<int> EnvironmentService::attr_write(hci_con_handle_t conn, uint16_t att_handle, uint16_t offset,
+optional<int> EnvironmentService::attr_write(hci_con_handle_t conn, uint16_t att_handle, uint16_t offset,
         uint8_t const* buffer, uint16_t buffer_size) {
     if (buffer_size < offset) return ATT_ERROR_INVALID_OFFSET;
     WriteConsumer consume{offset, buffer, buffer_size};

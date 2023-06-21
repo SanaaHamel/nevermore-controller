@@ -8,6 +8,8 @@
 #include <span>
 #include <utility>
 
+using namespace std;
+
 #define DEBUG_NEOPIXEL_UPDATE_RATE_LOG 0
 #if DEBUG_NEOPIXEL_UPDATE_RATE_LOG
 #include <chrono>
@@ -18,8 +20,6 @@
 
 using namespace std::literals::chrono_literals;
 #endif
-
-using namespace std;
 
 #define WS2812_UPDATE_SPAN_UUID 5d91b6ce_7db1_4e06_b8cb_d75e7dd49aae
 

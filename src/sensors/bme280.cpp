@@ -7,8 +7,10 @@
 #include <cstdint>
 #include <utility>
 
+using namespace std;
+
 // don't want to include the big library header via our own header, so just double check it matches here
-static_assert(BME280_POWER_ON_DELAY == std::chrono::microseconds(BME280_STARTUP_DELAY));
+static_assert(BME280_POWER_ON_DELAY == chrono::microseconds(BME280_STARTUP_DELAY));
 
 namespace {
 
@@ -30,14 +32,14 @@ BME280_INTF_RET_TYPE i2c_write(uint8_t reg_addr, const uint8_t* reg_data, uint32
 
     uint8_t buf[len + 1];
     buf[0] = reg_addr;
-    std::memcpy(buf + 1, reg_data, len);  // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+    memcpy(buf + 1, reg_data, len);  // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
     if (int(sizeof(buf)) != i2c_write_blocking(bus, BME280_ADDRESS, buf, sizeof(buf), false))
         return BME280_E_COMM_FAIL;
 
     return BME280_OK;
 }
 
-std::optional<bme280_dev> init(i2c_inst_t* bus) {
+optional<bme280_dev> init(i2c_inst_t* bus) {
     bme280_dev dev{
             .intf = BME280_I2C_INTF,
             .intf_ptr = bus,
@@ -86,9 +88,9 @@ struct BME280 final : SensorPeriodic {
 
 }  // namespace
 
-std::unique_ptr<SensorPeriodic> bme280(i2c_inst_t* bus, Sensor::Data state) {
+unique_ptr<SensorPeriodic> bme280(i2c_inst_t* bus, Sensor::Data state) {
     auto dev = init(bus);
     if (!dev) return {};  // nothing found
 
-    return std::make_unique<BME280>(*dev, state);
+    return make_unique<BME280>(*dev, state);
 }
