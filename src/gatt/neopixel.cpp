@@ -63,11 +63,6 @@ void NeoPixelService::disconnected(hci_con_handle_t) {}
 
 optional<uint16_t> NeoPixelService::attr_read(
         hci_con_handle_t, uint16_t att_handle, uint16_t offset, uint8_t* buffer, uint16_t buffer_size) {
-    auto readBlob = [&](auto&& datum) -> uint16_t {
-        return att_read_callback_handle_blob(
-                std::forward<decltype(datum)>(datum), offset, buffer, buffer_size);
-    };
-
     switch (att_handle) {
         USER_DESCRIBE(WS2812_TOTAL_COMPONENTS_01, "Total # of components (i.e. octets) in the WS2812 chain.")
         USER_DESCRIBE(WS2812_UPDATE_SPAN_01, "Update a span of the WS2812 chain.")

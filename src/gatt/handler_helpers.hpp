@@ -19,7 +19,7 @@ constexpr uint16_t GATT_CLIENT_CFG_NOTIFY_FLAG = 0b0000'0001;
 #define HANDLE_ATTR(attr, kind) HANDLE_ATTR_(attr, kind)
 
 #define HANDLE_READ_BLOB(attr, kind, expr) \
-    case HANDLE_ATTR(attr, kind): return readBlob(expr);
+    case HANDLE_ATTR(attr, kind): return att_read_callback_handle_blob(expr, offset, buffer, buffer_size);
 #define HANDLE_WRITE_EXPR(attr, kind, expr) \
     case HANDLE_ATTR(attr, kind): return expr;
 

@@ -91,11 +91,6 @@ void EnvironmentService::disconnected(hci_con_handle_t conn) {
 
 optional<uint16_t> EnvironmentService::attr_read(
         hci_con_handle_t conn, uint16_t att_handle, uint16_t offset, uint8_t* buffer, uint16_t buffer_size) {
-    auto readBlob = [&](auto&& datum) -> uint16_t {
-        return att_read_callback_handle_blob(
-                std::forward<decltype(datum)>(datum), offset, buffer, buffer_size);
-    };
-
     auto const& sensors = EnvironmentService::g_service_data;
 
     switch (att_handle) {
