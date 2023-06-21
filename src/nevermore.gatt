@@ -1,4 +1,5 @@
 // 4553d138-1d00-4b6f-bc42-955a89cf8c36 Service - Fan
+// 260a0845-e62f-48c6-aef9-04f62ff8bffd Service - Fan Control Policy
 // f62918ab-33b7-4f47-9fba-8ce9de9fecbb Service - NeoPixel
 
 // 216aa791-97d0-46ac-8752-60bbc00611e1 VOC Indexed
@@ -88,6 +89,21 @@ CHARACTERISTIC_FORMAT, tachometer-rpm, 06, 0, 27A8, 1, 0000
 CHARACTERISTIC, 75134bec-dd06-49b1-bac2-c15e05fd7199, READ | NOTIFY | DYNAMIC
 CHARACTERISTIC_USER_DESCRIPTION, READ | DYNAMIC
 
+/////////////////////////////
+// Fan Control Policy Service
+// Separate b/c we're interested in including this in the aggregated fan state.
+/////////////////////////////
+
+PRIMARY_SERVICE, 260a0845-e62f-48c6-aef9-04f62ff8bffd
+// Fan Policy - Cooldown Period (TimeSec16)
+CHARACTERISTIC, 2B16, READ | WRITE | DYNAMIC
+CHARACTERISTIC_USER_DESCRIPTION, READ | DYNAMIC
+// Fan Policy - VOC Passive Max
+CHARACTERISTIC, 216aa791-97d0-46ac-8752-60bbc00611e1, READ | WRITE | DYNAMIC
+CHARACTERISTIC_USER_DESCRIPTION, READ | DYNAMIC
+// Fan Policy - VOC Improvement Min
+CHARACTERISTIC, 216aa791-97d0-46ac-8752-60bbc00611e1, READ | WRITE | DYNAMIC
+CHARACTERISTIC_USER_DESCRIPTION, READ | DYNAMIC
 
 /////////////////////////////
 // NeoPixel Control Service

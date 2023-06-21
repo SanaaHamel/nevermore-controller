@@ -15,8 +15,8 @@ Features
 * [x] Klipper Module
 * [x] BLE - Multiple Connections Supported
 * [x] Fan - Tachometer
-* [ ] Fan - PWM Control - Automatic
-* [x] Fan - PWM Control - Override (via BLE)
+* [x] Fan - Control - Automatic
+* [x] Fan - Control - Override
 * [x] Sensor - BME280 (Temperature, Humidity, Pressure)
 * [x] Sensor - HTU2xD (Temperature, Humidity)
 * [x] Sensor - SGP40 (Volatile Organic Compound Index)
@@ -34,6 +34,15 @@ bt_address: <REPLACE WITH YOUR BT DEVICE ADDRESS>
 # (e.g. supports heterogenous pixel chains)
 led_colour_order: GBR
 led_chain_count: 16
+
+# All fan policy settings are optional. Values given here are also the defaults.
+
+# seconds, how long to keep filtering after the policy would otherwise stop
+fan_policy_cooldown: 900
+# voc index, 0 to disable, filter if any sensor meets this threshold
+fan_policy_voc_passive_max: 125
+# voc index, 0 to disable, filter if the intake exceeds exhaust by at least this much
+fan_policy_voc_improve_min: 5
 
 [temperature_sensor nvm0_intake]
 sensor_type: NevermoreSensor
@@ -63,6 +72,25 @@ layers:
     comet  1 0.5 add (0.0, 0.0, 0.0),(1.0, 0.0, 0.0),(1.0, 1.0, 0.0),(1.0, 1.0, 1.0)
     breathing  2 1 top (0,.25,0)
 ```
+
+
+Klipper - Fan Control & Macros
+------------------------------
+
+The fan can be controlled much like any other fan.
+
+
+```gcode
+; override automatic fan control, full speed ahead
+SET_FAN_SPEED FAN=nevermore_fan SPEED=1
+; not specifying `SPEED=` disables fan override and returns to automatic fan control
+SET_FAN_SPEED FAN=nevermore_fan
+```
+
+
+You could therefore alter your `print_start` macro to force the fan to start before the VOC sensors detect anything, and clear the override in `print_end` to allow automatic control to mop up on its own.
+
+WARNING: Setting the fan speed to 0 in Mainsail/Fluidd UI does **not** clear the control override. It just sets it to zero. (i.e. disables the fan)
 
 
 Build Requirements

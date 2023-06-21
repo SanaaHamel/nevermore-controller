@@ -1,5 +1,6 @@
 #include "fan.hpp"
 #include "config.hpp"
+#include "gatt/environmental.hpp"
 #include "handler_helpers.hpp"
 #include "nevermore.h"
 #include "sdk/ble_data_types.hpp"
@@ -18,6 +19,10 @@ using namespace std;
 // NB: Error prone, but we're the 2nd aggregation char instance in the DB
 #define FAN_AGGREGATE 75134bec_dd06_49b1_bac2_c15e05fd7199_02
 
+#define FAN_POLICY_COOLDOWN 2B16_01
+#define FAN_POLICY_VOC_PASSIVE_MAX 216aa791_97d0_46ac_8752_60bbc00611e1_03
+#define FAN_POLICY_VOC_IMPROVE_MIN 216aa791_97d0_46ac_8752_60bbc00611e1_04
+
 namespace {
 
 BLE_DECLARE_SCALAR_TYPE(RPM16, uint16_t, 1, 0, 0);
@@ -30,6 +35,9 @@ constexpr uint32_t FAN_PWN_HZ = 25'000;
 constexpr auto SLICE_PWM = pwm_gpio_to_slice_num_(PIN_FAN_PWM);
 constexpr auto SLICE_TACHOMETER = pwm_gpio_to_slice_num_(PIN_FAN_TACHOMETER);
 static_assert(pwm_gpio_to_channel_(PIN_FAN_TACHOMETER) == PWM_CHAN_B, "can only read from B channel");
+
+// not included in the fan aggregation - technically a separate service
+FanPolicyEnvironmental g_fan_policy;
 
 BLE::Percentage8 g_fan_power = 0;
 BLE::Percentage8 g_fan_power_override;  // not-known -> automatic control
@@ -76,8 +84,8 @@ btstack_timer_source_t g_fan_policy_update{.process = [](auto* timer) {
     btstack_run_loop_set_timer(timer, 1000 / FAN_POLICY_UPDATE_RATE_HZ);
     btstack_run_loop_add_timer(timer);
 
-    // ask the oracle what we should be doing
-    fan_power_set(fan_power_oracle() * 100);
+    static auto g_instance = g_fan_policy.instance();
+    fan_power_set(g_instance(EnvironmentService::g_service_data) * 100);
 }};
 
 void fan_automatic_start() {
@@ -124,10 +132,18 @@ optional<uint16_t> FanService::attr_read(
         USER_DESCRIBE(TACHOMETER, "Fan RPM")
         USER_DESCRIBE(FAN_AGGREGATE, "Aggregated Service Data")
 
+        USER_DESCRIBE(FAN_POLICY_COOLDOWN, "How long to continue filtering after conditions are acceptable")
+        USER_DESCRIBE(FAN_POLICY_VOC_PASSIVE_MAX, "Filter if any VOC sensor reaches this threshold")
+        USER_DESCRIBE(FAN_POLICY_VOC_IMPROVE_MIN, "Filter if intake exceeds exhaust by this threshold")
+
         READ_VALUE(FAN_POWER, g_fan_power)
         READ_VALUE(FAN_POWER_OVERRIDE, g_fan_power_override)
         READ_VALUE(TACHOMETER, Aggregate{}.tachometer)
         READ_VALUE(FAN_AGGREGATE, Aggregate{});  // default init populate from global state
+
+        READ_VALUE(FAN_POLICY_COOLDOWN, g_fan_policy.cooldown)
+        READ_VALUE(FAN_POLICY_VOC_PASSIVE_MAX, g_fan_policy.voc_passive_max)
+        READ_VALUE(FAN_POLICY_VOC_IMPROVE_MIN, g_fan_policy.voc_improve_min)
 
         READ_CLIENT_CFG(FAN_AGGREGATE, g_notify_aggregate)
 
@@ -141,6 +157,10 @@ optional<int> FanService::attr_write(hci_con_handle_t conn, uint16_t att_handle,
     WriteConsumer consume{offset, buffer, buffer_size};
 
     switch (att_handle) {
+        WRITE_VALUE(FAN_POLICY_COOLDOWN, g_fan_policy.cooldown)
+        WRITE_VALUE(FAN_POLICY_VOC_PASSIVE_MAX, g_fan_policy.voc_passive_max)
+        WRITE_VALUE(FAN_POLICY_VOC_IMPROVE_MIN, g_fan_policy.voc_improve_min)
+
         WRITE_CLIENT_CFG(FAN_AGGREGATE, g_notify_aggregate)
 
         case HANDLE_ATTR(FAN_POWER_OVERRIDE, VALUE): {

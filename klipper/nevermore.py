@@ -33,9 +33,14 @@ __all__ = [
     "load_config",
 ]
 
+_A = TypeVar("_A")
 _Float = TypeVar("_Float", bound=float)
 
 RGBW = tuple[float, float, float, float]
+
+# BLE Constants (inclusive)
+TIMESEC16_MAX = 2**16 - 2
+VOC_INDEX_MAX = 500
 
 
 # Not actually provided by `bleak`. IDK why not.
@@ -87,7 +92,7 @@ class SensorState:
     temperature: Optional[float] = None  # Celsius
     humidity: Optional[float] = None  # %
     pressure: Optional[float] = None  # hPa
-    voc_index: Optional[int] = None  # [1, 500]
+    voc_index: Optional[int] = None  # [1, VOC_INDEX_MAX]
 
     def as_dict(self) -> dict[str, float | int]:
         return {
@@ -114,11 +119,14 @@ UUID_SERVICE_GAP = short_uuid(0x1801)
 UUID_SERVICE_ENVIRONMENTAL_SENSING = short_uuid(0x181A)
 UUID_SERVICE_FAN = UUID("4553d138-1d00-4b6f-bc42-955a89cf8c36")
 UUID_SERVICE_WS2812 = UUID("f62918ab-33b7-4f47-9fba-8ce9de9fecbb")
+UUID_SERVICE_FAN_POLICY = UUID("260a0845-e62f-48c6-aef9-04f62ff8bffd")
 
 UUID_CHAR_PERCENT8 = short_uuid(0x2B04)
 UUID_CHAR_COUNT16 = short_uuid(0x2AEA)
+UUID_CHAR_TIMESEC16 = short_uuid(0x2B16)
 UUID_CHAR_DATA_AGGREGATE = UUID("75134bec-dd06-49b1-bac2-c15e05fd7199")
 UUID_CHAR_FAN_TACHO = UUID("03f61fe0-9fe7-4516-98e6-056de551687f")
+UUID_CHAR_VOC_INDEX = UUID("216aa791-97d0-46ac-8752-60bbc00611e1")
 UUID_CHAR_WS2812_UPDATE = UUID("5d91b6ce-7db1-4e06-b8cb-d75e7dd49aae")
 
 
@@ -250,9 +258,10 @@ def parse_agg_env(reader: BleAttrReader) -> tuple[SensorState, SensorState]:
     )
 
 
-def require_char(
+def require_chars(
     service: BleakGATTService,
     id: UUID,
+    num: Optional[int] = None,
     props: set[CharacteristicProperty] = {CharacteristicProperty.READ},
 ):
     xs = [
@@ -261,6 +270,23 @@ def require_char(
         if x.uuid == str(id)
         if all(prop.value in x.properties for prop in props)
     ]
+    # chars aren't necessarily ordered. order them by handle # (as they appear in the database)
+    xs = sorted(xs, key=lambda x: x.handle)
+
+    if num is not None and len(xs) != num:
+        raise Exception(
+            f"{service} doesn't have exactly {num} characteristic(s) {id} with properties {props}"
+        )
+
+    return xs
+
+
+def require_char(
+    service: BleakGATTService,
+    id: UUID,
+    props: set[CharacteristicProperty] = {CharacteristicProperty.READ},
+):
+    xs = require_chars(service, id, None, props)
     if len(xs) == 1:
         return xs[0]
 
@@ -338,7 +364,7 @@ class Command:
         raise NotImplemented
 
 
-@dataclass
+@dataclass(frozen=True)
 class CmdFanPower(Command):
     percent: Optional[float]
 
@@ -350,12 +376,46 @@ class CmdFanPower(Command):
         return int(p * 2).to_bytes(1, "little")
 
 
-@dataclass
+@dataclass(frozen=True)
+class CmdFanPolicyCooldown(Command):
+    value: int  # seconds
+
+    def params(self):
+        return _clamp(self.value, 0, TIMESEC16_MAX).to_bytes(2, "little")
+
+
+@dataclass(frozen=True)
+class CmdFanPolicyVocPassiveMax(Command):
+    value: int
+
+    def params(self):
+        return _clamp(self.value, 0, VOC_INDEX_MAX).to_bytes(2, "little")
+
+
+@dataclass(frozen=True)
+class CmdFanPolicyVocImproveMin(Command):
+    value: int
+
+    def params(self):
+        return _clamp(self.value, 0, VOC_INDEX_MAX).to_bytes(2, "little")
+
+
+@dataclass(frozen=True)
 class CmdWs2812Length(Command):
     n_total_components: int
 
     def params(self):
         return int(self.n_total_components).to_bytes(2, "little")
+
+
+class CmdFanPolicy(PseudoCommand):
+    def __init__(self, config: ConfigWrapper) -> None:
+        def cfg_int(key: str, min: int, max: int) -> Optional[int]:
+            return config.getint(f"fan_policy_{key}", None, minval=min, maxval=max)
+
+        self.cooldown = cfg_int("cooldown", 0, TIMESEC16_MAX)
+        self.voc_passive_max = cfg_int("voc_passive_max", 0, VOC_INDEX_MAX)
+        self.voc_improve_min = cfg_int("voc_improve_min", 0, VOC_INDEX_MAX)
 
 
 # Special pseudo command: Due to the very high frequency of these commands, we don't
@@ -420,9 +480,18 @@ class NevermoreBackgroundWorker:
     # PRECONDITION: `self._connected` is set
     def send_command(self, cmd: Command | PseudoCommand):
         assert self._command_queue is not None, "cannot send commands before connecting"
+
+        def send_maybe(wrapper: Callable[[_A], Command], x: Optional[_A]):
+            if x is not None:
+                self._command_queue.sync_q.put(wrapper(x))
+
         match cmd:
             case Command() as cmd:
                 self._command_queue.sync_q.put(cmd)
+            case CmdFanPolicy() as cmd:
+                send_maybe(CmdFanPolicyCooldown, cmd.cooldown)
+                send_maybe(CmdFanPolicyVocPassiveMax, cmd.voc_passive_max)
+                send_maybe(CmdFanPolicyVocImproveMin, cmd.voc_improve_min)
             case CmdWs2812MarkDirty():
                 self._led_dirty.set_threadsafe(self._loop)
             case _:
@@ -487,6 +556,7 @@ class NevermoreBackgroundWorker:
 
         service_env = require(UUID_SERVICE_ENVIRONMENTAL_SENSING)
         service_fan = require(UUID_SERVICE_FAN)
+        service_fan_policy = require(UUID_SERVICE_FAN_POLICY)
         service_ws2812 = require(UUID_SERVICE_WS2812)
 
         P = CharacteristicProperty
@@ -496,6 +566,12 @@ class NevermoreBackgroundWorker:
         ws2812_length = require_char(service_ws2812, UUID_CHAR_COUNT16, {P.WRITE})
         ws2812_update = require_char(
             service_ws2812, UUID_CHAR_WS2812_UPDATE, {P.WRITE_NO_RESPONSE}
+        )
+        fan_policy_cooldown = require_char(
+            service_fan_policy, UUID_CHAR_TIMESEC16, {P.WRITE}
+        )
+        fan_policy_voc_passive_max, fan_policy_voc_improve_min = require_chars(
+            service_fan_policy, UUID_CHAR_VOC_INDEX, 2, {P.WRITE}
         )
 
         self._connected.set()
@@ -520,20 +596,28 @@ class NevermoreBackgroundWorker:
         def notify_fan(nevermore: "Nevermore", params: BleAttrReader):
             # HACK: Abuse GIL to keep this thread-safe
             # show the current fan power even if it isn't overridden
-            nevermore.state.fan_power = params.percentage8() / 100. # need it in [0,1] range
+            nevermore.state.fan_power = params.percentage8() / 100.0  # need it in [0,1]
             _ = params.percentage8()  # power-override
             nevermore.state.fan_tacho = params.tachometer()
 
         async def handle_commands():
             cmd = await self._command_queue.async_q.get()
+            match cmd:
+                case CmdFanPower():
+                    char = fan_power_override
+                case CmdFanPolicyCooldown():
+                    char = fan_policy_cooldown
+                case CmdFanPolicyVocPassiveMax():
+                    char = fan_policy_voc_passive_max
+                case CmdFanPolicyVocImproveMin():
+                    char = fan_policy_voc_improve_min
+                case CmdWs2812Length():
+                    char = ws2812_length
+                case _:
+                    raise Exception(f"unhandled command {cmd}")
+
             try:
-                match cmd:
-                    case CmdFanPower():
-                        await client.write_gatt_char(fan_power_override, cmd.params())
-                    case CmdWs2812Length():
-                        await client.write_gatt_char(ws2812_length, cmd.params())
-                    case _:
-                        raise Exception(f"unhandled command {cmd}")
+                await client.write_gatt_char(char, cmd.params())
             except BleakError as e:
                 # consider non-fatal. don't to abort due to potentially transient error
                 # special case: lost connection -> wait and attempt reconnect
@@ -629,6 +713,7 @@ class Nevermore:
             config, "led"
         ).setup_helper(config, self._led_update, led_chain_count)
 
+        self._fan_policy = CmdFanPolicy(config)
         self._interface: Optional[NevermoreBackgroundWorker] = None
         self._handle_request_restart(None)
 
@@ -661,6 +746,7 @@ class Nevermore:
         if not self._interface.wait_for_connection(TIMEOUT_CONNECT):
             raise self.printer.config_error("nevermore failed to connect - timed out")
 
+        self._interface.send_command(self._fan_policy)
         self._interface.send_command(CmdWs2812Length(len(self.led_colour_idxs)))
         self._led_update(self.led_helper.get_status()["color_data"], None)
 

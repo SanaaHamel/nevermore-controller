@@ -31,6 +31,8 @@ constexpr uint16_t GATT_CLIENT_CFG_NOTIFY_FLAG = 0b0000'0001;
 #define USER_DESCRIBE(attr, desc) HANDLE_READ_BLOB(attr, USER_DESCRIPTION, desc "")
 #define WRITE_CLIENT_CFG(attr, handler) \
     HANDLE_WRITE_EXPR(attr, CLIENT_CONFIGURATION, handler.client_configuration(conn, consume))
+#define WRITE_VALUE(attr, dst) \
+    case HANDLE_ATTR(attr, VALUE): dst = consume.exactly<decltype(dst)>(); return 0;
 
 struct AttrWriteException {
     int error;
@@ -55,6 +57,13 @@ struct WriteConsumer {
         memcpy(&value, buffer + offset, sizeof(value));
         offset += sizeof(A);
         return value;
+    }
+
+    template <typename A>
+    A exactly() {
+        if (remaining() != sizeof(A)) throw AttrWriteException(ATT_ERROR_INVALID_ATTRIBUTE_VALUE_LENGTH);
+
+        return *this;
     }
 
     std::span<uint8_t const> span(size_t length) {
