@@ -23,7 +23,7 @@ option(BLUETOOTH_DEBUG "enable bluetooth debug logging (noisy)")
 option(BLUETOOTH_LOW_LEVEL_DEBUG "enable bluetooth low level debug logging (very noisy)")
 
 set(CMAKE_C_STANDARD 11)
-set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 set(PICO_BOARD pico_w)

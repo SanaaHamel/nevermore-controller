@@ -5,9 +5,9 @@
 #include "sdk/ble_data_types.hpp"
 #include "sdk/i2c.hpp"
 #include "sdk/timer.hpp"
-#include "utility/misc.hpp"
 #include "utility/numeric_suffixes.hpp"
 #include "utility/packed_tuple.hpp"
+#include <bit>
 #include <cstdint>
 #include <utility>
 
@@ -21,12 +21,13 @@ namespace {
 
 constexpr uint8_t SGP40_ADDRESS = 0x59;
 
+// clangd bug: crash if `byteswap` is used w/o `std::` prefix in enum RHS.
 // SGP40 wants its cmds in BE order
 enum class Cmd : uint16_t {
-    SGP40_SELF_TEST = byteswap(0x280E_u16),      // available in all modes, doesn't change mode
-    SGP40_MEASURE = byteswap(0x260F_u16),        // transitions to measure mode
-    SGP4x_HEATER_OFF = byteswap(0x3615_u16),     // transitions to idle mode
-    SGP4x_SERIAL_NUMBER = byteswap(0x3682_u16),  // only available when in idle mode
+    SGP40_SELF_TEST = std::byteswap(0x280E_u16),      // available in all modes, doesn't change mode
+    SGP40_MEASURE = std::byteswap(0x260F_u16),        // transitions to measure mode
+    SGP4x_HEATER_OFF = std::byteswap(0x3615_u16),     // transitions to idle mode
+    SGP4x_SERIAL_NUMBER = std::byteswap(0x3682_u16),  // only available when in idle mode
 };
 
 bool sgp4x_heater_off(i2c_inst_t* bus) {

@@ -68,28 +68,9 @@ layers:
 Build Requirements
 ------------------
 
-* Recent Pico-W SDK
+* Pico-W SDK 1.5.1+
+* CMake 3.20+
 * GCC 12+ (tested w/ 12.2.1, support for constexpr `std::bit_cast` required)
-* Patch for compile_gatt.py (see below)
-
-The Pico SDK's version of btstack https://github.com/bluekitchen/btstack/pull/468[contains a bug that generates malformed GATT databases].
-This has been fixed upstream, but until the SDK updates you'll have to apply the following diff to your installation.
-
-```diff
-diff --git ~/pico/pico-sdk/lib/btstack/tool/compile_gatt.py ~/pico/pico-sdk/lib/btstack/tool/compile_gatt.py
-index 167fb6701..8452c5f06 100755
---- ~/pico/pico-sdk/lib/btstack/tool/compile_gatt.py
-+++ ~/pico/pico-sdk/lib/btstack/tool/compile_gatt.py
-@@ -714,7 +714,7 @@ def parseGenericDynamicReadOnlyDescriptor(fout, parts, uuid, name):
-     write_16(fout, size)
-     write_16(fout, flags)
-     write_16(fout, handle)
--    write_16(fout, 0x2903)
-+    write_16(fout, uuid)
-     fout.write("\n")
-
-     database_hash_append_uint16(handle)
-```
 
 Credits
 -------

@@ -4,7 +4,7 @@
 #include "sdk/i2c.hpp"
 #include "sdk/timer.hpp"
 #include "sensors/async_sensor.hpp"
-#include "utility/misc.hpp"
+#include <bit>
 #include <cassert>
 #include <cstdint>
 #include <cstdio>
