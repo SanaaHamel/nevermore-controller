@@ -96,7 +96,7 @@ void LV_DRV_DISP_SPI_CS(bool) {
 void LV_DRV_DISP_SPI_WR_ARRAY(uint8_t const* src, unsigned len) {
     assert(g_display_spi && "SPI not yet ready");
     assert(src);
-    auto n = spi_write_blocking(g_display_spi, src, len);
+    [[maybe_unused]] auto n = spi_write_blocking(g_display_spi, src, len);
     assert(n == int(len) && "failed to write octet");
 }
 
