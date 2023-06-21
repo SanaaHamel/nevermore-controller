@@ -6,7 +6,6 @@
 #include "ws2812.hpp"
 #include <cstdint>
 #include <span>
-#include <utility>
 
 using namespace std;
 

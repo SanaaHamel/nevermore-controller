@@ -5,7 +5,6 @@
 #include "sdk/ble_data_types.hpp"
 #include "sdk/btstack.hpp"
 #include <cstdint>
-#include <utility>
 
 using namespace std;
 
