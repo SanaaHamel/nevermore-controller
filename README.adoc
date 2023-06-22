@@ -43,7 +43,7 @@ The Pico W's LED should start flashing once the controller has booted.
 +
 ```sh
 cd ~
-git clone git@github.com:SanaaHamel/nevermore-controller.git
+git clone https://github.com/SanaaHamel/nevermore-controller
 cd nevermore-controller
 ./install-klipper-module.bash
 ```
