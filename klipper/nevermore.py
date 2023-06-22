@@ -508,9 +508,6 @@ class NevermoreBackgroundWorker:
         worker_log = LogPrefixed(LOG, lambda x: f"{self._thread.name} - {x}")
 
         async def handle_connection() -> None:
-            # set this up ASAP once we're in an asyncio loop
-            self._command_queue = janus.Queue()
-
             # Attempt (re)connection. Might have to do this multiple times if we lose connection.
             while True:
                 try:
@@ -524,6 +521,9 @@ class NevermoreBackgroundWorker:
                     pass  # ignore, keep trying to (re)connect
 
         async def go():
+            # set this up ASAP once we're in an asyncio loop
+            self._command_queue = janus.Queue()
+
             main = asyncio.create_task(handle_connection())
 
             async def canceller():
