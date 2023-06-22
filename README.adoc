@@ -66,6 +66,15 @@ Configured MCU 'mcu' (283 moves)
 ```
 
 
+== Customisation & Pin Assignments
+
+`src/config.hpp` contains all user-customisable options.
+These options are, for the most part, validated at compile time to prevent mistakes.
+
+Pins assignments can be modified to suit your board/wiring, but are subject to hardware-related constraints. These are constraints are extensively checked at compile time, and will result in a (hopefully) useful error message if violated. If it compiles, it's a valid configuration.
+
+WARNING: GPIO 0 and 1 are currently hardcoded for UART. They cannot be used in any pin assignments.
+
 == Klipper
 
 [#klipper-requirements]
