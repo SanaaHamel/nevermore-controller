@@ -1,16 +1,15 @@
-
-Nevermore Controller
-====================
+= Nevermore Controller
+:toc: macro
+:toclevels: 2
 
 A Pi Pico W based controller for https://github.com/nevermore3d/Nevermore_Max[Nevermore Max] and
 https://github.com/nevermore3d/StealthMax[StealthMax] filters.
 This controller is BlueTooth LE enabled, minimising required wiring and allowing multiple clients
 to interact with the controller.
 
-*BUILD REQUIRES PATCH FOR PICO SDK BUG - See below.*
+toc::[]
 
-Features
---------
+== Features
 
 * [x] Klipper Module
 * [x] BLE - Multiple Connections Supported
@@ -23,19 +22,79 @@ Features
 * [x] WS2812 support
 * [ ] Display - GC9A01
 
-Klipper - Example Configuration
--------------------------------
+
+== Build Requirements
+
+* Pico-W SDK 1.5.1+
+* CMake 3.20+
+* C++23 compiler, e.g. GCC 12+ (tested w/ 12.2.1)
+
+== Installation For Dummies
+
+NOTE: Make sure you meet the xref:klipper-requirements[Klipper requirements].
+
+Instructions:
+
+. Build or download the controller `uf2` binaries, flash to Pico W.
++
+The Pico W's LED should start flashing once the controller has booted.
+
+. Execute the following to install the Klipper module:
++
+```sh
+cd ~
+git clone git@github.com:SanaaHamel/nevermore-controller.git
+cd nevermore-controller
+./install-klipper-module.bash
+```
+
+. Update your printer config. Here's an <<Example Configuration>> for reference.
+
+. Check your printer's log file. If everything went well you should see something like:
++
+```log
+... BLAH
+... BLAH
+Sending MCU 'mcu' printer configuration...
+Configured MCU 'mcu' (283 moves)
+... BLAH
+... BLAH
+[11:27:13:976834] nevermore - discovered controller 28:CD:C1:09:64:8F
+[11:27:13:981190] nevermore - connected to controller 28:CD:C1:09:64:8F
+... BLAH
+... BLAH
+```
+
+
+== Klipper
+
+[#klipper-requirements]
+=== Requirements
+
+* Klipper using Python 3.7+
+* Kiauh-like installation (required by installation script)
+
+TL;DR: If you installed everything using https://github.com/th33xitus/kiauh[Kiauh], you should be good to go so long as you installed Klipper with Python 3.
+
+=== Example Configuration
 
 ```ini
 [nevermore]
+# Optional - Can omit if you have only one nevermore in range.
+# See <<Finding The BT Address>> for more info.
 # example - `bt_address: 43:43:A2:12:1F:AC`
-bt_address: <REPLACE WITH YOUR BT DEVICE ADDRESS>
-# LED members are optional and generally behaves like the WS2812 klipper module
+# bt_address: <REPLACE WITH YOUR BT DEVICE ADDRESS>
+
+# Optional - LED
+# For the optional LED ring feature.
+# Members generally behaves like the WS2812 klipper module.
 # (e.g. supports heterogenous pixel chains)
 led_colour_order: GBR
 led_chain_count: 16
 
-# All fan policy settings are optional. Values given here are also the defaults.
+# Optional - Fan Policy
+# Controls how/when the fan turns on automatically.
+# Values given here are also the defaults.
 
 # seconds, how long to keep filtering after the policy would otherwise stop
 fan_policy_cooldown: 900
@@ -74,11 +133,69 @@ layers:
 ```
 
 
-Klipper - Fan Control & Macros
-------------------------------
+=== Finding The BT Address
 
-The fan can be controlled much like any other fan.
+**If you have only one Nevermore controller in range then you can omit the `bt_address` option in your printer configuration and ignore this section entirely.**
 
+If you have multiple BlueTooth devices in range that look like candidates for a Nevermore controller, then you have to specify which one to use.
+
+==== Method A - Check the Klipper Log
+
+An error will be raised if there are multiple controllers in range.
+The error message will list all the available controllers' addresses.
+
+Pick one from the list and stuff that into the `nevermore` section's `bt_address`.
+
+For example, given this log:
+
+```log
+...
+...
+[11:06:36:535560] nevermore - multiple nevermore controllers discovered.
+specify which to use by setting `bt_address: <insert-address-here>` in your klipper config.
+discovered controllers (ordered by signal strength):
+    address           | signal strength
+    -----------------------------------
+    FA:KE:AD:RE:SS:01 | -38 dBm
+    FA:KE:AD:RE:SS:00 | -57 dBm
+Config error
+Traceback (most recent call last):
+  File "~/klipper/klippy/klippy.py", line 180, in _connect
+    cb()
+  File "~/klipper/klippy/extras/nevermore.py", line 793, in _handle_connect
+    raise self.printer.config_error("nevermore failed to connect - timed out")
+configparser.Error: nevermore failed to connect - timed out
+...
+...
+```
+
+We could use `bt_address: FA:KE:AD:RE:SS:01` or `bt_address: FA:KE:AD:RE:SS:00`.
+
+In this case I'd plug in `FA:KE:AD:RE:SS:01` since that device has the strongest signal, i.e. closest-ish to the Klipper host.
+
+
+==== Method B - Use Your Phone + nRF Connect
+
+WARNING: If you're hosting Klipper on MacOS then you cannot use this approach and must use <<Method A - Check the Klipper Log>>.
+
+nRF Connect is an app by Nordic Semi.
+It's meant for debugging/exploring BLE devices, but we can (ab)use to find the BT addresses.
+
+Load the app, scan for BLE devices. The controllers will all be named "Nevermore", and their BT addresses will be listed below.
+
+.nRF Connect displays device names & addresses
+image::README-nrf-connect.png[nRC Connect Screenshot,256]
+
+
+=== Fan Control & Macros
+
+There are two modes of operation:
+
+* Automatic - Fan power is managed by the controller based on its fan policy (see <<Example Configuration>>).
+
+* Manual - Fan power is overridden and will run at the specified power until the override is cleared.
+
+From within Klipper, the fan can be controlled much like any other fan:
 
 ```gcode
 ; override automatic fan control, full speed ahead
@@ -92,16 +209,7 @@ You could therefore alter your `print_start` macro to force the fan to start bef
 
 WARNING: Setting the fan speed to 0 in Mainsail/Fluidd UI does **not** clear the control override. It just sets it to zero. (i.e. disables the fan)
 
-
-Build Requirements
-------------------
-
-* Pico-W SDK 1.5.1+
-* CMake 3.20+
-* GCC 12+ (tested w/ 12.2.1, support for constexpr `std::bit_cast` required)
-
-Credits
--------
+== Credits
 
 * https://github.com/julianschill/klipper-led_effect[Julian Schill] - installation script (derived)
 * https://github.com/boschsensortec/BME280_driver[Bosch Sensors] - BME280 library (included)
