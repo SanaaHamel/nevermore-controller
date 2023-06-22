@@ -42,4 +42,7 @@
         "~/klipper/klippy",
         "~/projects/klipper/klippy"
     ],
+    "mypy-type-checker.args": [
+        "--follow-imports=silent"
+    ],
 }
