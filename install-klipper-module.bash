@@ -10,6 +10,11 @@
 set -eu
 set -o pipefail
 
+if [ "$EUID" -eq 0 ]; then
+    echo "[ERROR] This script must not run as root. Exiting."
+    exit -1
+fi
+
 UNINSTALL=0
 KLIPPER_PATH="${HOME}/klipper"
 MOONRAKER_CONFIG_DIR="${HOME}/printer_data/config"
@@ -132,17 +137,7 @@ uninstall()
     fi
 }
 
-# Helper functions
-verify_ready()
-{
-    if [ "$EUID" -eq 0 ]; then
-        echo "[ERROR] This script must not run as root. Exiting."
-        exit -1
-    fi
-}
-
 # Run steps
-verify_ready
 check_klipper
 check_folders
 stop_klipper
