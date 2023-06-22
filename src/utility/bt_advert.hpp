@@ -68,22 +68,27 @@ constexpr auto complete_local_name(char const (&name)[M]) {
     return internal::string(BLUETOOTH_DATA_TYPE_COMPLETE_LOCAL_NAME, name);
 }
 
-template <uint16_t... xs>
-constexpr auto services() {
-    return internal::blob(BLUETOOTH_DATA_TYPE_COMPLETE_LIST_OF_16_BIT_SERVICE_CLASS_UUIDS, std::array{xs...});
-}
+#define BT_ADVERT_SERVICES0(name, kind, type, guard)    \
+    template <type... xs>                               \
+        requires(guard && ...)                          \
+    constexpr auto name() {                             \
+        return internal::blob(kind, std::array{xs...}); \
+    }
 
-template <uint32_t... xs>
-    requires((UINT16_MAX < xs) && ...)  // ensure can't be expressed as a 16 bit service ID
-constexpr auto services() {
-    return internal::blob(BLUETOOTH_DATA_TYPE_COMPLETE_LIST_OF_32_BIT_SERVICE_CLASS_UUIDS, std::array{xs...});
-}
+#define BT_ADVERT_SERVICES(name, enum16, enum32, enum128)          \
+    BT_ADVERT_SERVICES0(name, enum16, uint16_t, (0 <= xs))         \
+    BT_ADVERT_SERVICES0(name, enum32, uint32_t, (UINT16_MAX < xs)) \
+    BT_ADVERT_SERVICES0(name, enum128, BT::uint128_t, (UINT32_MAX < xs))
 
-template <BT::uint128_t... xs>
-    requires((UINT32_MAX < xs) && ...)  // ensure can't be expressed as a 32 or 16 bit service ID
-constexpr auto services() {
-    return internal::blob(
-            BLUETOOTH_DATA_TYPE_COMPLETE_LIST_OF_128_BIT_SERVICE_CLASS_UUIDS, std::array{xs...});
-}
+BT_ADVERT_SERVICES(services, BLUETOOTH_DATA_TYPE_COMPLETE_LIST_OF_16_BIT_SERVICE_CLASS_UUIDS,
+        BLUETOOTH_DATA_TYPE_COMPLETE_LIST_OF_32_BIT_SERVICE_CLASS_UUIDS,
+        BLUETOOTH_DATA_TYPE_COMPLETE_LIST_OF_128_BIT_SERVICE_CLASS_UUIDS)
+
+BT_ADVERT_SERVICES(services_incomplete, BLUETOOTH_DATA_TYPE_INCOMPLETE_LIST_OF_16_BIT_SERVICE_CLASS_UUIDS,
+        BLUETOOTH_DATA_TYPE_INCOMPLETE_LIST_OF_32_BIT_SERVICE_CLASS_UUIDS,
+        BLUETOOTH_DATA_TYPE_INCOMPLETE_LIST_OF_128_BIT_SERVICE_CLASS_UUIDS)
+
+#undef BT_ADVERT_SERVICES0
+#undef BT_ADVERT_SERVICES
 
 }  // namespace bt::advert
