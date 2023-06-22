@@ -139,6 +139,8 @@ layers:
 
 If you have multiple BlueTooth devices in range that look like candidates for a Nevermore controller, then you have to specify which one to use.
 
+NOTE: It is possible, but very rare, for the address to change when a new `uf2` is flashed onto the Pico. This has been observed once after updating the Pico SDK.
+
 ==== Method A - Check the Klipper Log
 
 An error will be raised if there are multiple controllers in range.
