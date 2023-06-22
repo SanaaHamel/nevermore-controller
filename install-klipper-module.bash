@@ -40,13 +40,26 @@ done
 # Find ROOT_DIR from the pathname of this script
 ROOT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
-# Verify Klipper has been installed
+# Verify Klipper has been installed, is kiauh-like, and is using Python 3
 check_klipper()
 {
     if [ "$(sudo systemctl list-units --full -all -t service --no-legend | grep -F "klipper.service")" ]; then
         echo "Klipper service found."
     else
         echo "[ERROR] Klipper service not found, please install Klipper first"
+        exit -1
+    fi
+
+    if [ ! -f "${HOME}/klippy-env/bin/pip" ]; then
+        echo "[ERROR] '${HOME}/klippy-env/bin/pip' is not a file"
+        echo "[ERROR] This can happen if you didn't install Klipper via Kiauh."
+        echo "[ERROR] This is not a supported scenario at this time, pardon."
+        exit -1
+    fi
+
+    if ! "${HOME}/klippy-env/bin/pip" --version | grep "(python 3\(\.[0-9]\+\)*)" >> /dev/null; then
+        echo "[ERROR] Klipper doesn't seem to be using Python 3."
+        echo "[ERROR] NOTE: You can reinstall Klipper w/ Python 3 using Kliauh. (Backup your config!)"
         exit -1
     fi
 }
