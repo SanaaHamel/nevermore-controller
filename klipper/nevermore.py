@@ -75,8 +75,6 @@ LOG = LogPrefixed(
 
 # How long to wait for a BLE connection to the controller (sec)
 TIMEOUT_CONNECT = 10.0
-# Polling rate for controller state updates
-NEVERMORE_POLL_HZ = 1
 
 
 # (measure-time, temperature) -> None
