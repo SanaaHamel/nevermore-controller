@@ -19,7 +19,8 @@ from typing import Any, Callable, Coroutine, MutableMapping, Optional, TypeVar, 
 from uuid import UUID
 
 import janus
-from bleak import BleakClient, BleakError
+from bleak import BleakClient, BleakError, BleakScanner
+from bleak.backends.device import BLEDevice
 from bleak.backends.service import BleakGATTCharacteristic, BleakGATTService
 from bleak.exc import BleakDeviceNotFoundError
 from configfile import ConfigWrapper
@@ -139,6 +140,7 @@ def _clamp(x: _Float, min: _Float, max: _Float) -> _Float:
 
 
 # must be of the form `xx:xx:xx:xx:xx:xx`, where `x` is a hex digit (uppercase)
+# FUTURE WORK: Won't work on MacOS. It uses UUIDs to abstract/hide the BT address.
 def _bt_address_validate(addr: str):
     octets = addr.split(":")
     if len(octets) != 6:
@@ -293,6 +295,23 @@ def require_char(
     raise Exception(
         f"{service} has {'no' if not xs else 'multiple'} characteristic {id} with properties {props}"
     )
+
+
+async def discover_controllers(
+    address: Optional[str] = None, timeout: float = 10
+) -> list[BLEDevice]:
+    NAME_SHORTENED = "Nevermore"
+    NAME_COMPLETE = "Nevermore Controller"
+
+    if address is not None:
+        device = await BleakScanner.find_device_by_address(address, timeout=timeout)
+        return [device] if device is not None else []
+
+    return [
+        x
+        for x in await BleakScanner.discover(timeout=timeout)
+        if x.name in {NAME_SHORTENED, NAME_COMPLETE}
+    ]
 
 
 @dataclass
@@ -457,7 +476,6 @@ class NevermoreBackgroundWorker:
         # A weak ref allows us to end the worker if the nevermore instance is
         # ever GC'd without asking us to disconnect (for whatever reason).
         self._nevermore = weakref.ref(nevermore, lambda nevermore: self.disconnect())
-        self._address = nevermore.bt_address
         self._connected = threading.Event()
         self._loop_exit = UNSAFE_LazyAsyncioEvent()
         self._led_dirty = UNSAFE_LazyAsyncioEvent()
@@ -503,17 +521,45 @@ class NevermoreBackgroundWorker:
             return  # Already dead and we didn't need to do anything...
 
         self._thread.name = nevermore.name
+        device_address = nevermore.bt_address
         nevermore = None  # release reference otherwise call frame keeps it alive
 
         worker_log = LogPrefixed(LOG, lambda x: f"{self._thread.name} - {x}")
 
-        async def handle_connection() -> None:
+        async def handle_connection(device_address: Optional[str]) -> None:
             # Attempt (re)connection. Might have to do this multiple times if we lose connection.
             while True:
                 try:
-                    async with BleakClient(
-                        self._address, timeout=TIMEOUT_CONNECT
-                    ) as client:
+                    # TIMEOUT_CONNECT * 0.75 b/c scan must finish before main thread
+                    # times out waiting for initial connection check
+                    devices = await discover_controllers(
+                        device_address, timeout=TIMEOUT_CONNECT * 0.75
+                    )
+                    if not devices:
+                        continue  # no devices found, try again
+
+                    if 1 < len(devices):  # multiple devices found
+                        worker_log.error(
+                            f"multiple nevermore controllers discovered.\n"
+                            f"specify which to use by setting `bt_address: <insert-address-here>` in your klipper config.\n"
+                            f"discovered controllers (ordered by signal strength):\n"
+                            f"\taddress           | signal strength\n"
+                            f"\t-----------------------------------\n"
+                            f"\t"
+                            + "\n\t".join(
+                                f"{x.address} | {x.rssi} dBm"
+                                for x in sorted(devices, key=lambda x: -x.rssi)
+                            )
+                        )
+                        return  # don't bother trying again. abort & let the user deal with it
+
+                    # remember the discovered device's address, just in case another
+                    # controller wanders into range and we need to reconnect to this one
+                    if device_address is None:
+                        worker_log.info(f"discovered controller {devices[0].address}")
+                        device_address = devices[0].address
+
+                    async with BleakClient(devices[0]) as client:
                         await self._worker_using(worker_log, client)
                 except TimeoutError:
                     pass  # ignore, keep trying to (re)connect
@@ -524,7 +570,7 @@ class NevermoreBackgroundWorker:
             # set this up ASAP once we're in an asyncio loop
             self._command_queue = janus.Queue()
 
-            main = asyncio.create_task(handle_connection())
+            main = asyncio.create_task(handle_connection(device_address))
 
             async def canceller():
                 await self._loop_exit.wait()
@@ -538,20 +584,20 @@ class NevermoreBackgroundWorker:
         except asyncio.CancelledError:
             worker_log.info("disconnecting")
             raise
-        except:  # TODO: ignore cancellation & interrupt exception
+        except:
             worker_log.exception("worker failed")
 
     async def _worker_using(
         self, log: logging.Logger | logging.LoggerAdapter, client: BleakClient
     ):
-        log.info("connected to controller")
+        log.info(f"connected to controller {client.address}")
 
         await client.get_services()  # fetch and cache services
 
         def require(id: UUID):
             x = client.services.get_service(id)
             if x is None:
-                raise Exception(f"{client} doesn't have required service {id}")
+                raise Exception(f"{client.address} doesn't have required service {id}")
             return x
 
         service_env = require(UUID_SERVICE_ENVIRONMENTAL_SENSING)
@@ -681,14 +727,16 @@ class Nevermore:
         self.name = config.get_name().split()[-1]
         self.printer: Printer = config.get_printer()
         self.reactor: SelectReactor = self.printer.get_reactor()
-        self.bt_address: str = config.get("bt_address").upper()
         self.state = ControllerState()
         self.fan = NevermoreFan(self)
 
-        if not _bt_address_validate(self.bt_address):
-            raise config.error(
-                f"invalid bluetooth address for `bt_address`, given `{self.bt_address}`"
-            )
+        self.bt_address: Optional[str] = config.get("bt_address", None)
+        if self.bt_address is not None:
+            self.bt_address = self.bt_address.upper()
+            if not _bt_address_validate(self.bt_address):
+                raise config.error(
+                    f"invalid bluetooth address for `bt_address`, given `{self.bt_address}`"
+                )
 
         # LED-specific code.
         # Ripped from `extras/neopixel.py` because the processing code is entangled with MCU transmission.
