@@ -33,8 +33,7 @@ constexpr tuple ADVERT{
                 Flag::EDR_NOT_SUPPORTED,
         }),
         shortened_local_name("Nevermore"),
-        services<ORG_BLUETOOTH_SERVICE_GENERIC_ACCESS, ORG_BLUETOOTH_SERVICE_GENERIC_ATTRIBUTE,
-                ORG_BLUETOOTH_SERVICE_ENVIRONMENTAL_SENSING>(),
+        services<ORG_BLUETOOTH_SERVICE_ENVIRONMENTAL_SENSING>(),
 };
 
 void hci_handler(uint8_t packet_type, uint16_t channel, uint8_t* packet, uint16_t size) {
