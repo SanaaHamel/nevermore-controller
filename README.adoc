@@ -48,7 +48,7 @@ cd nevermore-controller
 ./install-klipper-module.bash
 ```
 
-. Update your printer config. Here's an <<Example Configuration>> for reference.
+. Update your printer config. Here's a xref:klipper-config-minimal[trivial configuration example], and xref:klipper-config-full[see here for complete documentation].
 
 . Check your printer's log file. If everything went well you should see something like:
 +
@@ -85,7 +85,38 @@ WARNING: GPIO 0 and 1 are currently hardcoded for UART. They cannot be used in a
 
 TL;DR: If you installed everything using https://github.com/th33xitus/kiauh[Kiauh], you should be good to go so long as you installed Klipper with Python 3.
 
-=== Example Configuration
+=== Configuration
+
+[#klipper-config-minimal]
+==== Minimal Example
+
+This example configuration is suitable quickly getting up and running.
+
+```ini
+[nevermore]
+# BOM states a 16 pixel
+led_colour_order: GBR
+led_chain_count: 16
+
+[temperature_sensor nevermore_intake]
+sensor_type: NevermoreSensor
+sensor_kind: intake
+class_name_override: bme280
+
+[temperature_sensor nevermore_exhaust]
+sensor_type: NevermoreSensor
+sensor_kind: exhaust
+class_name_override: bme280
+
+[temperature_sensor nevermore_intake_VOC]
+sensor_type: NevermoreSensor
+sensor_kind: intake
+plot_voc: true
+```
+
+
+[#klipper-config-full]
+==== Full Documentation
 
 ```ini
 [nevermore]
@@ -112,25 +143,25 @@ fan_policy_voc_passive_max: 125
 # voc index, 0 to disable, filter if the intake exceeds exhaust by at least this much
 fan_policy_voc_improve_min: 5
 
-[temperature_sensor nvm0_intake]
+
+[temperature_sensor nevermore_sensor]
 sensor_type: NevermoreSensor
+
+# required - valid values: `intake`, `exhaust`
 sensor_kind: intake
+
+# optional
 # If you do not wish to edit your mainsail installation to add `NevermoreSensor`,
 # to its list of known sensors, you can use an already recognised classname (e.g. `bme280`)
 class_name_override: bme280
 
-# If you wish the VOC index levels plotted, this can be hacked in by pretending the
-# VOC index is a temperature by using `plot_voc: true`
-[temperature_sensor nvm0_intake_VOC]
-sensor_type: NevermoreSensor
-sensor_kind: intake
+# optional - default: false
+# Pretends the VOC index is a temperature, allowing it to be plotted in Mainsail/Fluidd.
+# Setting this to true will suppress the all other readings for this sensor object. (e.g. temperature, pressure, etc)
 plot_voc: true
 
-[temperature_sensor nvm1_exhaust]
-sensor_type: NevermoreSensor
-sensor_kind: exhaust
 
-# led-effects are supported
+# led-effects are supported, here's an example:
 [led_effect panel_idle]
 autostart:              true
 frame_rate:             24
@@ -202,7 +233,7 @@ image::README-nrf-connect.png[nRC Connect Screenshot,256]
 
 There are two modes of operation:
 
-* Automatic - Fan power is managed by the controller based on its fan policy (see <<Example Configuration>>).
+* Automatic - Fan power is managed by the controller based on its fan policy (xref:klipper-config-full[see here]).
 
 * Manual - Fan power is overridden and will run at the specified power until the override is cleared.
 
