@@ -48,7 +48,47 @@ cd nevermore-controller
 ./install-klipper-module.bash
 ```
 
-. Update your printer config. Here's a xref:klipper-config-minimal[trivial configuration example], and xref:klipper-config-full[see here for complete documentation].
+. Add nevermore your printer config. Here's a xref:klipper-config-minimal[trivial configuration example], and xref:klipper-config-full[see here for complete documentation].
+
+. Update your printer macros.
+
+.. Add `SET_FAN_SPEED FAN=nevermore_fan SPEED=1` to your `print_start` macro.footnote:[I suggest adding gcode rather than a macro wrapper because you want the filter to start when the extruder/bed heats up, and your `print_start` probably does a lot of things (homing, QGL, purge, etc).]
++
+This'll let you kick-start the filter before the chamber gets detectably filthy. Example:
++
+```ini
+[gcode_macro PRINT_START]
+gcode:
+    ... <SNIP YOUR CURRENT GCODE> ...
+
+    # Insert right before heating extruder or bed
+    # (e.g. M104, M109, M190, ...)
+    # Override automatic control.
+    # Start filtering before sensors can detect VOCs.
+    SET_FAN_SPEED FAN=nevermore_fan SPEED=1
+
+    ... <SNIP YOUR CURRENT GCODE> ...
+```
+
+.. Add `SET_FAN_SPEED FAN=nevermore_fan` to your `TURN_OFF_HEARTS` macro.
++
+WARNING: This assumes your `print_end` macro calls `TURN_OFF_HEATERS`. If it doesn't you'll want to put `SET_FAN_SPEED FAN=nevermore_fan` in your `print_end` macro to turn off the fan override.
++
+Easiest way would be to put this macro wrapper in your config:footnote:[Wherever you'd like.`TURN_OFF_HEATERS` is a built-in macro, and should never be overridden w/o calling the replaced macro, so it doesn't matter if another macro ends up wrapping this wrapper.]
++
+```ini
+# ASSUME: Your `print_end`
+# Put this at the very
+[gcode_macro TURN_OFF_HEATERS]
+rename_existing: NEVERMORE_CONTROLLER_INNER_TURN_OFF_HEATERS
+gcode:
+    NEVERMORE_CONTROLLER_INNER_TURN_OFF_HEATERS
+    # Clear the fan control override, we're cooling down
+    # NB: Setting SPEED=0 does *NOT* clear control override.
+    #     It instead forces the speed to 0.
+    #     Omit `SPEED` argument entirely to clear override.
+    SET_FAN_SPEED FAN=nevermore_fan
+```
 
 . Check your printer's log file. If everything went well you should see something like:
 +
@@ -303,9 +343,6 @@ SET_FAN_SPEED FAN=nevermore_fan SPEED=1
 ; not specifying `SPEED=` disables fan override and returns to automatic fan control
 SET_FAN_SPEED FAN=nevermore_fan
 ```
-
-
-You could therefore alter your `print_start` macro to force the fan to start before the VOC sensors detect anything, and clear the override in `print_end` to allow automatic control to mop up on its own.
 
 WARNING: Setting the fan speed to 0 in Mainsail/Fluidd UI does **not** clear the control override. It just sets it to zero. (i.e. disables the fan)
 
