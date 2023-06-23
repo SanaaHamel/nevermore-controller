@@ -91,7 +91,9 @@ class SensorState:
     temperature: Optional[float] = None  # Celsius
     humidity: Optional[float] = None  # %
     pressure: Optional[float] = None  # hPa
-    voc_index: Optional[int] = None  # [1, VOC_INDEX_MAX]
+    # HACK: Must be named `gas` b/c Fluidd only looks at `temperature`, `humidity`, `pressure`, and `gas`.
+    #       Also happens to be what the bme680 reports.
+    gas: Optional[int] = None  # [1, VOC_INDEX_MAX]
 
     def as_dict(self) -> dict[str, float | int]:
         return {
@@ -882,7 +884,7 @@ class NevermoreSensor:
     def get_status(self, eventtime: float) -> dict[str, float]:
         # HACK: can only plot on mainsail/fluidd if we pretend the VOC Index is a temperature
         if self.plot_voc:
-            return {"temperature": self.state.voc_index or 0}
+            return {"temperature": self.state.gas or 0}
 
         return self.state.as_dict()
 
@@ -911,7 +913,7 @@ class NevermoreSensor:
         # HACK: can only plot on mainsail/fluidd if we pretend the VOC Index is a temperature
         temp = self.state.temperature
         if self.plot_voc:
-            temp = self.state.voc_index
+            temp = self.state.gas
 
         if temp is not None and self._callback is not None:
             self._callback(measured_time, temp)
