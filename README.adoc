@@ -106,14 +106,39 @@ Configured MCU 'mcu' (283 moves)
 ```
 
 
-== Customisation & Pin Assignments
+== Controller Customisation
 
 `src/config.hpp` contains all user-customisable options.
 These options are, for the most part, validated at compile time to prevent mistakes.
 
+
+=== Pin Assignments
+
 Pins assignments can be modified to suit your board/wiring, but are subject to hardware-related constraints. These are constraints are extensively checked at compile time, and will result in a (hopefully) useful error message if violated. If it compiles, it's a valid configuration.
 
 WARNING: GPIO 0 and 1 are currently hardcoded for UART. They cannot be used in any pin assignments.
+
+WARNING: The default assignments are tentative and will probably change after we get some feedback as to which layouts work best in practice.
+
+.Default Pin Assignments
+[%autowidth]
+|===
+|GPIO | Function
+|0  | UART - TX
+|1  | UART - RX
+|6  | Display - GC9A01 - SPI SCK
+|7  | Display - GC9A01 - SPI TX
+|8  | Display - GC9A01 - Command
+|9  | Display - GC9A01 - Reset
+|13 | Fan - PWM
+|15 | Fan - Tachometer
+|12 | NeoPixel - Data
+|18 | Exhaust - I2C SDA
+|19 | Exhaust - I2C SCL
+|20 | Intake - I2C SDA
+|21 | Intake - I2C SCL
+|===
+
 
 == Klipper
 
