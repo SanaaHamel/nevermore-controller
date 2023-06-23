@@ -57,7 +57,7 @@ list(APPEND SRC_CPP "${SRC_DIR}/binary_info.cpp")
 set(SRC_FILES ${SRC_H} ${SRC_C} ${SRC_HPP} ${SRC_CPP})
 
 # `psabi` is a useless warning for our purposes
-add_compile_options(-Wall -Wno-psabi)
+add_compile_options(-Wall -Wno-psabi -Wno-trigraphs)
 add_compile_definitions(PARAM_ASSERTIONS_ENABLE_ALL=1)
 
 if(BLUETOOTH_DEBUG)

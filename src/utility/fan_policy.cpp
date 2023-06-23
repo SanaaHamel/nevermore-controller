@@ -12,20 +12,6 @@ using EnvironmentService::VOCIndex;
 
 namespace {
 
-// Toy for debugging purposes.
-#if 0
-template <typename A>
-constexpr A remap(A const& x, A const& min, A const& max, A const& lo, A const& hi) {
-    auto p = (x - min) / (max - min);
-    return lerp(std::move(p), lo, hi);
-}
-
-[[maybe_unused]] float fan_power_time_sin(chrono::duration<float> period = 10s) {
-    auto t = chrono::system_clock::now().time_since_epoch() / period;
-    return remap<float>(sin(t * 2 * M_PI), -1, 1, 0, 1);
-}
-#endif
-
 bool should_filter(FanPolicyEnvironmental const& params, VOCIndex intake, VOCIndex exhaust) {
     // Can't decide anything until we have readings available
     if (intake == BLE::NOT_KNOWN) return false;

@@ -20,7 +20,7 @@ toc::[]
 * [x] Sensor - HTU2xD (Temperature, Humidity)
 * [x] Sensor - SGP40 (Volatile Organic Compound Index)
 * [x] WS2812 support
-* [ ] Display - GC9A01
+* [x] Display - GC9A01
 
 
 == Build Requirements
