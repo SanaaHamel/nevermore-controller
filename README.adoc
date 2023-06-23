@@ -177,7 +177,11 @@ layers:
 
 **If you have only one Nevermore controller in range then you can omit the `bt_address` option in your printer configuration and ignore this section entirely.**
 
-If you have multiple BlueTooth devices in range that look like candidates for a Nevermore controller, then you have to specify which one to use.
+If you have multiple BlueTooth (BT) devices in range that look like candidates for a Nevermore controller, then you have to specify which one to use. This is done by specifying their 'address' in the printer config using `bt_address: <address>`.
+
+On Linux and Windows hosts, this address looks like `XX:XX:XX:XX:XX:XX`, where `X` is a hexadecimal digit.
+
+On MacOS hosts, this address is a randomly assigned UUID specific to that host.
 
 NOTE: It is possible, but very rare, for the address to change when a new `uf2` is flashed onto the Pico. This has been observed once after updating the Pico SDK.
 
@@ -215,8 +219,62 @@ We could use `bt_address: FA:KE:AD:RE:SS:01` or `bt_address: FA:KE:AD:RE:SS:00`.
 
 In this case I'd plug in `FA:KE:AD:RE:SS:01` since that device has the strongest signal, i.e. closest-ish to the Klipper host.
 
+==== Method B - Linux Only - `bluetoothctl`
 
-==== Method B - Use Your Phone + nRF Connect
+NOTE: Only works on Linux. Yes, I know you didn't read the title.
+
+. Make sure your Nevermore controller is powered and the LED is blinking. (Indicates it is active.)
+
+. In a terminal, run: `bluetoothctl`
++
+This'll open a REPL interface.
++
+```
+⋊> ~ bluetoothctl
+Agent registered
+[CHG] Controller FA-KE-AD-RE-SS-FF Pairable: yes
+[bluetooth]#
+```
+
+. Run: `scan on`, **wait a few seconds** (~5 or 6 is plenty)
++
+Starts background scan for devices.
+This isn't a blocking command, you can issue other commands as it scans in the background.
++
+```
+[bluetooth]# scan on
+Discovery started
+[CHG] Controller FA-KE-AD-RE-SS-FF Discovering: yes
+[NEW] Device FA:KE:AD:RE:SS:05 <censored>
+[NEW] Device FA:KE:AD:RE:SS:00 Nevermore
+[CHG] Device FA:KE:AD:RE:SS:05 RSSI: -53
+[CHG] Device FA:KE:AD:RE:SS:04 ManufacturerData Key: 0x004c
+...
+[DEL] Device FA:KE:AD:RE:SS:04 FA-KE-AD-RE-SS-04
+[NEW] Device FA:KE:AD:RE:SS:04 FA-KE-AD-RE-SS-04
+...
+```
++
+WARNING: If you wait too long (~15-20 seconds), the scan ends, and the host will forget about the devices it discovered.
+
+. Run: `devices
++
+```
+[bluetooth]# devices
+Device FA:KE:AD:RE:SS:05 <censored>
+Device FA:KE:AD:RE:SS:01 Nevermore
+Device FA:KE:AD:RE:SS:04 FA-KE-AD-RE-SS-04
+Device FA:KE:AD:RE:SS:00 Nevermore
+Device FA:KE:AD:RE:SS:02 FA-KE-AD-RE-SS-02
+Device FA:KE:AD:RE:SS:03 FA-KE-AD-RE-SS-03
+```
++
+Look for the entries named "Nevermore" or "Nevermore Controller", and copy their address into the printer configuration.
++
+In this example, we could use `bt_address: FA:KE:AD:RE:SS:00` or `bt_address: FA:KE:AD:RE:SS:01`.
+
+
+==== Method C - Use Your Phone + nRF Connect
 
 WARNING: If you're hosting Klipper on MacOS then you cannot use this approach and must use <<Method A - Check the Klipper Log>>.
 
