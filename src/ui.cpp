@@ -79,8 +79,6 @@ auto g_display_content_update_timer = mk_async_worker<DISPLAY_TIMER_LABELS_INTER
 });
 
 auto g_display_chart_update_timer = mk_async_worker<uint32_t(DISPLAY_TIMER_CHART_INTERVAL / 1ms)>([]() {
-    printf("Duration: %f ms\n", double(DISPLAY_TIMER_CHART_INTERVAL / 1ms));
-
     auto& state = EnvironmentService::g_service_data;
     lv_chart_set_next_value(ui_Chart, ui_chart_voc_intake.ui, state.voc_index_intake.value_or(0));
     lv_chart_set_next_value(ui_Chart, ui_chart_voc_exhaust.ui, state.voc_index_exhaust.value_or(0));
