@@ -1,5 +1,6 @@
 #include "btstack_run_loop.h"
 #include "config.hpp"
+#include "display.hpp"
 #include "gatt.hpp"
 #include "hardware/adc.h"
 #include "hardware/gpio.h"
@@ -8,7 +9,6 @@
 #include "pico/stdio.h"
 #include "sdk/spi.hpp"
 #include "sensors.hpp"
-#include "ui.hpp"
 #include "utility/square_wave.hpp"
 #include "ws2812.hpp"
 #include <cstdint>
@@ -84,7 +84,7 @@ int main() {
 
     pins_setup();
     ws2812_init(ctx_async);
-    if (!ui_init_on_second_cpu(*spi)) return -1;
+    if (!display_and_ui_init_on_second_cpu(*spi)) return -1;
     if (!sensors_init(ctx_async, EnvironmentService::g_service_data)) return -1;
     if (!gatt_init(ctx_async)) return -1;
 
