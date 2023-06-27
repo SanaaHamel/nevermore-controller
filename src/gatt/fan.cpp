@@ -100,6 +100,10 @@ void fan_automatic_stop() {
 
 }  // namespace
 
+double FanService::fan_power() {
+    return g_fan_power.value_or(0);
+}
+
 bool FanService::init(async_context& ctx_async) {
     // setup PWM configurations for fan PWM and fan tachometer
     auto cfg_pwm = pwm_get_default_config();

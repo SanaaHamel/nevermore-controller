@@ -17,4 +17,7 @@ std::optional<int> attr_write(
 
 void disconnected(hci_con_handle_t);
 
+// Current fan power. [0, 100]
+double fan_power();
+
 }  // namespace FanService

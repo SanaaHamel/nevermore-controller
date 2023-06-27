@@ -11,23 +11,27 @@
 // SCREEN: ui_Main
 void ui_Main_screen_init(void);
 lv_obj_t * ui_Main;
-lv_obj_t * ui_Chart;
 lv_obj_t * ui_Panel0;
-lv_obj_t * ui_Panel1;
+lv_obj_t * ui_PressureLabels;
 lv_obj_t * ui_PressureIn;
-lv_obj_t * ui_HumidityIn;
-lv_obj_t * ui_Panel2;
 lv_obj_t * ui_PressureOut;
+lv_obj_t * ui_HumidityLabels;
+lv_obj_t * ui_HumidityIn;
 lv_obj_t * ui_HumidityOut;
-lv_obj_t * ui_VocPanel;
-lv_obj_t * ui_VocBarLine100;
-lv_obj_t * ui_VocBars;
-lv_obj_t * ui_VocBarIn;
-lv_obj_t * ui_VocLabelIn;
-lv_obj_t * ui_VocValueIn;
-lv_obj_t * ui_VocBarOut;
-lv_obj_t * ui_VocLabelOut;
-lv_obj_t * ui_VocValueOut;
+lv_obj_t * ui_ChartBox;
+lv_obj_t * ui_ChartOverlay;
+lv_obj_t * ui_Chart;
+lv_obj_t * ui_ChartLabels;
+lv_obj_t * ui_VocLabels;
+lv_obj_t * ui_VocIn;
+lv_obj_t * ui_VocOut;
+lv_obj_t * ui_TempLabels;
+lv_obj_t * ui_TempIn;
+lv_obj_t * ui_TempOut;
+lv_obj_t * ui_XAxisScale;
+lv_obj_t * ui_FanBox;
+lv_obj_t * ui_FanPowerText;
+lv_obj_t * ui_FanPower;
 lv_obj_t * ui____initial_actions0;
 
 ///////////////////// TEST LVGL SETTINGS ////////////////////
