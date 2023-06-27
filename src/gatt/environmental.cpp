@@ -132,7 +132,7 @@ optional<uint16_t> EnvironmentService::attr_read(
 
         READ_CLIENT_CFG(ENV_AGGREGATE_01, g_notify_aggregate)
 
-        default: return {};
+    default: return {};
     }
 }
 
@@ -145,6 +145,6 @@ optional<int> EnvironmentService::attr_write(hci_con_handle_t conn, uint16_t att
     switch (att_handle) {
         WRITE_CLIENT_CFG(ENV_AGGREGATE_01, g_notify_aggregate)
 
-        default: return {};
+    default: return {};
     }
 }

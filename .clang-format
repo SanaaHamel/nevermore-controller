@@ -39,7 +39,8 @@ IncludeCategories:
     Priority: 2
   - Regex: '<.*\.h>'
     Priority: 3
-IndentCaseLabels: true
+IndentCaseLabels: false
+IndentCaseBlocks: false
 IndentWidth: 4
 IndentWrappedFunctionNames: false
 KeepEmptyLinesAtTheStartOfBlocks: false

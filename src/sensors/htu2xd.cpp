@@ -67,8 +67,8 @@ bool htu2xd_reset(i2c_inst_t* bus) {
 bool htu2xd_issue(i2c_inst_t* bus, HTU2xD_Measure kind) {
     Cmd cmd;
     switch (kind) {
-        case HTU2xD_Measure::Temperature: cmd = Cmd::MEASURE_TEMPERATURE_NON_BLOCKING; break;
-        case HTU2xD_Measure::Humidity: cmd = Cmd::MEASURE_HUMIDITY_NON_BLOCKING; break;
+    case HTU2xD_Measure::Temperature: cmd = Cmd::MEASURE_TEMPERATURE_NON_BLOCKING; break;
+    case HTU2xD_Measure::Humidity: cmd = Cmd::MEASURE_HUMIDITY_NON_BLOCKING; break;
     }
 
     if (auto r = i2c_write_blocking(bus, HTU1xD_I2C_ADDRESS, cmd); r < 0) {
@@ -132,8 +132,8 @@ struct HTU2xDSensor final : SensorPeriodic {
             auto [response_kind, value] = *response;
             assert(kind == response_kind && "htu2xd_fetch - response kind mismatch");
             switch (response_kind) {
-                case HTU2xD_Measure::Temperature: temperature = value; break;
-                case HTU2xD_Measure::Humidity: humidity = value; break;
+            case HTU2xD_Measure::Temperature: temperature = value; break;
+            case HTU2xD_Measure::Humidity: humidity = value; break;
             }
         };
 

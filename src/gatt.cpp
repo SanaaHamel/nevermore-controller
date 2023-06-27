@@ -43,26 +43,26 @@ void hci_handler(uint8_t packet_type, uint16_t channel, uint8_t* packet, uint16_
 
     auto const event_type = hci_event_packet_get_type(packet);
     switch (event_type) {
-        case BTSTACK_EVENT_STATE: {
-            if (btstack_event_state_get_state(packet) != HCI_STATE_WORKING) break;
+    case BTSTACK_EVENT_STATE: {
+        if (btstack_event_state_get_state(packet) != HCI_STATE_WORKING) break;
 
-            bd_addr_t local_addr;
-            gap_local_bd_addr(local_addr);
-            printf("BTstack up and running on %s.\n", bd_addr_to_str(local_addr));
+        bd_addr_t local_addr;
+        gap_local_bd_addr(local_addr);
+        printf("BTstack up and running on %s.\n", bd_addr_to_str(local_addr));
 
-            // setup advertisements
-            static_assert(sizeof(ADVERT) <= 31, "too large for non-extended advertisement");
-            gap_advertisements_set_params(ADVERTISE_INTERVAL_MIN, ADVERTISE_INTERVAL_MAX);
-            gap_advertisements_set_data(sizeof(ADVERT), (uint8_t*)&ADVERT);  // NOLINT
-            gap_advertisements_enable(1);
-        } break;
+        // setup advertisements
+        static_assert(sizeof(ADVERT) <= 31, "too large for non-extended advertisement");
+        gap_advertisements_set_params(ADVERTISE_INTERVAL_MIN, ADVERTISE_INTERVAL_MAX);
+        gap_advertisements_set_data(sizeof(ADVERT), (uint8_t*)&ADVERT);  // NOLINT
+        gap_advertisements_enable(1);
+    } break;
 
-        case ATT_EVENT_DISCONNECTED: {
-            auto conn = att_event_disconnected_get_handle(packet);
-            EnvironmentService::disconnected(conn);
-            FanService::disconnected(conn);
-            NeoPixelService::disconnected(conn);
-        };
+    case ATT_EVENT_DISCONNECTED: {
+        auto conn = att_event_disconnected_get_handle(packet);
+        EnvironmentService::disconnected(conn);
+        FanService::disconnected(conn);
+        NeoPixelService::disconnected(conn);
+    };
     }
 }
 

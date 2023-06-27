@@ -47,8 +47,8 @@ bool sgp40_self_test(i2c_inst_t* bus) {
 
     auto&& [code, _] = *response;
     switch (code) {
-        case 0xD4: return true;   // tests passed
-        case 0x4B: return false;  // tests failed
+    case 0xD4: return true;   // tests passed
+    case 0x4B: return false;  // tests failed
     }
 
     printf("WARN - unexpected response code from SGP40 self-test: 0x%02x\n", int(code));

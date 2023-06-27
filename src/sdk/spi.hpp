@@ -15,8 +15,8 @@ constexpr SPI_Pin spi_gpio_kind(uint8_t pin) {
 
 inline spi_inst_t* spi_gpio_bus(uint8_t pin) {
     switch (spi_gpio_bus_num(pin)) {
-        default: return nullptr;
-        case 0: return spi0;  // NOLINT(cppcoreguidelines-pro-type-cstyle-cast)
-        case 1: return spi1;  // NOLINT(cppcoreguidelines-pro-type-cstyle-cast)
+    default: return nullptr;
+    case 0: return spi0;  // NOLINT(cppcoreguidelines-pro-type-cstyle-cast)
+    case 1: return spi1;  // NOLINT(cppcoreguidelines-pro-type-cstyle-cast)
     }
 }

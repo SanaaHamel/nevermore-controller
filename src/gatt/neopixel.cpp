@@ -71,7 +71,7 @@ optional<uint16_t> NeoPixelService::attr_read(
             return min<size_t>(ws2812_components_total(), UINT16_MAX - 1);
         })())
 
-        default: return {};
+    default: return {};
     }
 }
 
@@ -81,27 +81,26 @@ optional<int> NeoPixelService::attr_write(
     WriteConsumer consume{offset, buffer, buffer_size};
 
     switch (att_handle) {
-        case HANDLE_ATTR(WS2812_TOTAL_COMPONENTS_01, VALUE): {
-            BLE::Count16 count = consume;
-            if (count == BLE::NOT_KNOWN) return ATT_ERROR_VALUE_NOT_ALLOWED;
-            if (!ws2812_setup(size_t(double(count)))) return ATT_ERROR_VALUE_NOT_ALLOWED;
+    case HANDLE_ATTR(WS2812_TOTAL_COMPONENTS_01, VALUE): {
+        BLE::Count16 count = consume;
+        if (count == BLE::NOT_KNOWN) return ATT_ERROR_VALUE_NOT_ALLOWED;
+        if (!ws2812_setup(size_t(double(count)))) return ATT_ERROR_VALUE_NOT_ALLOWED;
 
-            return 0;
-        }
+        return 0;
+    }
 
-        case HANDLE_ATTR(WS2812_UPDATE_SPAN_01, VALUE): {
-            DBG_update_rate_log();
+    case HANDLE_ATTR(WS2812_UPDATE_SPAN_01, VALUE): {
+        DBG_update_rate_log();
 
-            UpdateSpanHeader header = consume;
-            // be extra picky, reject any pending extra data
-            // FUTURE WORK: change attr to just assume any tailing data is the span?
-            if (header.length != consume.remaining()) return ATT_ERROR_INVALID_ATTRIBUTE_VALUE_LENGTH;
-            if (!ws2812_update(header.offset, consume.span(header.length)))
-                return ATT_ERROR_VALUE_NOT_ALLOWED;
+        UpdateSpanHeader header = consume;
+        // be extra picky, reject any pending extra data
+        // FUTURE WORK: change attr to just assume any tailing data is the span?
+        if (header.length != consume.remaining()) return ATT_ERROR_INVALID_ATTRIBUTE_VALUE_LENGTH;
+        if (!ws2812_update(header.offset, consume.span(header.length))) return ATT_ERROR_VALUE_NOT_ALLOWED;
 
-            return 0;
-        }
+        return 0;
+    }
 
-        default: return {};
+    default: return {};
     }
 }

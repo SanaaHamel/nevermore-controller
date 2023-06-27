@@ -147,7 +147,7 @@ optional<uint16_t> FanService::attr_read(
 
         READ_CLIENT_CFG(FAN_AGGREGATE, g_notify_aggregate)
 
-        default: return {};
+    default: return {};
     }
 }
 
@@ -163,25 +163,25 @@ optional<int> FanService::attr_write(hci_con_handle_t conn, uint16_t att_handle,
 
         WRITE_CLIENT_CFG(FAN_AGGREGATE, g_notify_aggregate)
 
-        case HANDLE_ATTR(FAN_POWER_OVERRIDE, VALUE): {
-            BLE::Percentage8 power = consume;
-            if (g_fan_power_override == power) return 0;  // no-op
+    case HANDLE_ATTR(FAN_POWER_OVERRIDE, VALUE): {
+        BLE::Percentage8 power = consume;
+        if (g_fan_power_override == power) return 0;  // no-op
 
-            if (g_fan_power_override == BLE::NOT_KNOWN) {
-                fan_automatic_stop();
-            }
-
-            g_fan_power_override = power;
-            g_notify_aggregate.notify();
-
-            if (power != BLE::NOT_KNOWN)
-                fan_power_set(power);  // apply override
-            else
-                fan_automatic_start();
-
-            return 0;
+        if (g_fan_power_override == BLE::NOT_KNOWN) {
+            fan_automatic_stop();
         }
 
-        default: return {};
+        g_fan_power_override = power;
+        g_notify_aggregate.notify();
+
+        if (power != BLE::NOT_KNOWN)
+            fan_power_set(power);  // apply override
+        else
+            fan_automatic_start();
+
+        return 0;
+    }
+
+    default: return {};
     }
 }
