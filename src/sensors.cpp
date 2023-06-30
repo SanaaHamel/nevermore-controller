@@ -57,7 +57,7 @@ private:
     }
 } g_mcu_temperature_sensor;
 
-VecSensors sensors_init_bus(async_context_t& ctx_async, i2c_inst_t* bus, EnvironmentalSensorData state) {
+VecSensors sensors_init_bus(async_context_t& ctx_async, i2c_inst_t& bus, EnvironmentalSensorData state) {
     VecSensors sensors;
     auto probe_for = [&](auto p) {
         if (!p) return;
@@ -86,10 +86,11 @@ bool sensors_init(async_context_t& ctx_async, EnvironmentService::ServiceData& s
     busy_wait(SENSOR_POWER_ON_DELAY);
 
     printf("I2C0 - initializing sensors...\n");
-    g_sensors_intake = sensors_init_bus(ctx_async, i2c0,
+    g_sensors_intake = sensors_init_bus(ctx_async, *i2c0,
             {state.temperature_intake, state.humidity_intake, state.pressure_intake, state.voc_index_intake});
+
     printf("I2C1 - initializing sensors...\n");
-    g_sensors_exhaust = sensors_init_bus(ctx_async, i2c1,
+    g_sensors_exhaust = sensors_init_bus(ctx_async, *i2c1,
             {state.temperature_exhaust, state.humidity_exhaust, state.pressure_exhaust,
                     state.voc_index_exhaust});
 

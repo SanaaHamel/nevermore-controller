@@ -56,14 +56,14 @@ double htu2xd_humidity_compensated(double humidity_uncompensated, double tempera
     return clamp(humidity_uncompensated + bias, 0., 100.);
 }
 
-bool htu2xd_reset(i2c_inst_t* bus) {
+bool htu2xd_reset(i2c_inst_t& bus) {
     return 1 == i2c_write_blocking(bus, HTU1xD_I2C_ADDRESS, Cmd::SOFT_RESET, false);
 }
 
 // Once a measure is enqueued, call await to retrieve the value.
 // You cannot interweave multiple measurements to the same device.
 // Returns `false` on failure to enqueue.
-bool htu2xd_issue(i2c_inst_t* bus, HTU2xD_Measure kind) {
+bool htu2xd_issue(i2c_inst_t& bus, HTU2xD_Measure kind) {
     Cmd cmd;
     switch (kind) {
     case HTU2xD_Measure::Temperature: cmd = Cmd::MEASURE_TEMPERATURE_NON_BLOCKING; break;
@@ -79,7 +79,7 @@ bool htu2xd_issue(i2c_inst_t* bus, HTU2xD_Measure kind) {
 }
 
 optional<tuple<HTU2xD_Measure, double>> htu2xd_read_compensated(
-        i2c_inst_t* bus, double temperature = HTU2xD_HUMIDITY_COMPENSATION_ZERO_POINT) {
+        i2c_inst_t& bus, double temperature = HTU2xD_HUMIDITY_COMPENSATION_ZERO_POINT) {
     // in either case we're waiting for the same kind of payload
     auto response = i2c_read_blocking_crc<0, uint16_t>(bus, HTU1xD_I2C_ADDRESS);
     if (!response) return {};
@@ -104,10 +104,10 @@ optional<tuple<HTU2xD_Measure, double>> htu2xd_read_compensated(
 }
 
 struct HTU2xDSensor final : SensorPeriodic {
-    i2c_inst_t* bus;
+    i2c_inst_t& bus;               // NOLINT(cppcoreguidelines-avoid-const-or-ref-data-members)
     EnvironmentalSensorData data;  // tiny bit wasteful, but terser to manage
 
-    HTU2xDSensor(i2c_inst_t* bus, EnvironmentalSensorData data) : bus(bus), data(std::move(data)) {}
+    HTU2xDSensor(i2c_inst_t& bus, EnvironmentalSensorData data) : bus(bus), data(std::move(data)) {}
 
     [[nodiscard]] char const* name() const override {
         return "HTU2xD";
@@ -141,13 +141,13 @@ struct HTU2xDSensor final : SensorPeriodic {
     }
 };
 
-bool htu2xd_exists(i2c_inst_t* bus) {
-    return bus && htu2xd_reset(bus);
+bool htu2xd_exists(i2c_inst_t& bus) {
+    return htu2xd_reset(bus);
 }
 
 }  // namespace
 
-unique_ptr<SensorPeriodic> htu2xd(i2c_inst_t* bus, EnvironmentalSensorData state) {
+unique_ptr<SensorPeriodic> htu2xd(i2c_inst_t& bus, EnvironmentalSensorData state) {
     if (!htu2xd_exists(bus)) return {};  // nothing found
 
     return make_unique<HTU2xDSensor>(bus, state);

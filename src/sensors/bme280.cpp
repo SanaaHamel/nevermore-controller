@@ -20,7 +20,7 @@ constexpr uint8_t BME280_ADDRESS = 0b0111'0110;
 
 BME280_INTF_RET_TYPE i2c_read(uint8_t reg_addr, uint8_t* reg_data, uint32_t len, void* intf_ptr) {
     auto* bus = reinterpret_cast<i2c_inst_t*>(intf_ptr);
-    if (1 != i2c_write_blocking(bus, BME280_ADDRESS, reg_addr)) return BME280_E_COMM_FAIL;
+    if (1 != i2c_write_blocking(*bus, BME280_ADDRESS, reg_addr)) return BME280_E_COMM_FAIL;
     if (int(len) != i2c_read_blocking(bus, BME280_ADDRESS, reg_data, len, false)) return BME280_E_COMM_FAIL;
 
     return BME280_OK;
@@ -39,10 +39,10 @@ BME280_INTF_RET_TYPE i2c_write(uint8_t reg_addr, const uint8_t* reg_data, uint32
     return BME280_OK;
 }
 
-optional<bme280_dev> init(i2c_inst_t* bus) {
+optional<bme280_dev> init(i2c_inst_t& bus) {
     bme280_dev dev{
             .intf = BME280_I2C_INTF,
-            .intf_ptr = bus,
+            .intf_ptr = &bus,
             .read = i2c_read,
             .write = i2c_write,
             .delay_us = [](uint32_t delay_us, void*) { busy_wait_us_32(delay_us); },
@@ -88,7 +88,7 @@ struct BME280 final : SensorPeriodic {
 
 }  // namespace
 
-unique_ptr<SensorPeriodic> bme280(i2c_inst_t* bus, EnvironmentalSensorData state) {
+unique_ptr<SensorPeriodic> bme280(i2c_inst_t& bus, EnvironmentalSensorData state) {
     auto dev = init(bus);
     if (!dev) return {};  // nothing found
 

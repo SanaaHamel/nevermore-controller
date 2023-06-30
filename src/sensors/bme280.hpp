@@ -10,4 +10,4 @@ using namespace std::literals::chrono_literals;
 
 constexpr auto BME280_POWER_ON_DELAY = 2ms;
 
-std::unique_ptr<SensorPeriodic> bme280(i2c_inst_t*, EnvironmentalSensorData state);
+std::unique_ptr<SensorPeriodic> bme280(i2c_inst_t&, EnvironmentalSensorData state);

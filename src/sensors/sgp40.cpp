@@ -30,14 +30,12 @@ enum class Cmd : uint16_t {
     SGP4x_SERIAL_NUMBER = std::byteswap(0x3682_u16),  // only available when in idle mode
 };
 
-bool sgp4x_heater_off(i2c_inst_t* bus) {
-    if (!bus) return false;
+bool sgp4x_heater_off(i2c_inst_t& bus) {
     return 2 == i2c_write_blocking(bus, SGP40_ADDRESS, Cmd::SGP4x_HEATER_OFF);
 }
 
 // returns true IIF self-test passed. any error (I2C or self-test) -> false
-bool sgp40_self_test(i2c_inst_t* bus) {
-    if (!bus) return false;
+bool sgp40_self_test(i2c_inst_t& bus) {
     if (2 != i2c_write_blocking(bus, SGP40_ADDRESS, Cmd::SGP40_SELF_TEST)) return false;
 
     sleep(320ms);  // spec says max delay of 320ms
@@ -55,9 +53,7 @@ bool sgp40_self_test(i2c_inst_t* bus) {
     return false;
 }
 
-bool sgp40_measure_issue(i2c_inst_t* bus, double temperature, double humidity) {
-    if (!bus) return {};
-
+bool sgp40_measure_issue(i2c_inst_t& bus, double temperature, double humidity) {
     auto to_tick = [](double n, double min, double max) {
         return byteswap(uint16_t((clamp(n, min, max) - min) / (max - min) * UINT16_MAX));
     };
@@ -70,13 +66,11 @@ bool sgp40_measure_issue(i2c_inst_t* bus, double temperature, double humidity) {
 }
 
 bool sgp40_measure_issue(
-        i2c_inst_t* bus, BLE::Temperature const& temperature, BLE::Humidity const& humidity) {
+        i2c_inst_t& bus, BLE::Temperature const& temperature, BLE::Humidity const& humidity) {
     return sgp40_measure_issue(bus, temperature.value_or(25), humidity.value_or(50));
 }
 
-optional<uint16_t> sgp40_measure_read(i2c_inst_t* bus) {
-    if (!bus) return {};
-
+optional<uint16_t> sgp40_measure_read(i2c_inst_t& bus) {
     auto response = i2c_read_blocking_crc<0xFF, uint16_t>(bus, SGP40_ADDRESS);
     if (!response) return false;
 
@@ -84,16 +78,16 @@ optional<uint16_t> sgp40_measure_read(i2c_inst_t* bus) {
     return byteswap(voc_raw);
 }
 
-bool sgp40_exists(i2c_inst_t* bus) {
-    return sgp4x_heater_off(bus);  // could
+bool sgp40_exists(i2c_inst_t& bus) {
+    return sgp4x_heater_off(bus);  // FUTURE WORK: better way of doing this?
 }
 
 struct SGP40 final : SensorDelayedResponse {
-    i2c_inst_t* bus;
+    i2c_inst_t& bus;               // NOLINT(cppcoreguidelines-avoid-const-or-ref-data-members)
     EnvironmentalSensorData data;  // tiny bit wasteful, but terser to manage
     GasIndexAlgorithmParams gas_index_algorithm{};
 
-    SGP40(i2c_inst_t* bus, EnvironmentalSensorData data) : bus(bus), data(std::move(data)) {
+    SGP40(i2c_inst_t& bus, EnvironmentalSensorData data) : bus(bus), data(std::move(data)) {
         GasIndexAlgorithm_init(&gas_index_algorithm, GasIndexAlgorithm_ALGORITHM_TYPE_VOC);
     }
 
@@ -128,7 +122,7 @@ struct SGP40 final : SensorDelayedResponse {
 
 }  // namespace
 
-unique_ptr<SensorPeriodic> sgp40(i2c_inst_t* bus, EnvironmentalSensorData state) {
+unique_ptr<SensorPeriodic> sgp40(i2c_inst_t& bus, EnvironmentalSensorData state) {
     if (!sgp40_exists(bus)) return {};  // nothing found
     if (!sgp40_self_test(bus)) {
         printf("Found SGP40, but failed self-test\n");
