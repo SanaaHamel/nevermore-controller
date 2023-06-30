@@ -3,6 +3,7 @@
 #include "hardware/i2c.h"
 #include "utility/crc.hpp"
 #include "utility/packed_tuple.hpp"
+#include <cstdio>
 #include <optional>
 #include <type_traits>
 
