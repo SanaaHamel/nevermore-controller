@@ -3,7 +3,6 @@
 #include "sdk/ble_data_types.hpp"
 #include "sdk/i2c.hpp"
 #include "sdk/timer.hpp"
-#include "sensors/async_sensor.hpp"
 #include <bit>
 #include <cassert>
 #include <cstdint>
@@ -106,9 +105,9 @@ optional<tuple<HTU2xD_Measure, double>> htu2xd_read_compensated(
 
 struct HTU2xDSensor final : SensorPeriodic {
     i2c_inst_t* bus;
-    Sensor::Data data;  // tiny bit wasteful, but terser to manage
+    EnvironmentalSensorData data;  // tiny bit wasteful, but terser to manage
 
-    HTU2xDSensor(i2c_inst_t* bus, Sensor::Data data) : bus(bus), data(std::move(data)) {}
+    HTU2xDSensor(i2c_inst_t* bus, EnvironmentalSensorData data) : bus(bus), data(std::move(data)) {}
 
     [[nodiscard]] char const* name() const override {
         return "HTU2xD";
@@ -148,7 +147,7 @@ bool htu2xd_exists(i2c_inst_t* bus) {
 
 }  // namespace
 
-unique_ptr<SensorPeriodic> htu2xd(i2c_inst_t* bus, Sensor::Data state) {
+unique_ptr<SensorPeriodic> htu2xd(i2c_inst_t* bus, EnvironmentalSensorData state) {
     if (!htu2xd_exists(bus)) return {};  // nothing found
 
     return make_unique<HTU2xDSensor>(bus, state);

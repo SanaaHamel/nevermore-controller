@@ -64,10 +64,10 @@ optional<bme280_dev> init(i2c_inst_t* bus) {
 // This could update more/less frequently, based on the update period (see `bme280_cal_meas_delay`).
 // Current update period of 1s should be more than enough to compute results.
 struct BME280 final : SensorPeriodic {
-    Sensor::Data data;  // tiny bit wasteful, but terser to manage
+    EnvironmentalSensorData data;  // tiny bit wasteful, but terser to manage
     bme280_dev dev;
 
-    BME280(bme280_dev dev, Sensor::Data data) : data(std::move(data)), dev(dev) {}
+    BME280(bme280_dev dev, EnvironmentalSensorData data) : data(std::move(data)), dev(dev) {}
 
     [[nodiscard]] char const* name() const override {
         return "BME280";
@@ -88,7 +88,7 @@ struct BME280 final : SensorPeriodic {
 
 }  // namespace
 
-unique_ptr<SensorPeriodic> bme280(i2c_inst_t* bus, Sensor::Data state) {
+unique_ptr<SensorPeriodic> bme280(i2c_inst_t* bus, EnvironmentalSensorData state) {
     auto dev = init(bus);
     if (!dev) return {};  // nothing found
 

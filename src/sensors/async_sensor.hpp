@@ -1,14 +1,9 @@
 #pragma once
 
 #include "config.hpp"
-#include "gatt/environmental.hpp"
 #include "pico/async_context.h"
-#include "sdk/ble_data_types.hpp"
-#include <tuple>
 
 struct Sensor {
-    using Data = std::tuple<BLE::Temperature&, BLE::Humidity&, BLE::Pressure&, EnvironmentService::VOCIndex&>;
-
     virtual ~Sensor() = default;
 
     [[nodiscard]] virtual char const* name() const = 0;

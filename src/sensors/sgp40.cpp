@@ -1,5 +1,4 @@
 #include "sgp40.hpp"
-#include "async_sensor.hpp"
 #include "config.hpp"
 #include "lib/sensirion_gas_index_algorithm.h"
 #include "sdk/ble_data_types.hpp"
@@ -9,6 +8,7 @@
 #include "utility/packed_tuple.hpp"
 #include <bit>
 #include <cstdint>
+#include <cstdio>
 #include <utility>
 
 using namespace std;
@@ -90,10 +90,10 @@ bool sgp40_exists(i2c_inst_t* bus) {
 
 struct SGP40 final : SensorDelayedResponse {
     i2c_inst_t* bus;
-    Sensor::Data data;  // tiny bit wasteful, but terser to manage
+    EnvironmentalSensorData data;  // tiny bit wasteful, but terser to manage
     GasIndexAlgorithmParams gas_index_algorithm{};
 
-    SGP40(i2c_inst_t* bus, Sensor::Data data) : bus(bus), data(std::move(data)) {
+    SGP40(i2c_inst_t* bus, EnvironmentalSensorData data) : bus(bus), data(std::move(data)) {
         GasIndexAlgorithm_init(&gas_index_algorithm, GasIndexAlgorithm_ALGORITHM_TYPE_VOC);
     }
 
@@ -128,7 +128,7 @@ struct SGP40 final : SensorDelayedResponse {
 
 }  // namespace
 
-unique_ptr<SensorPeriodic> sgp40(i2c_inst_t* bus, Sensor::Data state) {
+unique_ptr<SensorPeriodic> sgp40(i2c_inst_t* bus, EnvironmentalSensorData state) {
     if (!sgp40_exists(bus)) return {};  // nothing found
     if (!sgp40_self_test(bus)) {
         printf("Found SGP40, but failed self-test\n");

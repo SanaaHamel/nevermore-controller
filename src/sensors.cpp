@@ -57,7 +57,7 @@ private:
     }
 } g_mcu_temperature_sensor;
 
-VecSensors sensors_init_bus(async_context_t& ctx_async, i2c_inst_t* bus, Sensor::Data state) {
+VecSensors sensors_init_bus(async_context_t& ctx_async, i2c_inst_t* bus, EnvironmentalSensorData state) {
     VecSensors sensors;
     auto probe_for = [&](auto p) {
         if (!p) return;
