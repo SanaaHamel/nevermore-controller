@@ -322,7 +322,7 @@ Discovery started
 +
 WARNING: If you wait too long (~15-20 seconds), the scan ends, and the host will forget about the devices it discovered.
 
-. Run: `devices
+. Run: `devices`
 +
 ```
 [bluetooth]# devices
