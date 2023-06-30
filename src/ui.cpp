@@ -17,16 +17,26 @@ using namespace std::literals::chrono_literals;
 
 namespace {
 
-constexpr auto CHART_X_AXIS_LENGTH = 1.h;  // 1.h;
+constexpr auto CHART_X_AXIS_LENGTH = 1.h;
 constexpr lv_opa_t CHART_RED_ZONE_HI = LV_OPA_30;
 constexpr uint8_t CHART_SERIES_ENTIRES_MAX = DISPLAY_RESOLUTION.width / 3;
 
 constexpr auto DISPLAY_TIMER_CHART_INTERVAL = CHART_X_AXIS_LENGTH / CHART_SERIES_ENTIRES_MAX;
 constexpr auto DISPLAY_TIMER_LABELS_INTERVAL = 1s;
 
+bool chart_point_less_than(lv_coord_t x, lv_coord_t y) {
+    if (y == LV_CHART_POINT_NONE) return false;
+    if (x == LV_CHART_POINT_NONE) return true;
+    return x < y;
+}
+
 struct Series {
     lv_chart_series_t* ui = {};
     array<lv_coord_t, CHART_SERIES_ENTIRES_MAX> values{};
+
+    Series() {
+        values.fill(LV_CHART_POINT_NONE);
+    }
 
     void setup(lv_obj_t* chart, lv_chart_axis_t axis, uint32_t clr) {
         assert(!ui);
@@ -122,16 +132,25 @@ auto g_display_chart_update_timer = mk_async_worker<uint32_t(DISPLAY_TIMER_CHART
         lv_label_set_text(ui_XAxisScale, pretty_print_time(n * DISPLAY_TIMER_CHART_INTERVAL).c_str());
     }
 
-    lv_chart_set_next_value(ui_Chart, ui_chart_voc_intake.ui, state.voc_index_intake.value_or(0));
-    lv_chart_set_next_value(ui_Chart, ui_chart_voc_exhaust.ui, state.voc_index_exhaust.value_or(0));
-    lv_chart_set_next_value(ui_Chart, ui_chart_temp_intake.ui, state.temperature_intake.value_or(0));
-    lv_chart_set_next_value(ui_Chart, ui_chart_temp_exhaust.ui, state.temperature_exhaust.value_or(0));
+    auto set_next_value = [&](auto* series, auto&& value) {
+        lv_chart_set_next_value(ui_Chart, series, value.value_or(LV_CHART_POINT_NONE));
+    };
+
+    set_next_value(ui_chart_voc_intake.ui, state.voc_index_intake);
+    set_next_value(ui_chart_voc_exhaust.ui, state.voc_index_exhaust);
+    set_next_value(ui_chart_temp_intake.ui, state.temperature_intake);
+    set_next_value(ui_chart_temp_exhaust.ui, state.temperature_exhaust);
 
     auto scale_axis = [](lv_chart_axis_t axis, lv_coord_t top_min, lv_coord_t step,
                               initializer_list<Series> const& xs) {
+        // TODO: handle case where plot coords are < 0 (why are you running your printer in a freezer?)
         lv_coord_t top = 0;
-        for (auto&& x : xs)
-            top = max(top, *std::max_element(x.values.begin(), x.values.end()));
+        for (auto&& x : xs) {
+            auto val = *std::max_element(x.values.begin(), x.values.end(), chart_point_less_than);
+            if (val != LV_CHART_POINT_NONE) {
+                top = max(top, val);
+            }
+        }
 
         auto ticks = 1 + (max(top_min, top) + step - 1) / step;
         lv_chart_set_range(ui_Chart, axis, 0, lv_coord_t(ticks * step));
