@@ -70,7 +70,7 @@ gcode:
     ... <SNIP YOUR CURRENT GCODE> ...
 ```
 
-.. Add `SET_FAN_SPEED FAN=nevermore_fan` to your `TURN_OFF_HEARTS` macro.
+.. Add `SET_FAN_SPEED FAN=nevermore_fan` to your `TURN_OFF_HEATERS` macro.
 +
 WARNING: This assumes your `print_end` macro calls `TURN_OFF_HEATERS`. If it doesn't you'll want to put `SET_FAN_SPEED FAN=nevermore_fan` in your `print_end` macro to turn off the fan override.
 +
