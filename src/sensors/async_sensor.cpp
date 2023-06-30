@@ -5,7 +5,7 @@
 
 using namespace std;
 
-void SensorPeriodic::dispatcher(async_context_t* context, async_work_on_timeout* work) {
+void SensorPeriodic::update_dispatcher(async_context_t* context, async_work_on_timeout* work) {
     reinterpret_cast<SensorPeriodic*>(work->user_data)->update(*context);
 }
 

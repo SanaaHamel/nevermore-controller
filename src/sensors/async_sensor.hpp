@@ -32,16 +32,16 @@ protected:
     void update_enqueue(async_context_t&, std::chrono::steady_clock::duration update_duration);
 
 private:
-    static void dispatcher(async_context_t*, async_work_on_timeout*);
+    static void update_dispatcher(async_context_t*, async_work_on_timeout*);
 
-    async_at_time_worker_t update_task{.do_work = dispatcher, .user_data = this};
+    async_at_time_worker_t update_task{.do_work = update_dispatcher, .user_data = this};
 };
 
 struct SensorDelayedResponse : SensorPeriodic {
     using SensorPeriodic::SensorPeriodic;
 
 protected:
-    // calls `issue()`, and if successfull enqueues a `read`
+    // calls `issue()`, and if successful enqueues a `read`
     void update(async_context_t&) final;
 
     [[nodiscard]] virtual bool issue() = 0;
