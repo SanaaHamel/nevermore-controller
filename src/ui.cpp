@@ -178,8 +178,47 @@ auto g_display_chart_update_timer = mk_async_worker<uint32_t(DISPLAY_TIMER_CHART
     lv_label_set_text(ui_ChartMax, buffer);
 });
 
+// Code more or less ripped from LVGL's `lv_chart.c`.
+void chart_draw_hdivs(lv_draw_ctx_t& draw_ctx, lv_draw_line_dsc_t const& line_desc, lv_chart_t const& chart,
+        uint16_t hdiv_cnt) {
+    if (hdiv_cnt <= 0) return;
+
+    auto const border_opa = lv_obj_get_style_border_opa(&chart.obj, LV_PART_MAIN);
+    auto const border_side = lv_obj_get_style_border_side(&chart.obj, LV_PART_MAIN);
+    auto const border_width = lv_obj_get_style_border_width(&chart.obj, LV_PART_MAIN);
+    auto const pad_top = lv_obj_get_style_pad_top(&chart.obj, LV_PART_MAIN) + border_width;
+    // WORKAROUND: `lv_obj_get_scroll_top` mistakenly lacks a `const` qualifier
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-const-cast)
+    auto const scroll_top = lv_obj_get_scroll_top(const_cast<lv_obj_t*>(&chart.obj));
+    auto const y_ofs = chart.obj.coords.y1 + pad_top - scroll_top;
+    auto const h = (lv_obj_get_content_height(&chart.obj) * chart.zoom_y) >> 8;
+    static_assert(sizeof(int32_t) <= sizeof(int), "some of this code assumes <= 32 bits");
+
+    lv_point_t p1{.x = chart.obj.coords.x1};
+    lv_point_t p2{.x = chart.obj.coords.x2};
+
+    auto i_start = 0;
+    auto i_end = hdiv_cnt;
+    if (LV_OPA_MIN < border_opa && 0 < border_width) {
+        if ((border_side & LV_BORDER_SIDE_TOP) && lv_obj_get_style_pad_top(&chart.obj, LV_PART_MAIN) == 0)
+            i_start++;
+
+        if ((border_side & LV_BORDER_SIDE_BOTTOM) &&
+                lv_obj_get_style_pad_bottom(&chart.obj, LV_PART_MAIN) == 0)
+            i_end--;
+    }
+
+    for (auto i = i_start; i < i_end; i++) {
+        p1.y = y_ofs + (h * i) / (hdiv_cnt - 1);
+        p2.y = p1.y;
+
+        lv_draw_line(&draw_ctx, &line_desc, &p1, &p2);
+    }
+}
+
 void on_chart_draw(bool begin, lv_event_t* e) {
     auto* obj = lv_event_get_target(e);
+    auto const& chart = *reinterpret_cast<lv_chart_t const*>(obj);
     auto const& desc = *lv_event_get_draw_part_dsc(e);
 
     auto abs_pos_for_value = [&](lv_chart_series_t const* series, lv_coord_t value, bool last = false) {
@@ -190,20 +229,30 @@ void on_chart_draw(bool begin, lv_event_t* e) {
     default: break;
 
     case LV_PART_MAIN: {
-        // draw the VOC clean-line after all other lines
-        if (begin || desc.p1 || desc.p2 || !desc.line_dsc) break;
+        if (desc.p1 || desc.p2 || !desc.line_dsc) break;  // drawing main lines, or no line-info
 
-        constexpr lv_coord_t VOC_LINE_PAD = 0;
-        desc.line_dsc->color = lv_color_make(0, 255, 0);
-        desc.line_dsc->opa = LV_OPA_50;
-        desc.line_dsc->width = 2;
-        desc.line_dsc->dash_gap = 6;
-        desc.line_dsc->dash_width = 6;
-        auto p1 = abs_pos_for_value(ui_chart_voc_intake.ui, 100, false);
-        auto p2 = abs_pos_for_value(ui_chart_voc_intake.ui, 100, true);
-        p1.x -= VOC_LINE_PAD;
-        p2.x += VOC_LINE_PAD;
-        lv_draw_line(desc.draw_ctx, desc.line_dsc, &p1, &p2);
+        if (begin) {
+            // draw the secondary axis division lines before the primary axis lines
+            auto y_secondary_range = max(0, chart.ymax[1] - chart.ymin[1]);
+            auto hdiv_cnt = 1 + (y_secondary_range / CHART_DIV_TEMP.value_per);
+
+            auto line_desc = *desc.line_dsc;
+            line_desc.dash_gap = 6;
+            line_desc.dash_width = 6;
+            chart_draw_hdivs(*desc.draw_ctx, line_desc, chart, hdiv_cnt);
+        } else {
+            // draw the VOC clean-line after all other lines
+            lv_draw_line_dsc_t line_desc{
+                    .color = lv_color_make(0, 255, 0),
+                    .width = 2,
+                    .dash_width = 6,
+                    .dash_gap = 6,
+                    .opa = LV_OPA_50,
+            };
+            auto p1 = abs_pos_for_value(ui_chart_voc_intake.ui, 100, false);
+            auto p2 = abs_pos_for_value(ui_chart_voc_intake.ui, 100, true);
+            lv_draw_line(desc.draw_ctx, &line_desc, &p1, &p2);
+        }
     } break;
 
     case LV_PART_ITEMS: {
