@@ -11,6 +11,7 @@
 #include <cstdio>
 #include <initializer_list>
 #include <string>
+#include <tuple>
 
 using namespace std;
 using namespace std::literals::chrono_literals;
@@ -18,11 +19,19 @@ using namespace std::literals::chrono_literals;
 namespace {
 
 constexpr auto CHART_X_AXIS_LENGTH = 1.h;
-constexpr lv_opa_t CHART_RED_ZONE_HI = LV_OPA_30;
 constexpr uint8_t CHART_SERIES_ENTIRES_MAX = DISPLAY_RESOLUTION.width / 3;
 
 constexpr auto DISPLAY_TIMER_CHART_INTERVAL = CHART_X_AXIS_LENGTH / CHART_SERIES_ENTIRES_MAX;
 constexpr auto DISPLAY_TIMER_LABELS_INTERVAL = 1s;
+
+struct ChartDivY {
+    uint8_t min;
+    lv_coord_t value_per;
+};
+
+constexpr ChartDivY CHART_DIV_VOC{.min = 4, .value_per = 25};
+constexpr ChartDivY CHART_DIV_TEMP{.min = 1, .value_per = 10};
+constexpr lv_opa_t CHART_RED_ZONE_HI = LV_OPA_30;
 
 bool chart_point_less_than(lv_coord_t x, lv_coord_t y) {
     if (y == LV_CHART_POINT_NONE) return false;
@@ -141,8 +150,7 @@ auto g_display_chart_update_timer = mk_async_worker<uint32_t(DISPLAY_TIMER_CHART
     set_next_value(ui_chart_temp_intake.ui, state.temperature_intake);
     set_next_value(ui_chart_temp_exhaust.ui, state.temperature_exhaust);
 
-    auto scale_axis = [](lv_chart_axis_t axis, lv_coord_t top_min, lv_coord_t step,
-                              initializer_list<Series> const& xs) {
+    auto scale_axis = [](lv_chart_axis_t axis, ChartDivY const& div, initializer_list<Series> const& xs) {
         // TODO: handle case where plot coords are < 0 (why are you running your printer in a freezer?)
         lv_coord_t top = 0;
         for (auto&& x : xs) {
@@ -152,15 +160,22 @@ auto g_display_chart_update_timer = mk_async_worker<uint32_t(DISPLAY_TIMER_CHART
             }
         }
 
-        auto ticks = 1 + (max(top_min, top) + step - 1) / step;
-        lv_chart_set_range(ui_Chart, axis, 0, lv_coord_t(ticks * step));
-        return ticks;
+        auto lines = max<uint>(div.min, 1 + (top + div.value_per - 1) / div.value_per);
+        auto coord = lv_coord_t(lines * div.value_per);
+        lv_chart_set_range(ui_Chart, axis, 0, coord);
+        return tuple{lines, coord};
     };
 
-    auto ticks_y = scale_axis(LV_CHART_AXIS_PRIMARY_Y, 100, 25, {ui_chart_voc_intake, ui_chart_voc_exhaust});
-    scale_axis(LV_CHART_AXIS_SECONDARY_Y, 50, 25, {ui_chart_temp_intake, ui_chart_temp_exhaust});
+    auto [lines_voc, max_voc] =
+            scale_axis(LV_CHART_AXIS_PRIMARY_Y, CHART_DIV_VOC, {ui_chart_voc_intake, ui_chart_voc_exhaust});
+    auto [_, max_temp] = scale_axis(
+            LV_CHART_AXIS_SECONDARY_Y, CHART_DIV_TEMP, {ui_chart_temp_intake, ui_chart_temp_exhaust});
 
-    lv_chart_set_div_line_count(ui_Chart, ticks_y + 1, 10);
+    lv_chart_set_div_line_count(ui_Chart, lines_voc + 1, 10);
+
+    char buffer[256];
+    sprintf(buffer, "%u VOC\n%uc", max_voc, max_temp);
+    lv_label_set_text(ui_ChartMax, buffer);
 });
 
 void on_chart_draw(bool begin, lv_event_t* e) {

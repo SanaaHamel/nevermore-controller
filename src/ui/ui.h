@@ -44,6 +44,7 @@ extern lv_obj_t * ui_VocOut;
 extern lv_obj_t * ui_TempLabels;
 extern lv_obj_t * ui_TempIn;
 extern lv_obj_t * ui_TempOut;
+extern lv_obj_t * ui_ChartMax;
 extern lv_obj_t * ui_XAxisScale;
 extern lv_obj_t * ui_FanBox;
 extern lv_obj_t * ui_FanPowerText;

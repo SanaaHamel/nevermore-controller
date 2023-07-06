@@ -28,6 +28,7 @@ lv_obj_t * ui_VocOut;
 lv_obj_t * ui_TempLabels;
 lv_obj_t * ui_TempIn;
 lv_obj_t * ui_TempOut;
+lv_obj_t * ui_ChartMax;
 lv_obj_t * ui_XAxisScale;
 lv_obj_t * ui_FanBox;
 lv_obj_t * ui_FanPowerText;

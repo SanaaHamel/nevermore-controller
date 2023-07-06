@@ -277,6 +277,20 @@ void ui_Main_screen_init(void)
     lv_obj_set_style_pad_top(ui_TempOut, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_pad_bottom(ui_TempOut, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
 
+    ui_ChartMax = lv_label_create(ui_ChartOverlay);
+    lv_obj_set_width(ui_ChartMax, LV_SIZE_CONTENT);   /// 1
+    lv_obj_set_height(ui_ChartMax, LV_SIZE_CONTENT);    /// 1
+    lv_obj_set_align(ui_ChartMax, LV_ALIGN_TOP_RIGHT);
+    lv_label_set_text(ui_ChartMax, "");
+    lv_obj_set_style_text_color(ui_ChartMax, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_opa(ui_ChartMax, 220, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_align(ui_ChartMax, LV_TEXT_ALIGN_RIGHT, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_font(ui_ChartMax, &lv_font_montserrat_10, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_pad_left(ui_ChartMax, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_pad_right(ui_ChartMax, 2, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_pad_top(ui_ChartMax, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_pad_bottom(ui_ChartMax, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
+
     ui_XAxisScale = lv_label_create(ui_ChartBox);
     lv_obj_set_width(ui_XAxisScale, LV_SIZE_CONTENT);   /// 1
     lv_obj_set_height(ui_XAxisScale, LV_SIZE_CONTENT);    /// 1
