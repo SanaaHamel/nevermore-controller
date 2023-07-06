@@ -155,11 +155,11 @@ TL;DR: If you installed everything using https://github.com/th33xitus/kiauh[Kiau
 [#klipper-config-minimal]
 ==== Minimal Example
 
-This example configuration is suitable quickly getting up and running.
+This example configuration is suitable for quickly getting up and running.
 
 ```ini
 [nevermore]
-# BOM states a 16 pixel
+# BOM specifies a 16 pixel ring
 led_colour_order: GBR
 led_chain_count: 16
 
