@@ -11,6 +11,11 @@
 #include <cstdio>
 #include <utility>
 
+#define DBG_SGP40_TEMP_HUMIDITY_BREAKDOWN 0
+#if DBG_SGP40_TEMP_HUMIDITY_BREAKDOWN
+#include <array>
+#endif
+
 using namespace std;
 
 // SGP40 supports std-mode 100 kbits/s and fast mode 400 kbits/s
@@ -87,6 +92,15 @@ struct SGP40 final : SensorDelayedResponse {
     EnvironmentalSensorData data;  // tiny bit wasteful, but terser to manage
     GasIndexAlgorithmParams gas_index_algorithm{};
 
+#if DBG_SGP40_TEMP_HUMIDITY_BREAKDOWN
+    uint8_t state = 0;
+    array<uint16_t, 4> history{};
+
+    [[nodiscard]] chrono::milliseconds update_period() const override {
+        return SENSOR_UPDATE_PERIOD / 4;
+    }
+#endif
+
     SGP40(i2c_inst_t& bus, EnvironmentalSensorData data) : bus(bus), data(std::move(data)) {
         GasIndexAlgorithm_init(&gas_index_algorithm, GasIndexAlgorithm_ALGORITHM_TYPE_VOC);
     }
@@ -100,6 +114,15 @@ struct SGP40 final : SensorDelayedResponse {
     }
 
     bool issue() override {
+#if DBG_SGP40_TEMP_HUMIDITY_BREAKDOWN
+        switch (state) {
+        case 0: break;
+        case 1: return sgp40_measure_issue(bus, get<BLE::Temperature&>(data), BLE::NOT_KNOWN);
+        case 2: return sgp40_measure_issue(bus, BLE::NOT_KNOWN, get<BLE::Humidity&>(data));
+        case 3: return sgp40_measure_issue(bus, BLE::NOT_KNOWN, BLE::NOT_KNOWN);
+        }
+#endif
+
         return sgp40_measure_issue(bus, get<BLE::Temperature&>(data), get<BLE::Humidity&>(data));
     }
 
@@ -109,6 +132,17 @@ struct SGP40 final : SensorDelayedResponse {
             printf("SGP40 - read back failed\n");
             return;
         }
+
+#if DBG_SGP40_TEMP_HUMIDITY_BREAKDOWN
+        state = (state + 1) % 4;
+        history.at(state) = *voc_raw;
+        if (state == 3) {
+            printf("SGP40 - both=% 7d  temp=% 7d  humid=% 7d  none=% 7d\n", history[0], history[1],
+                    history[2], history[3]);
+            printf("                      temp=% 7d  humid=% 7d  none=% 7d\n", history[1] - history[0],
+                    history[2] - history[0], history[3] - history[0]);
+        }
+#endif
 
         // ~330 us during steady-state, ~30 us during startup blackout
         int32_t gas_index{};
