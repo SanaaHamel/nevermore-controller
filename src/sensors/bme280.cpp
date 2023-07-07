@@ -58,6 +58,9 @@ optional<bme280_dev> init(i2c_inst_t& bus) {
     };
 
     if (auto r = bme280_init(&dev); r != BME280_OK) {
+        // suppress error msg & assume this just means there's no one on the bus
+        if (r == BME280_E_COMM_FAIL) return {};
+
         printf("BME280 - Failed to initialize the device (code %+d).\n", r);
         return {};
     }
