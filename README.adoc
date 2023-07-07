@@ -11,16 +11,67 @@ toc::[]
 
 == Features
 
-* [x] Klipper Module
+* [x] xref:klipper[Klipper Module]
 * [x] BLE - Multiple Connections Supported
-* [x] Fan - Tachometer
-* [x] Fan - Control - Automatic
-* [x] Fan - Control - Override
-* [x] Sensor - BME280 (Temperature, Humidity, Pressure)
-* [x] Sensor - HTU2xD (Temperature, Humidity)
-* [x] Sensor - SGP40 (Volatile Organic Compound Index)
-* [x] WS2812 support
-* [x] Display - GC9A01
+* [x] Fan - Tachometer & xref:fan-control[Automatic Control]
+* [x] xref:supported-sensors[Multiple Sensors]
+* [x] xref:supported-displays[Custom Display]
+* [x] NeoPixel Support
+
+== Required Hardware
+
+*Refer to the BOM from whatever filter you're building. This is just a basic guide for what kind of hardware is needed.*
+
+NOTE: Sensors are available in various sizes, form factors, and pin orders. Check your filter's BOM to see which you should obtain.
+
+.Recommended Hardware
+[%autowidth]
+|===
+| Part      | Name          | Quantity
+| MCU       | Pico W        | 1
+| Sensor    | VOC           | 2
+|           | Temperature   | 2
+|           | Humidity      | 2
+|===
+
+NOTE: xref:supported-sensors[Many sensor boards are multi-function.] e.g. you'll likely only need one board for temperature/humidity.
+
+The only hard requirement is a Pico W.
+Everything else can be omitted at the cost of reduced functionality.
+
+The VOC sensors are critical; they measure the relevant contaminants we wish to filter out.
+
+The temperature & humidity sensors are optional; they serve to improve the accuracy of the VOC sensor. If they're omitted, the system will assume some sensible defaults instead.
+
+NOTE: In the future, you'll be able to use Klipper sensors/thermistors to provide these values. This isn't as precise as dedicated sensors, but it's better than nothing. e.g. You could use the temperature from your toolhead's MCU for the intake temperature.
+
+== Supported Hardware
+
+[#supported-sensors]
+.Supported Sensors
+[%autowidth]
+|===
+| Sensor    | Measures
+| BME280    | Humidity, Temperature, Pressure
+| HTU2xD    | Humidity, Temperature
+| SGP40     | Volatile Organic Compounds
+|===
+
+[#supported-displays]
+.Supported Displays
+[%autowidth]
+|===
+| Display   | Description
+| GC9A01    | Round, 240px^2
+|===
+
+.Supported Miscellaneous
+[%autowidth]
+|===
+| Name      | Description
+| NeoPixel  | RGB Bling
+|===
+
 
 == Installation For Dummies
 
@@ -97,7 +148,7 @@ Configured MCU 'mcu' (283 moves)
 ... BLAH
 ```
 
-== Build Requirements
+== Software Build Requirements
 
 * Pico-W SDK 1.5.1+
 * CMake 3.20+
@@ -117,6 +168,7 @@ WARNING: GPIO 0 and 1 are currently hardcoded for UART. They cannot be used in a
 
 WARNING: The default assignments are tentative and will probably change after we get some feedback as to which layouts work best in practice.
 
+[#default-pin-table]
 .Default Pin Assignments
 [%autowidth]
 |===
@@ -137,6 +189,7 @@ WARNING: The default assignments are tentative and will probably change after we
 |===
 
 
+[#klipper]
 == Klipper
 
 [#klipper-requirements]
@@ -349,6 +402,7 @@ Load the app, scan for BLE devices. The controllers will all be named "Nevermore
 image::README-nrf-connect.png[nRC Connect Screenshot,256]
 
 
+[#fan-control]
 === Fan Control & Macros
 
 There are two modes of operation:
