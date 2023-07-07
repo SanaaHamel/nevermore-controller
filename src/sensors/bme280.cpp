@@ -18,6 +18,15 @@ namespace {
 // Assume LSB of 0 for now.
 constexpr uint8_t BME280_ADDRESS = 0b0111'0110;
 
+constexpr bme280_settings BME280_SETTINGS{
+        .osr_p = BME280_OVERSAMPLING_1X,
+        .osr_t = BME280_OVERSAMPLING_1X,
+        .osr_h = BME280_OVERSAMPLING_1X,
+        .filter = BME280_FILTER_COEFF_2,
+        // TODO: base this off of sampling period
+        .standby_time = BME280_STANDBY_TIME_250_MS,
+};
+
 BME280_INTF_RET_TYPE i2c_read(uint8_t reg_addr, uint8_t* reg_data, uint32_t len, void* intf_ptr) {
     auto* bus = reinterpret_cast<i2c_inst_t*>(intf_ptr);
     if (1 != i2c_write_blocking(*bus, BME280_ADDRESS, reg_addr)) return BME280_E_COMM_FAIL;
@@ -50,6 +59,12 @@ optional<bme280_dev> init(i2c_inst_t& bus) {
 
     if (auto r = bme280_init(&dev); r != BME280_OK) {
         printf("BME280 - Failed to initialize the device (code %+d).\n", r);
+        return {};
+    }
+
+    if (auto r = bme280_set_sensor_settings(BME280_SEL_ALL_SETTINGS, &BME280_SETTINGS, &dev);
+            r != BME280_OK) {
+        printf("BME280 - Failed to set device settings (code %+d).\n", r);
         return {};
     }
 
