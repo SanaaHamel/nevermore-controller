@@ -35,7 +35,7 @@ void ui_Main_screen_init(void)
     lv_obj_set_height(ui_PressureLabels, LV_SIZE_CONTENT);    /// 50
     lv_obj_set_align(ui_PressureLabels, LV_ALIGN_CENTER);
     lv_obj_set_flex_flow(ui_PressureLabels, LV_FLEX_FLOW_COLUMN);
-    lv_obj_set_flex_align(ui_PressureLabels, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
+    lv_obj_set_flex_align(ui_PressureLabels, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_END, LV_FLEX_ALIGN_START);
     lv_obj_clear_flag(ui_PressureLabels, LV_OBJ_FLAG_SCROLLABLE);      /// Flags
     lv_obj_set_style_radius(ui_PressureLabels, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_bg_color(ui_PressureLabels, lv_color_hex(0x000000), LV_PART_MAIN | LV_STATE_DEFAULT);
@@ -55,6 +55,7 @@ void ui_Main_screen_init(void)
     lv_label_set_text(ui_PressureIn, "??? kPa");
     lv_obj_set_style_text_color(ui_PressureIn, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_opa(ui_PressureIn, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_font(ui_PressureIn, &lv_font_montserrat_12, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_pad_left(ui_PressureIn, 2, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_pad_right(ui_PressureIn, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_pad_top(ui_PressureIn, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
@@ -67,6 +68,7 @@ void ui_Main_screen_init(void)
     lv_label_set_text(ui_PressureOut, "??? kPa");
     lv_obj_set_style_text_color(ui_PressureOut, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_opa(ui_PressureOut, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_font(ui_PressureOut, &lv_font_montserrat_12, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_pad_left(ui_PressureOut, 2, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_pad_right(ui_PressureOut, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_pad_top(ui_PressureOut, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
@@ -97,6 +99,7 @@ void ui_Main_screen_init(void)
     lv_label_set_text(ui_HumidityIn, "??.?%");
     lv_obj_set_style_text_color(ui_HumidityIn, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_opa(ui_HumidityIn, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_font(ui_HumidityIn, &lv_font_montserrat_12, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_pad_left(ui_HumidityIn, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_pad_right(ui_HumidityIn, 2, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_pad_top(ui_HumidityIn, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
@@ -109,6 +112,7 @@ void ui_Main_screen_init(void)
     lv_label_set_text(ui_HumidityOut, "??.?%");
     lv_obj_set_style_text_color(ui_HumidityOut, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_opa(ui_HumidityOut, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_font(ui_HumidityOut, &lv_font_montserrat_12, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_pad_left(ui_HumidityOut, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_pad_right(ui_HumidityOut, 2, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_pad_top(ui_HumidityOut, 0, LV_PART_MAIN | LV_STATE_DEFAULT);

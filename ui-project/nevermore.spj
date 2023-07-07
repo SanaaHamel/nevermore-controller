@@ -292,6 +292,12 @@
                                 "InheritedType": 7
                               },
                               {
+                                "nid": -1435152472,
+                                "strtype": "_style/Text_Font",
+                                "strval": "montserrat_12",
+                                "InheritedType": 3
+                              },
+                              {
                                 "nid": 1802432185,
                                 "strtype": "_style/Padding",
                                 "intarray": [
@@ -597,6 +603,12 @@
                                 "InheritedType": 7
                               },
                               {
+                                "nid": -1819808928,
+                                "strtype": "_style/Text_Font",
+                                "strval": "montserrat_12",
+                                "InheritedType": 3
+                              },
+                              {
                                 "nid": -326624295,
                                 "strtype": "_style/Padding",
                                 "intarray": [
@@ -645,7 +657,7 @@
                     "Wrap": false,
                     "Reversed": false,
                     "MainAlignment": 0,
-                    "CrossAlignment": 0,
+                    "CrossAlignment": 2,
                     "TrackAlignment": 0,
                     "LayoutType": 1,
                     "nid": 1595820916,
@@ -1214,6 +1226,12 @@
                                 "InheritedType": 7
                               },
                               {
+                                "nid": 33912234,
+                                "strtype": "_style/Text_Font",
+                                "strval": "montserrat_12",
+                                "InheritedType": 3
+                              },
+                              {
                                 "nid": -1790011551,
                                 "strtype": "_style/Padding",
                                 "intarray": [
@@ -1518,6 +1536,12 @@
                                   255
                                 ],
                                 "InheritedType": 7
+                              },
+                              {
+                                "nid": -1939554889,
+                                "strtype": "_style/Text_Font",
+                                "strval": "montserrat_12",
+                                "InheritedType": 3
                               },
                               {
                                 "nid": -185386833,
@@ -7254,7 +7278,7 @@
     "theme_color2": 0,
     "exportFolderPath": "",
     "projectExportFolderPath": "",
-    "backup_cnt": 119,
+    "backup_cnt": 122,
     "autosave_cnt": 0,
     "lvgl_version": "8.3.6",
     "callfuncsexport": "CPP_FILE",

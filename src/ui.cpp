@@ -114,8 +114,8 @@ auto chart_pos_for_value(
 auto g_display_content_update_timer = mk_async_worker<DISPLAY_TIMER_LABELS_INTERVAL / 1ms>([]() {
     auto& state = EnvironmentService::g_service_data;
 
-    label_set(ui_PressureIn, "??? kPa", "%.f kPa", state.pressure_intake, 1e3);
-    label_set(ui_PressureOut, "??? kPa", "%.f kPa", state.pressure_exhaust, 1e3);
+    label_set(ui_PressureIn, "??? kPa", "%.1f kPa", state.pressure_intake, 1e3);
+    label_set(ui_PressureOut, "??? kPa", "%.1f kPa", state.pressure_exhaust, 1e3);
     label_set(ui_HumidityIn, "??%", "%2.1f%%", state.humidity_intake);
     label_set(ui_HumidityOut, "??%", "%2.1f%%", state.humidity_exhaust);
 
