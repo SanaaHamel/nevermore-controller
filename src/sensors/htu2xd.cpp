@@ -31,7 +31,7 @@ enum class Cmd : uint8_t {
 };
 
 constexpr double HTU2xD_HUMIDITY_COMPENSATION_ZERO_POINT = 25;
-constexpr double HTU2xD_HUMIDITY_COMPENSATION_COEFFICIENT = 25;
+constexpr double HTU2xD_HUMIDITY_COMPENSATION_COEFFICIENT = -0.15;
 
 // 50ms @ 14 bits, 25ms @ 13 bits, 13ms @ 12 bits, 7ms @ 11 bits
 constexpr auto HTU2xD_MEASURE_TEMPERATURE_DELAY = 50ms;
