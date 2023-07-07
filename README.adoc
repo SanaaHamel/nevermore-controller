@@ -77,8 +77,7 @@ WARNING: This assumes your `print_end` macro calls `TURN_OFF_HEATERS`. If it doe
 Easiest way would be to put this macro wrapper in your config:footnote:[Wherever you'd like.`TURN_OFF_HEATERS` is a built-in macro, and should never be overridden w/o calling the replaced macro, so it doesn't matter if another macro ends up wrapping this wrapper.]
 +
 ```ini
-# ASSUME: Your `print_end`
-# Put this at the very
+# ASSUME: Your `print_end` macro calls `TURN_OFF_HEATERS`.
 [gcode_macro TURN_OFF_HEATERS]
 rename_existing: NEVERMORE_CONTROLLER_INNER_TURN_OFF_HEATERS
 gcode:
