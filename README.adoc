@@ -22,13 +22,6 @@ toc::[]
 * [x] WS2812 support
 * [x] Display - GC9A01
 
-
-== Build Requirements
-
-* Pico-W SDK 1.5.1+
-* CMake 3.20+
-* C++23 compiler, e.g. GCC 12+ (tested w/ 12.2.1)
-
 == Installation For Dummies
 
 NOTE: Make sure you meet the xref:klipper-requirements[Klipper requirements].
@@ -104,6 +97,11 @@ Configured MCU 'mcu' (283 moves)
 ... BLAH
 ```
 
+== Build Requirements
+
+* Pico-W SDK 1.5.1+
+* CMake 3.20+
+* C++23 compiler, e.g. GCC 12+ (tested w/ 12.2.1)
 
 == Controller Customisation
 
