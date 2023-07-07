@@ -19,6 +19,7 @@
     "cmake.buildBeforeRun": true,
     "C_Cpp.default.configurationProvider": "ms-vscode.cmake-tools",
     "editor.formatOnSave": true,
+    "cortex-debug.objdumpPath": "/usr/bin/arm-none-eabi-objdump",
     "clangd.arguments": [
         "--clang-tidy",
         "--background-index",
