@@ -13,12 +13,14 @@ using EnvironmentService::VOCIndex;
 namespace {
 
 bool should_filter(FanPolicyEnvironmental const& params, VOCIndex intake, VOCIndex exhaust) {
-    // Can't decide anything until we have readings available
-    if (intake == BLE::NOT_KNOWN) return false;
-    if (exhaust == BLE::NOT_KNOWN) return false;
+    // Can't decide anything until we have an intake VOC reading available
+    if (intake == NOT_KNOWN) return false;
 
     // Too filthy in here. Just start filtering.
-    if (params.voc_passive_max <= std::max(intake, exhaust)) return true;
+    if (params.voc_passive_max <= max(intake, exhaust)) return true;
+
+    // Second policy requires having a value for the exhaust
+    if (exhaust == NOT_KNOWN) return false;
 
     auto const voc_improvement = intake.value_or(0) - exhaust.value_or(0);
     return params.voc_improve_min.value_or(INFINITY) < voc_improvement;
@@ -28,10 +30,6 @@ bool should_filter(FanPolicyEnvironmental const& params, VOCIndex intake, VOCInd
 
 float FanPolicyEnvironmental::Instance::operator()(
         EnvironmentService::ServiceData const& state, chrono::system_clock::time_point now) {
-    // can't do anything until we have readings available
-    if (state.voc_index_intake == BLE::NOT_KNOWN) return 0;
-    if (state.voc_index_exhaust == BLE::NOT_KNOWN) return 0;
-
     if (should_filter(params, state.voc_index_intake, state.voc_index_exhaust)) {
         last_filtered = chrono::system_clock::now();
         return 1;  // conditions are bad enough we should filter
