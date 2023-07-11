@@ -15,7 +15,20 @@ from abc import abstractmethod
 from dataclasses import dataclass
 from enum import Enum
 from threading import Thread
-from typing import Any, Callable, Coroutine, MutableMapping, Optional, TypeVar, overload
+from typing import (
+    Any,
+    Callable,
+    Coroutine,
+    Dict,
+    List,
+    MutableMapping,
+    Optional,
+    Set,
+    Tuple,
+    TypeVar,
+    Union,
+    overload,
+)
 from uuid import UUID
 
 import janus
@@ -37,7 +50,7 @@ __all__ = [
 _A = TypeVar("_A")
 _Float = TypeVar("_Float", bound=float)
 
-RGBW = tuple[float, float, float, float]
+RGBW = Tuple[float, float, float, float]
 
 # BLE Constants (inclusive)
 TIMESEC16_MAX = 2**16 - 2
@@ -45,7 +58,7 @@ VOC_INDEX_MAX = 500
 
 
 # Not actually provided by `bleak`. IDK why not.
-class CharacteristicProperty(enum.StrEnum):
+class CharacteristicProperty(enum.Enum):
     BROADCAST = "broadcast"
     INDICATE = "indicate"
     NOTIFY = "notify"
@@ -57,10 +70,10 @@ class CharacteristicProperty(enum.StrEnum):
 class LogPrefixed(logging.LoggerAdapter):
     def __init__(
         self,
-        logger: logging.Logger | logging.LoggerAdapter,
+        logger: Union[logging.Logger, logging.LoggerAdapter],
         format: Callable[[str], str],
     ):
-        super().__init__(logger)
+        super().__init__(logger, None)
         self.format = format
 
     def process(self, msg: Any, kwargs: MutableMapping[str, Any]):
@@ -95,7 +108,7 @@ class SensorState:
     #       Also happens to be what the bme680 reports.
     gas: Optional[int] = None  # [1, VOC_INDEX_MAX]
 
-    def as_dict(self) -> dict[str, float | int]:
+    def as_dict(self) -> Dict[str, float]:
         return {
             f.name: getattr(self, f.name)
             for f in dataclasses.fields(self)
@@ -191,7 +204,7 @@ class BleAttrReader:
 
     def _signed(
         self, sz: int, M: int, d: int, e: int, *, not_known: Optional[int] = None
-    ) -> float | Optional[float]:
+    ) -> Optional[float]:
         return self._consume(True, sz, M, d, e, not_known)
 
     @overload
@@ -206,7 +219,7 @@ class BleAttrReader:
 
     def _unsigned(
         self, sz: int, M: int, d: int, e: int, *, not_known: Optional[int] = None
-    ) -> float | Optional[float]:
+    ) -> Optional[float]:
         return self._consume(False, sz, M, d, e, not_known)
 
     def _consume(
@@ -237,7 +250,7 @@ class BleAttrReader:
         return None if x is None else int(x)
 
 
-def parse_agg_env(reader: BleAttrReader) -> tuple[SensorState, SensorState]:
+def parse_agg_env(reader: BleAttrReader) -> Tuple[SensorState, SensorState]:
     t_in = reader.temperature()
     t_out = reader.temperature()
     t_mcu = reader.temperature()  # unused/ignored
@@ -264,7 +277,7 @@ def require_chars(
     service: BleakGATTService,
     id: UUID,
     num: Optional[int] = None,
-    props: set[CharacteristicProperty] = {CharacteristicProperty.READ},
+    props: Set[CharacteristicProperty] = {CharacteristicProperty.READ},
 ):
     xs = [
         x
@@ -286,7 +299,7 @@ def require_chars(
 def require_char(
     service: BleakGATTService,
     id: UUID,
-    props: set[CharacteristicProperty] = {CharacteristicProperty.READ},
+    props: Set[CharacteristicProperty] = {CharacteristicProperty.READ},
 ):
     xs = require_chars(service, id, None, props)
     if len(xs) == 1:
@@ -299,7 +312,7 @@ def require_char(
 
 async def discover_controllers(
     address: Optional[str] = None, timeout: float = 10
-) -> list[BLEDevice]:
+) -> List[BLEDevice]:
     NAME_SHORTENED = "Nevermore"
     NAME_COMPLETE = "Nevermore Controller"
 
@@ -496,24 +509,23 @@ class NevermoreBackgroundWorker:
         self._loop_exit.set_threadsafe(self._loop)
 
     # PRECONDITION: `self._connected` is set
-    def send_command(self, cmd: Command | PseudoCommand):
+    def send_command(self, cmd: Union[Command, PseudoCommand]):
         assert self._command_queue is not None, "cannot send commands before connecting"
 
         def send_maybe(wrapper: Callable[[_A], Command], x: Optional[_A]):
             if x is not None:
                 self._command_queue.sync_q.put(wrapper(x))
 
-        match cmd:
-            case Command() as cmd:
-                self._command_queue.sync_q.put(cmd)
-            case CmdFanPolicy() as cmd:
-                send_maybe(CmdFanPolicyCooldown, cmd.cooldown)
-                send_maybe(CmdFanPolicyVocPassiveMax, cmd.voc_passive_max)
-                send_maybe(CmdFanPolicyVocImproveMin, cmd.voc_improve_min)
-            case CmdWs2812MarkDirty():
-                self._led_dirty.set_threadsafe(self._loop)
-            case _:
-                raise Exception(f"unhandled pseudo-command {cmd}")
+        if isinstance(cmd, Command):
+            self._command_queue.sync_q.put(cmd)
+        elif isinstance(cmd, CmdFanPolicy):
+            send_maybe(CmdFanPolicyCooldown, cmd.cooldown)
+            send_maybe(CmdFanPolicyVocPassiveMax, cmd.voc_passive_max)
+            send_maybe(CmdFanPolicyVocImproveMin, cmd.voc_improve_min)
+        elif isinstance(cmd, CmdWs2812MarkDirty):
+            self._led_dirty.set_threadsafe(self._loop)
+        else:
+            raise Exception(f"unhandled pseudo-command {cmd}")
 
     def _worker(self) -> None:
         nevermore = self._nevermore()
@@ -588,7 +600,7 @@ class NevermoreBackgroundWorker:
             worker_log.exception("worker failed")
 
     async def _worker_using(
-        self, log: logging.Logger | logging.LoggerAdapter, client: BleakClient
+        self, log: Union[logging.Logger, logging.LoggerAdapter], client: BleakClient
     ):
         log.info(f"connected to controller {client.address}")
 
@@ -648,19 +660,18 @@ class NevermoreBackgroundWorker:
 
         async def handle_commands():
             cmd = await self._command_queue.async_q.get()
-            match cmd:
-                case CmdFanPower():
-                    char = fan_power_override
-                case CmdFanPolicyCooldown():
-                    char = fan_policy_cooldown
-                case CmdFanPolicyVocPassiveMax():
-                    char = fan_policy_voc_passive_max
-                case CmdFanPolicyVocImproveMin():
-                    char = fan_policy_voc_improve_min
-                case CmdWs2812Length():
-                    char = ws2812_length
-                case _:
-                    raise Exception(f"unhandled command {cmd}")
+            if isinstance(cmd, CmdFanPower):
+                char = fan_power_override
+            if isinstance(cmd, CmdFanPolicyCooldown):
+                char = fan_policy_cooldown
+            if isinstance(cmd, CmdFanPolicyVocPassiveMax):
+                char = fan_policy_voc_passive_max
+            if isinstance(cmd, CmdFanPolicyVocImproveMin):
+                char = fan_policy_voc_improve_min
+            if isinstance(cmd, CmdWs2812Length):
+                char = ws2812_length
+            else:
+                raise Exception(f"unhandled command {cmd}")
 
             try:
                 await client.write_gatt_char(char, cmd.params())
@@ -776,7 +787,7 @@ class Nevermore:
         if self._interface is not None:
             self._interface.send_command(CmdFanPower(percent))
 
-    def _led_update(self, led_state: list[RGBW], print_time: Optional[float]) -> None:
+    def _led_update(self, led_state: List[RGBW], print_time: Optional[float]) -> None:
         for i, (led, clr) in enumerate(self.led_colour_idxs):
             self.led_colour_data[i] = int(led_state[led][clr] * 255.0 + 0.5)
 
@@ -831,7 +842,7 @@ class NevermoreFan:
 
         self.printer.register_event_handler("klippy:connect", self._handle_connect)
 
-    def get_status(self, eventtime: float) -> dict[str, float]:
+    def get_status(self, eventtime: float) -> Dict[str, float]:
         return {
             "speed": 0 if self.nevermore is None else self.nevermore.state.fan_power,
             "rpm": 0 if self.nevermore is None else self.nevermore.state.fan_tacho,
@@ -881,7 +892,7 @@ class NevermoreSensor:
         else:
             return self.nevermore.state.exhaust
 
-    def get_status(self, eventtime: float) -> dict[str, float]:
+    def get_status(self, eventtime: float) -> Dict[str, float]:
         # HACK: can only plot on mainsail/fluidd if we pretend the VOC Index is a temperature
         if self.plot_voc:
             return {"temperature": self.state.gas or 0}
