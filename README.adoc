@@ -216,11 +216,13 @@ led_chain_count: 16
 [temperature_sensor nevermore_intake]
 sensor_type: NevermoreSensor
 sensor_kind: intake
+# Need `class_name_override` to fool mainsail into showing all values. Remove once mainsail PR is merged.
 class_name_override: bme280
 
 [temperature_sensor nevermore_exhaust]
 sensor_type: NevermoreSensor
 sensor_kind: exhaust
+# Need `class_name_override` to fool mainsail into showing all values. Remove once mainsail PR is merged.
 class_name_override: bme280
 
 [temperature_sensor nevermore_intake_VOC]
