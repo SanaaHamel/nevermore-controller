@@ -211,15 +211,6 @@ struct [[gnu::packed]] Scalar {
 };
 
 template <typename Unit, typename Raw, int32_t M, int32_t D, int32_t B>
-constexpr auto operator<(Scalar<Unit, Raw, M, D, B> const& lhs, Scalar<Unit, Raw, M, D, B> const& rhs) {
-    if constexpr (has_not_known<Scalar<Unit, Raw, M, D, B>>) {
-        if (lhs == NOT_KNOWN || rhs == NOT_KNOWN) return false;
-    }
-
-    return lhs.raw_value < rhs.raw_value;
-}
-
-template <typename Unit, typename Raw, int32_t M, int32_t D, int32_t B>
 constexpr auto operator<=>(Scalar<Unit, Raw, M, D, B> const& lhs, Scalar<Unit, Raw, M, D, B> const& rhs) {
     if constexpr (has_not_known<Scalar<Unit, Raw, M, D, B>>) {
         if (lhs.raw_value == rhs.raw_value) return std::partial_ordering::equivalent;
@@ -229,6 +220,18 @@ constexpr auto operator<=>(Scalar<Unit, Raw, M, D, B> const& lhs, Scalar<Unit, R
     } else {
         return lhs.raw_value <=> rhs.raw_value;
     }
+}
+
+template <typename Unit, typename Raw, int32_t M, int32_t D, int32_t B>
+constexpr auto operator<=>(Scalar<Unit, Raw, M, D, B> const& lhs, double const& rhs) {
+    return lhs <=> Scalar<Unit, Raw, M, D, B>(rhs);
+}
+
+template <typename Unit, typename Raw, int32_t M, int32_t D, int32_t B>
+constexpr auto operator<=>(Scalar<Unit, Raw, M, D, B> const& lhs, struct NOT_KNOWN const& rhs)
+    requires has_not_known<Scalar<Unit, Raw, M, D, B>>
+{
+    return lhs <=> Scalar<Unit, Raw, M, D, B>(rhs);
 }
 
 }  // namespace internal
