@@ -31,12 +31,11 @@ bool should_filter(FanPolicyEnvironmental const& params, VOCIndex intake, VOCInd
 float FanPolicyEnvironmental::Instance::operator()(
         EnvironmentService::ServiceData const& state, chrono::system_clock::time_point now) {
     if (should_filter(params, state.voc_index_intake, state.voc_index_exhaust)) {
-        last_filtered = chrono::system_clock::now();
+        cooldown_ends = chrono::system_clock::now() + chrono::seconds(uint32_t(params.cooldown.value_or(0)));
         return 1;  // conditions are bad enough we should filter
     }
 
-    if (chrono::system_clock::now() <
-            last_filtered + chrono::seconds(uint32_t(params.cooldown.value_or(0)))) {
+    if (chrono::system_clock::now() < cooldown_ends) {
         return 1;  // in cooldown phase, keep going for a bit to mop up the leftovers
     }
 

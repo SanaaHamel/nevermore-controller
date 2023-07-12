@@ -15,7 +15,7 @@ struct FanPolicyEnvironmental {
 
     struct Instance {
         FanPolicyEnvironmental const& params;
-        std::chrono::system_clock::time_point last_filtered;
+        std::chrono::system_clock::time_point cooldown_ends;
 
         // Stateful.
         // Returns fan power [0, 1] based on env state and policy parameters.
