@@ -12,32 +12,68 @@ using EnvironmentService::VOCIndex;
 
 namespace {
 
-bool should_filter(FanPolicyEnvironmental const& params, VOCIndex intake, VOCIndex exhaust) {
-    // Can't decide anything until we have an intake VOC reading available
-    if (intake == NOT_KNOWN) return false;
+constexpr bool policy_voc_too_high(VOCIndex voc_passive_max, VOCIndex intake, VOCIndex exhaust) {
+    return voc_passive_max <= max(intake.value_or(0), exhaust.value_or(0));
+}
 
-    // Too filthy in here. Just start filtering.
-    if (params.voc_passive_max <= max(intake, exhaust)) return true;
-
-    // Second policy requires having a value for the exhaust
-    if (exhaust == NOT_KNOWN) return false;
+constexpr bool policy_voc_improving(VOCIndex voc_improve_min, VOCIndex intake, VOCIndex exhaust) {
+    if (intake == NOT_KNOWN || exhaust == NOT_KNOWN) return false;  // Need a reading for both sensors.
 
     auto const voc_improvement = intake.value_or(0) - exhaust.value_or(0);
-    return params.voc_improve_min.value_or(INFINITY) < voc_improvement;
+    return voc_improve_min <= voc_improvement;
+}
+
+constexpr bool should_filter(FanPolicyEnvironmental const& params, VOCIndex intake, VOCIndex exhaust) {
+    return policy_voc_too_high(params.voc_passive_max, intake, exhaust) ||
+           policy_voc_improving(params.voc_improve_min, intake, exhaust);
+}
+
+enum class PolicyState { Idle, Filtering, Cooldown };
+using enum PolicyState;
+
+constexpr PolicyState evaluate(FanPolicyEnvironmental::Instance const& instance,
+        EnvironmentService::ServiceData const& state, chrono::system_clock::time_point now) {
+    if (should_filter(instance.params, state.voc_index_intake, state.voc_index_exhaust)) return Filtering;
+
+    if (now < instance.cooldown_ends) return Cooldown;
+
+    return Idle;
 }
 
 }  // namespace
 
 float FanPolicyEnvironmental::Instance::operator()(
         EnvironmentService::ServiceData const& state, chrono::system_clock::time_point now) {
-    if (should_filter(params, state.voc_index_intake, state.voc_index_exhaust)) {
-        cooldown_ends = chrono::system_clock::now() + chrono::seconds(uint32_t(params.cooldown.value_or(0)));
-        return 1;  // conditions are bad enough we should filter
+    switch (evaluate(*this, state, now)) {
+    case Idle: return 0;
+    case Cooldown: return 1;
+    case Filtering: {
+        cooldown_ends = now + chrono::seconds(uint32_t(params.cooldown.value_or(0)));
+        return 1;
+    }
     }
 
-    if (chrono::system_clock::now() < cooldown_ends) {
-        return 1;  // in cooldown phase, keep going for a bit to mop up the leftovers
-    }
-
-    return 0;
+    // Annoying. GCC's case analysis fails to detect that switch is total.
+    std::unreachable();
 }
+
+// Policy Tests
+
+// Initial state should be off if no sensors.
+static_assert(evaluate(FanPolicyEnvironmental{}.instance(), {}, {}) == Idle);
+
+// VOC-exceeds-limits case
+static_assert(policy_voc_too_high(1, 1, 1));                   // barely
+static_assert(policy_voc_too_high(1, 1, NOT_KNOWN));           // barely
+static_assert(policy_voc_too_high(1, NOT_KNOWN, 1));           // barely
+static_assert(!policy_voc_too_high(2, 1, 1));                  // not enough
+static_assert(!policy_voc_too_high(NOT_KNOWN, 500, 500));      // disabled
+static_assert(!policy_voc_too_high(1, NOT_KNOWN, NOT_KNOWN));  // sensors not connected
+
+// VOC-improved-by-filtering case
+static_assert(policy_voc_improving(2, 3, 1));                   // barely
+static_assert(!policy_voc_improving(2, 3, 2));                  // not enough
+static_assert(!policy_voc_improving(2, 3, NOT_KNOWN));          // basic case - need both sensors
+static_assert(!policy_voc_improving(2, NOT_KNOWN, 1));          // basic case - need both sensors
+static_assert(!policy_voc_improving(NOT_KNOWN, 3, 1));          // disabled
+static_assert(!policy_voc_improving(2, NOT_KNOWN, NOT_KNOWN));  // sensors not connected

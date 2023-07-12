@@ -19,12 +19,12 @@ struct FanPolicyEnvironmental {
 
         // Stateful.
         // Returns fan power [0, 1] based on env state and policy parameters.
-        float operator()(EnvironmentService::ServiceData const& state,
+        [[nodiscard]] float operator()(EnvironmentService::ServiceData const& state,
                 std::chrono::system_clock::time_point now = std::chrono::system_clock::now());
     };
 
     // NB: DANGER - `this` must outlive `instance`
-    [[nodiscard]] Instance instance() const {
+    [[nodiscard]] constexpr Instance instance() const {
         return {*this};
     }
 };
