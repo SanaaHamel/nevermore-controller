@@ -35,7 +35,9 @@ constexpr PolicyState evaluate(FanPolicyEnvironmental::Instance const& instance,
         EnvironmentService::ServiceData const& state, chrono::system_clock::time_point now) {
     if (should_filter(instance.params, state.voc_index_intake, state.voc_index_exhaust)) return Filtering;
 
-    if (now < instance.cooldown_ends) return Cooldown;
+    auto cooldown_end =
+            instance.last_filter + chrono::seconds(uint32_t(instance.params.cooldown.value_or(0)));
+    if (now < cooldown_end) return Cooldown;
 
     return Idle;
 }
@@ -48,7 +50,7 @@ float FanPolicyEnvironmental::Instance::operator()(
     case Idle: return 0;
     case Cooldown: return 1;
     case Filtering: {
-        cooldown_ends = now + chrono::seconds(uint32_t(params.cooldown.value_or(0)));
+        last_filter = now;
         return 1;
     }
     }
