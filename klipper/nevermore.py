@@ -490,14 +490,18 @@ class NevermoreBackgroundWorker:
         # ever GC'd without asking us to disconnect (for whatever reason).
         self._nevermore = weakref.ref(nevermore, lambda nevermore: self.disconnect())
         self._connected = threading.Event()
-        self._loop_exit = UNSAFE_LazyAsyncioEvent()
-        self._led_dirty = UNSAFE_LazyAsyncioEvent()
         self._led_colour_data_old = bytearray()
         self._loop = asyncio.new_event_loop()
         self._thread = Thread(target=self._worker)
         # HACK: Can't set this up yet b/c the loop isn't set.
         # It'll be available at some point before `self._connected` is set.
         self._command_queue: janus.Queue[Command] = None
+        # HACK: Python < 3.10 compatibility.
+        #       *ALSO* can't set this up for the same god damn reason, specifically
+        #       `asyncio.Event` had a `loop` param that was removed in 3.10
+        #       but everyone before that had an implicit get-current-loop in the ctor.
+        self._loop_exit: UNSAFE_LazyAsyncioEvent = None
+        self._led_dirty: UNSAFE_LazyAsyncioEvent = None
 
         self._thread.start()
 
@@ -581,6 +585,9 @@ class NevermoreBackgroundWorker:
         async def go():
             # set this up ASAP once we're in an asyncio loop
             self._command_queue = janus.Queue()
+            # HACK: Python < 3.10 compatibility - See comment in `__init__`.
+            self._loop_exit = UNSAFE_LazyAsyncioEvent()
+            self._led_dirty = UNSAFE_LazyAsyncioEvent()
 
             main = asyncio.create_task(handle_connection(device_address))
 
