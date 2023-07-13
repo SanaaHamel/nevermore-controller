@@ -9,6 +9,9 @@ bool display_and_ui_init(spi_inst_t&, async_context_t&);
 // `display_and_ui_init`, but on core 1.
 bool display_and_ui_init_on_second_cpu(spi_inst_t&);
 
+void display_brightness(float power);  // range: [0, 1]
+float display_brightness();            // range: [0, 1]
+
 struct DisplayResolution {
     uint16_t width;
     uint16_t height;

@@ -5,10 +5,12 @@
 #include "hardware/spi.h"
 #include "lvgl.h"
 #include "pico/cyw43_arch.h"
+#include "sdk/pwm.hpp"
 #include "sdk/timer.hpp"
 #include "ui.hpp"
 #include "utility/async_worker.hpp"
 #include <chrono>
+#include <cstdint>
 #include <cstdio>
 
 using namespace std;
@@ -17,6 +19,9 @@ using namespace std::literals::chrono_literals;
 namespace {
 
 constexpr auto DISPLAY_TIMER_INTERVAL = 5ms;
+constexpr auto DISPLAY_BACKLIGHT_FREQ = 1'000;
+
+float g_display_brightness = 1;
 
 lv_color_t g_draw_scratch_buffer[DISPLAY_RESOLUTION.width * DISPLAY_RESOLUTION.height];
 lv_disp_draw_buf_t g_draw_buffer;
@@ -28,10 +33,24 @@ auto g_display_timer = mk_async_worker<DISPLAY_TIMER_INTERVAL / 1ms>(lv_timer_ha
 
 }  // namespace
 
+void display_brightness(float power) {
+    g_display_brightness = clamp(power, 0.f, 1.f);
+    pwm_set_gpio_duty(PIN_DISPLAY_BRIGHTNESS, UINT16_MAX * g_display_brightness);
+}
+
+float display_brightness() {
+    return g_display_brightness;
+}
+
 // Initialises the UI. Everything else should be hands off after that.
 bool display_and_ui_init(spi_inst_t& spi, async_context_t& ctx_async) {
     assert(!g_display_spi && "already initialised?");  // likely an error to attempt repeat init
     g_display_spi = &spi;
+
+    auto cfg_display_brightness = pwm_get_default_config();
+    pwm_config_set_freq_hz(cfg_display_brightness, DISPLAY_BACKLIGHT_FREQ);
+    pwm_init(pwm_gpio_to_slice_num_(PIN_DISPLAY_BRIGHTNESS), &cfg_display_brightness, true);
+    display_brightness(1);
 
     if (auto e = GC9A01_init(); e != 0) {
         printf("ERR - ui_init - GC9A01_init failed = %d\n", e);

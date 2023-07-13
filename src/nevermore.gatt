@@ -1,3 +1,4 @@
+// 7be8ac4b-7eb4-4e09-b134-91a46b622832 Service - Display
 // 4553d138-1d00-4b6f-bc42-955a89cf8c36 Service - Fan
 // 260a0845-e62f-48c6-aef9-04f62ff8bffd Service - Fan Control Policy
 // f62918ab-33b7-4f47-9fba-8ce9de9fecbb Service - NeoPixel
@@ -21,6 +22,10 @@ CHARACTERISTIC, GAP_APPEARANCE, READ, 42 05
 
 PRIMARY_SERVICE, GATT_SERVICE
 CHARACTERISTIC, GATT_DATABASE_HASH, READ,
+
+/////////////////////////////
+// Environmental Sensing Service
+/////////////////////////////
 
 PRIMARY_SERVICE, ORG_BLUETOOTH_SERVICE_ENVIRONMENTAL_SENSING
 ////////////////////////////////////////
@@ -115,4 +120,13 @@ CHARACTERISTIC, 2AEA, READ | WRITE | DYNAMIC
 CHARACTERISTIC_USER_DESCRIPTION, READ | DYNAMIC
 // support write w/o response for speed (vastly faster than awaiting a response)
 CHARACTERISTIC, 5d91b6ce-7db1-4e06-b8cb-d75e7dd49aae, WRITE | WRITE_WITHOUT_RESPONSE | DYNAMIC
+CHARACTERISTIC_USER_DESCRIPTION, READ | DYNAMIC
+
+/////////////////////////////
+// Display Service
+/////////////////////////////
+
+PRIMARY_SERVICE, 7be8ac4b-7eb4-4e09-b134-91a46b622832
+// Display Brightness %
+CHARACTERISTIC, 2B04, READ | WRITE | DYNAMIC
 CHARACTERISTIC_USER_DESCRIPTION, READ | DYNAMIC

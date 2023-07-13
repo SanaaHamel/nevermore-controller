@@ -71,6 +71,13 @@ constexpr uint8_t spi_has_at_least(span<GPIO_Pin const> pins, initializer_list<S
     return missing == 0;
 }
 
+constexpr bool pwm_slices_overlap() {
+    array xs{PIN_FAN_PWM, PIN_FAN_TACHOMETER, PIN_DISPLAY_BRIGHTNESS};
+    ranges::sort(xs, {}, pwm_gpio_to_slice_num_);
+    auto [last, end] = ranges::unique(xs);
+    return last != end;
+}
+
 static_assert(all_pins_valid(), "`config.hpp` uses a GPIO pin outside of range [0, 29].");
 static_assert(all_pins_unique(), "`config.hpp` uses duplicate pins. A pin can be used at most once.");
 static_assert(!pin_exists(contains(PINS_RESERVED_PICO_W)),
@@ -83,10 +90,11 @@ static_assert(i2c_bus_pins_defined(0) & 0b10, "`config.hpp` has no pins defined 
 static_assert(i2c_bus_pins_defined(1) & 0b01, "`config.hpp` has no pins defined for I2C1 SDA.");
 static_assert(i2c_bus_pins_defined(1) & 0b10, "`config.hpp` has no pins defined for I2C1 SCL.");
 
-// can't use the same slice to both drive a signal and read a signal
-static_assert(pwm_gpio_to_slice_num_(PIN_FAN_PWM) != pwm_gpio_to_slice_num_(PIN_FAN_TACHOMETER),
-        "`config.hpp` specifies `PIN_FAN_PWM` and `PIN_FAN_TACHOMETER` on the same PWM slice. "
-        "They must be on separate slices.");
+// can't use the same slice to both drive a signal and read a signal, and all of thee require
+// drastically different frequencies.
+static_assert(!pwm_slices_overlap(),
+        "`config.hpp` specifies `PIN_FAN_PWM`, `PIN_FAN_TACHOMETER`, or `PIN_DISPLAY_BRIGHTNESS` on "
+        " the same PWM slice. They must all be on separate slices.");
 // PWM slice can only read from B channel
 static_assert(pwm_gpio_to_channel_(PIN_FAN_TACHOMETER) == PWM_CHAN_B,
         "`config.hpp` specifies `PIN_FAN_TACHOMETER` on a A channel pin instead of a B channel pin . "

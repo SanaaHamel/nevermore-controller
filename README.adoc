@@ -228,6 +228,7 @@ WARNING: The default assignments are tentative and will probably change after we
 |4  | Display - GC9A01 - SPI RX (not used, for future hardware)
 |5  | Display - GC9A01 - Command
 |6  | Display - GC9A01 - Reset
+|7  | Display - Backlight Brightness PWM
 |12 | NeoPixel - Data
 |13 | Fan - PWM
 |15 | Fan - Tachometer

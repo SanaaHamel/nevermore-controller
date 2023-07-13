@@ -5,6 +5,7 @@
 #include "boards/pico_w.h"
 #include "btstack_event.h"
 #include "config.hpp"
+#include "gatt/display.hpp"
 #include "gatt/environmental.hpp"
 #include "gatt/fan.hpp"
 #include "gatt/handler_helpers.hpp"
@@ -59,6 +60,7 @@ void hci_handler(uint8_t packet_type, uint16_t channel, uint8_t* packet, uint16_
 
     case ATT_EVENT_DISCONNECTED: {
         auto conn = att_event_disconnected_get_handle(packet);
+        DisplayService::disconnected(conn);
         EnvironmentService::disconnected(conn);
         FanService::disconnected(conn);
         NeoPixelService::disconnected(conn);
@@ -69,6 +71,7 @@ void hci_handler(uint8_t packet_type, uint16_t channel, uint8_t* packet, uint16_
 uint16_t attr_read(
         hci_con_handle_t conn, uint16_t attr, uint16_t offset, uint8_t* buffer, uint16_t buffer_size) {
     constexpr array HANDLERS{
+            DisplayService::attr_read,
             EnvironmentService::attr_read,
             FanService::attr_read,
             NeoPixelService::attr_read,
@@ -91,6 +94,7 @@ int attr_write(hci_con_handle_t conn, uint16_t attr, uint16_t transaction_mode, 
     }
 
     constexpr array HANDLERS{
+            DisplayService::attr_write,
             EnvironmentService::attr_write,
             FanService::attr_write,
             NeoPixelService::attr_write,
