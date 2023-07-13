@@ -150,6 +150,52 @@ Configured MCU 'mcu' (283 moves)
 ... BLAH
 ```
 
+[#faq]
+== FAQ / Known Issues
+
+[#faq-is-the-bluetooth-on]
+* The controller is properly flashed (e.g. the LED is blinking) but my Klipper can't connect to it.
++
+Make sure the Bluetooth is turned on & working.
+If you're using Linux you can use the following to check:
++
+```
+⋊> ~ # ensure BT is on
+⋊> ~ bluetoothctl power on
+Changing power on succeeded
+⋊> ~ # scan to see if we see any BT devices
+⋊> ~ # if the nevermore controller is powered on then you should see it listed here
+⋊> ~ bluetoothctl scan on
+Discovery started
+[CHG] Controller XX:XX:XX:XX:XX:XX Discovering: yes
+[NEW] Device XX:XX:XX:XX:XX:XX <censored>
+[NEW] Device XX:XX:XX:XX:XX:XX <censored>
+^C⏎
+```
++
+If `bluetoothctl` works fine and the scan lists the Nevermore controller then something probably went wrong with the Klipper module. Go find me on the Nevermore Discord for help.
+
+* I'm using Mainsail-OS and...
++
+This distro disables BlueTooth by default. Unless you're very familiar with Linux, it'll likely be easier to install a new OS. I suggest using a recent Debian and https://github.com/th33xitus/kiauh[KIAUH].
++
+NOTE: Make sure you back up the `~/printer_data` directory!
+
+* Mainsail doesn't show sensor values other than temperature.
++
+https://github.com/mainsail-crew/mainsail/pull/1437[There's a PR for Mainsail which has unofficial support] but until that's merged xref:klipper-config-full[you'll need to use the `class_name_override` hack].
+
+* Mainsail doesn't show sensor values other than temperature and, yes, I applied the `class_name_override` hack.
++
+Refresh the webpage. Mainsail assumes that the first time it sees a multi-value sensor (usually when the page loads) that it will always have the same fields. This isn't true for Nevermore controller sensors.
++
+NOTE: This is very common with the VOC sensors during controller startup. They take a few seconds to initialise.
+
+* Fluidd doesn't show sensor values other than temperature, even with the `class_name_override` hack.
++
+Can't fix due to how Fluidd interprets Klipper state data. https://github.com/fluidd-core/fluidd/pull/1114[There's a PR fixing the issue, but it hasn't received much support.]
+
+
 == Software Build Requirements
 
 * Pico-W SDK 1.5.1+
@@ -198,9 +244,9 @@ WARNING: The default assignments are tentative and will probably change after we
 === Requirements
 
 * Klipper using Python 3.7+
-* Kiauh-like installation (required by installation script)
+* KIAUH-like installation (required by installation script)
 
-TL;DR: If you installed everything using https://github.com/th33xitus/kiauh[Kiauh], you should be good to go so long as you installed Klipper with Python 3.
+TL;DR: If you installed everything using https://github.com/th33xitus/kiauh[KIAUH], you should be good to go so long as you installed Klipper with Python 3.
 
 === Configuration
 
@@ -338,6 +384,7 @@ We could use `bt_address: FA:KE:AD:RE:SS:01` or `bt_address: FA:KE:AD:RE:SS:00`.
 
 In this case I'd plug in `FA:KE:AD:RE:SS:01` since that device has the strongest signal, i.e. closest-ish to the Klipper host.
 
+[#find-the-bt-address-bluetoothctl]
 ==== Method B - Linux Only - `bluetoothctl`
 
 NOTE: Only works on Linux. Yes, I know you didn't read the title.
