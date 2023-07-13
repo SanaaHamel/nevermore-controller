@@ -52,7 +52,7 @@ private:
 };
 
 template <uint32_t DELAY_MS, typename A>
-auto mk_sync_worker(A (*go)()) {
+auto mk_async_worker(A (*go)()) {
     return AsyncWorker<decltype(A())>(go, std::chrono::milliseconds(DELAY_MS));
 }
 
