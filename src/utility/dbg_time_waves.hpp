@@ -9,16 +9,16 @@
 template <typename A>
 constexpr A remap(A const& x, A const& min, A const& max, A const& lo, A const& hi) {
     auto p = (x - min) / (max - min);
-    return lerp(lo, hi, p);
+    return std::lerp(lo, hi, p);
 }
 
 double time_sin(std::chrono::duration<float> period) {
     auto t = std::chrono::system_clock::now().time_since_epoch() / period;
-    return remap<double>(sin(t * 2 * M_PI), -1, 1, 0, 1);
+    return remap<double>(std::sin(t * 2 * M_PI), -1, 1, 0, 1);
 }
 
 double time_saw(std::chrono::duration<float> period) {
-    return fmod(std::chrono::system_clock::now().time_since_epoch() / std::chrono::seconds(1),
+    return std::fmod(std::chrono::system_clock::now().time_since_epoch() / std::chrono::seconds(1),
                    period.count()) /
            period.count();
 }
