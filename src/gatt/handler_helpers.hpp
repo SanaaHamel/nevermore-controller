@@ -5,6 +5,7 @@
 #include "btstack_config.h"
 #include "btstack_defines.h"
 #include "hci.h"
+#include "sdk/btstack.hpp"
 #include <algorithm>
 #include <array>
 #include <cassert>
