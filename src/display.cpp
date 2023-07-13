@@ -71,11 +71,11 @@ bool display_and_ui_init_on_second_cpu(spi_inst_t& spi) {
 ////////////////////////////////////
 
 void LV_DRV_DISP_CMD_DATA(bool value) {
-    gpio_put(PINS_DISPLAY_CMD, value);
+    gpio_put(PIN_DISPLAY_COMMAND, value);
 }
 
 void LV_DRV_DISP_RST(bool value) {
-    gpio_put(PINS_DISPLAY_RST, value);
+    gpio_put(PIN_DISPLAY_RESET, value);
 }
 
 void LV_DRV_DISP_SPI_CS(bool) {

@@ -40,10 +40,11 @@ void pins_setup() {
     for (auto pin : PINS_DISPLAY_SPI)
         gpio_set_function(pin, GPIO_FUNC_SPI);
 
-    gpio_set_function(PINS_DISPLAY_CMD, GPIO_FUNC_SIO);
-    gpio_set_function(PINS_DISPLAY_RST, GPIO_FUNC_SIO);
-    gpio_set_dir(PINS_DISPLAY_CMD, true);
-    gpio_set_dir(PINS_DISPLAY_RST, true);
+    gpio_set_function(PIN_DISPLAY_COMMAND, GPIO_FUNC_SIO);
+    gpio_set_function(PIN_DISPLAY_RESET, GPIO_FUNC_SIO);
+    gpio_set_function(PIN_DISPLAY_BRIGHTNESS, GPIO_FUNC_PWM);
+    gpio_set_dir(PIN_DISPLAY_COMMAND, true);
+    gpio_set_dir(PIN_DISPLAY_RESET, true);
 
 #ifndef NDEBUG
     if (PIN_DBG_SQUARE_WAVE) {

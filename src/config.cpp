@@ -93,11 +93,9 @@ static_assert(pwm_gpio_to_channel_(PIN_FAN_TACHOMETER) == PWM_CHAN_B,
         "Move `PIN_FAN_TACHOMETER` to an odd # pin to fix this.");
 
 static_assert(
-        size(PINS_DISPLAY_SPI) == 2, "`config.hpp` doesn't specify exactly two pins for `PINS_DISPLAY_SPI`");
-static_assert(
         ranges::all_of(PINS_DISPLAY_SPI,
                 [](auto pin) { return spi_gpio_bus_num(PINS_DISPLAY_SPI[0]) == spi_gpio_bus_num(pin); }),
         "`config.hpp`'s `PINS_DISPLAY_SPI` aren't all on the same bus");
 static_assert(spi_has_at_least(PINS_DISPLAY_SPI, {SPI_Pin::CLOCK, SPI_Pin::SEND}),
-        "`config.hpp`'s `PINS_DISPLAY_SPI` doesn't specify at a clock and send pin");
+        "`config.hpp`'s `PINS_DISPLAY_SPI` doesn't specify at least a clock and send pin");
 }  // namespace

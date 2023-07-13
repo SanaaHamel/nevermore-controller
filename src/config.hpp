@@ -25,11 +25,11 @@ constexpr GPIO_Pin PINS_I2C[] = {
 };
 
 // must all be on the same SPI, only need clock & TX
-constexpr GPIO_Pin PINS_DISPLAY_SPI[] = {6, 7};
+constexpr GPIO_Pin PINS_DISPLAY_SPI[] = {2, 3, 4};
 // cmd & rst can be any GPIO
-constexpr GPIO_Pin PINS_DISPLAY_CMD = 8;
-constexpr GPIO_Pin PINS_DISPLAY_RST = 9;
-// TODO: Option to control display brightness via pin? For now we just assume user shorts LED to 3.3v.
+constexpr GPIO_Pin PIN_DISPLAY_COMMAND = 5;
+constexpr GPIO_Pin PIN_DISPLAY_RESET = 6;
+constexpr GPIO_Pin PIN_DISPLAY_BRIGHTNESS = 7;
 
 ////////////////////////////
 // Other configurable stuff.
@@ -65,8 +65,9 @@ constexpr bool pins_forall(F&& go) {
     if (!(go(PIN_FAN_PWM) && go(PIN_FAN_TACHOMETER))) return false;
     if (!go(PIN_NEOPIXEL_DATA_IN)) return false;
     if (!std::all_of(std::begin(PINS_DISPLAY_SPI), std::end(PINS_DISPLAY_SPI), go)) return false;
-    if (!go(PINS_DISPLAY_CMD)) return false;
-    if (!go(PINS_DISPLAY_RST)) return false;
+    if (!go(PIN_DISPLAY_COMMAND)) return false;
+    if (!go(PIN_DISPLAY_RESET)) return false;
+    if (!go(PIN_DISPLAY_BRIGHTNESS)) return false;
 
     return true;
 }

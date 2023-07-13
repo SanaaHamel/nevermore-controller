@@ -223,10 +223,11 @@ WARNING: The default assignments are tentative and will probably change after we
 |GPIO | Function
 |0  | UART - TX
 |1  | UART - RX
-|6  | Display - GC9A01 - SPI SCK
-|7  | Display - GC9A01 - SPI TX
-|8  | Display - GC9A01 - Command
-|9  | Display - GC9A01 - Reset
+|2  | Display - GC9A01 - SPI SCK
+|3  | Display - GC9A01 - SPI TX
+|4  | Display - GC9A01 - SPI RX (not used, for future hardware)
+|5  | Display - GC9A01 - Command
+|6  | Display - GC9A01 - Reset
 |12 | NeoPixel - Data
 |13 | Fan - PWM
 |15 | Fan - Tachometer
