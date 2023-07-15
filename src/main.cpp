@@ -43,8 +43,13 @@ void pins_setup() {
     gpio_set_function(PIN_DISPLAY_COMMAND, GPIO_FUNC_SIO);
     gpio_set_function(PIN_DISPLAY_RESET, GPIO_FUNC_SIO);
     gpio_set_function(PIN_DISPLAY_BRIGHTNESS, GPIO_FUNC_PWM);
+    gpio_set_function(PIN_TOUCH_INTERRUPT, GPIO_FUNC_SIO);
+    gpio_set_function(PIN_TOUCH_RESET, GPIO_FUNC_SIO);
+
     gpio_set_dir(PIN_DISPLAY_COMMAND, true);
     gpio_set_dir(PIN_DISPLAY_RESET, true);
+    gpio_set_dir(PIN_TOUCH_INTERRUPT, false);
+    gpio_set_dir(PIN_TOUCH_RESET, true);
 
 #ifndef NDEBUG
     if (PIN_DBG_SQUARE_WAVE) {
@@ -85,6 +90,7 @@ int main() {
 
     pins_setup();
     ws2812_init(ctx_async);
+    // display must be init before sensors b/c some sensors are display input devices
     if (!display_and_ui_init_on_second_cpu(*spi)) return -1;
     if (!sensors_init(ctx_async, EnvironmentService::g_service_data)) return -1;
     if (!gatt_init(ctx_async)) return -1;

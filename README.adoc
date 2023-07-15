@@ -67,10 +67,11 @@ NOTE: In the future, you'll be able to use Klipper sensors/thermistors to provid
 | GC9A01    | Round, 240px^2
 |===
 
-.Supported Miscellaneous
+.Supported Miscellaneous Hardware
 [%autowidth]
 |===
 | Name      | Description
+| CST816S   | Display Touch Sensor
 | NeoPixel  | RGB Bling
 |===
 
@@ -229,6 +230,8 @@ WARNING: The default assignments are tentative and will probably change after we
 |5  | Display - GC9A01 - Command
 |6  | Display - GC9A01 - Reset
 |7  | Display - Backlight Brightness PWM
+|8  | Display Touch - CST816S - Interrupt
+|9  | Display Touch - CST816S - Reset
 |12 | NeoPixel - Data
 |13 | Fan - PWM
 |15 | Fan - Tachometer

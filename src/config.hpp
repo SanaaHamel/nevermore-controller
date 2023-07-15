@@ -30,6 +30,8 @@ constexpr GPIO_Pin PINS_DISPLAY_SPI[] = {2, 3, 4};
 constexpr GPIO_Pin PIN_DISPLAY_COMMAND = 5;
 constexpr GPIO_Pin PIN_DISPLAY_RESET = 6;
 constexpr GPIO_Pin PIN_DISPLAY_BRIGHTNESS = 7;
+constexpr GPIO_Pin PIN_TOUCH_INTERRUPT = 8;
+constexpr GPIO_Pin PIN_TOUCH_RESET = 9;
 
 ////////////////////////////
 // Other configurable stuff.
@@ -68,6 +70,8 @@ constexpr bool pins_forall(F&& go) {
     if (!go(PIN_DISPLAY_COMMAND)) return false;
     if (!go(PIN_DISPLAY_RESET)) return false;
     if (!go(PIN_DISPLAY_BRIGHTNESS)) return false;
+    if (!go(PIN_TOUCH_INTERRUPT)) return false;
+    if (!go(PIN_TOUCH_RESET)) return false;
 
     return true;
 }

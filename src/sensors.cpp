@@ -5,6 +5,7 @@
 #include "sdk/timer.hpp"
 #include "sensors/async_sensor.hpp"
 #include "sensors/bme280.hpp"
+#include "sensors/cst816s.hpp"
 #include "sensors/htu2xd.hpp"
 #include "sensors/sgp40.hpp"
 #include <algorithm>
@@ -70,6 +71,7 @@ VecSensors sensors_init_bus(async_context_t& ctx_async, i2c_inst_t& bus, Environ
     probe_for(htu2xd(bus, state));
     probe_for(bme280(bus, state));
     probe_for(sgp40(bus, state));
+    probe_for(CST816S::mk(bus));
 
     if (sensors.empty()) printf("!! No sensors found?\n");
     return sensors;
