@@ -104,6 +104,26 @@ double FanService::fan_power() {
     return g_fan_power.value_or(0);
 }
 
+void FanService::fan_power_override(BLE::Percentage8 power) {
+    if (g_fan_power_override == power) return;
+
+    if (g_fan_power_override == BLE::NOT_KNOWN) {
+        fan_automatic_stop();
+    }
+
+    g_fan_power_override = power;
+    g_notify_aggregate.notify();
+
+    if (power != BLE::NOT_KNOWN)
+        fan_power_set(power);  // apply override
+    else
+        fan_automatic_start();
+}
+
+BLE::Percentage8 FanService::fan_power_override() {
+    return g_fan_power_override;
+}
+
 bool FanService::init(async_context& ctx_async) {
     // setup PWM configurations for fan PWM and fan tachometer
     auto cfg_pwm = pwm_get_default_config();
@@ -168,21 +188,7 @@ optional<int> FanService::attr_write(hci_con_handle_t conn, uint16_t att_handle,
         WRITE_CLIENT_CFG(FAN_AGGREGATE, g_notify_aggregate)
 
     case HANDLE_ATTR(FAN_POWER_OVERRIDE, VALUE): {
-        BLE::Percentage8 power = consume;
-        if (g_fan_power_override == power) return 0;  // no-op
-
-        if (g_fan_power_override == BLE::NOT_KNOWN) {
-            fan_automatic_stop();
-        }
-
-        g_fan_power_override = power;
-        g_notify_aggregate.notify();
-
-        if (power != BLE::NOT_KNOWN)
-            fan_power_set(power);  // apply override
-        else
-            fan_automatic_start();
-
+        fan_power_override((BLE::Percentage8)consume);
         return 0;
     }
 

@@ -2,6 +2,7 @@
 
 #include "bluetooth.h"
 #include "pico/async_context.h"
+#include "sdk/ble_data_types.hpp"
 #include <cstdint>
 #include <optional>
 
@@ -19,5 +20,8 @@ void disconnected(hci_con_handle_t);
 
 // Current fan power. [0, 100]
 double fan_power();
+
+void fan_power_override(BLE::Percentage8 power);  // `NOT_KNOWN` to clear override
+BLE::Percentage8 fan_power_override();
 
 }  // namespace FanService

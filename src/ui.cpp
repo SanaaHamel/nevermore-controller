@@ -320,6 +320,14 @@ bool ui_init(async_context_t& ctx_async) {
     lv_obj_add_event_cb(ui_Chart, [](auto* e) { on_chart_draw(true, e); }, LV_EVENT_DRAW_PART_BEGIN, {});
     lv_obj_add_event_cb(ui_Chart, [](auto* e) { on_chart_draw(false, e); }, LV_EVENT_DRAW_PART_END, {});
 
+    lv_obj_add_event_cb(ui_Chart,
+            [](auto*) {
+                FanService::fan_power_override(FanService::fan_power_override() == BLE::NOT_KNOWN
+                                                       ? BLE::Percentage8(100)
+                                                       : BLE::NOT_KNOWN);
+            },
+            LV_EVENT_LONG_PRESSED, {});
+
 #if 0  // DEBUG HELPER - pre-populate chart with some data to test rendering
     lv_chart_set_point_count(ui_Chart, CHART_SERIES_ENTIRES_MAX);
     lv_label_set_text(ui_XAxisScale,
