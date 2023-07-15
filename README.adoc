@@ -196,6 +196,11 @@ NOTE: This is very common with the VOC sensors during controller startup. They t
 +
 Can't fix due to how Fluidd interprets Klipper state data. https://github.com/fluidd-core/fluidd/pull/1114[There's a PR fixing the issue, but it hasn't received much support.]
 
+== Touch Display Support
+
+Touch display support is early in development and currently very limited. For now you can:
+
+* Long press on the center plot to toggle the fan override on/off
 
 == Software Build Requirements
 
