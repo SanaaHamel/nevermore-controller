@@ -30,7 +30,7 @@ struct ChartDivY {
 };
 
 constexpr ChartDivY CHART_DIV_VOC{.min = 4, .value_per = 25};
-constexpr ChartDivY CHART_DIV_TEMP{.min = 1, .value_per = 10};
+constexpr ChartDivY CHART_DIV_TEMP{.min = 6, .value_per = 10};
 constexpr lv_opa_t CHART_RED_ZONE_HI = LV_OPA_30;
 
 bool chart_point_less_than(lv_coord_t x, lv_coord_t y) {
