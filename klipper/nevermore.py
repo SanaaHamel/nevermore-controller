@@ -641,6 +641,17 @@ class NevermoreBackgroundWorker:
 
         self._connected.set()
 
+        # clear WS2812 diff cache, other end is in an undefined state
+        self._led_colour_data_old = bytearray()
+
+        nevermore = self._nevermore()
+        if nevermore is None:
+            return
+
+        # inform frontend it should send setup/init commands
+        nevermore.handle_controller_connect()
+        nevermore = None  # release local ref
+
         async def notify(
             char: BleakGATTCharacteristic,
             callback: Callable[["Nevermore", BleAttrReader], Any],
@@ -812,9 +823,11 @@ class Nevermore:
         if not self._interface.wait_for_connection(TIMEOUT_CONNECT):
             raise self.printer.config_error("nevermore failed to connect - timed out")
 
+        self._led_update(self.led_helper.get_status()["color_data"], None)
+
+    def handle_controller_connect(self) -> None:
         self._interface.send_command(self._fan_policy)
         self._interface.send_command(CmdWs2812Length(len(self.led_colour_idxs)))
-        self._led_update(self.led_helper.get_status()["color_data"], None)
 
     def _handle_request_restart(self, print_time: Optional[float]):
         self._handle_shutdown()
