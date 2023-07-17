@@ -680,13 +680,13 @@ class NevermoreBackgroundWorker:
             cmd = await self._command_queue.async_q.get()
             if isinstance(cmd, CmdFanPower):
                 char = fan_power_override
-            if isinstance(cmd, CmdFanPolicyCooldown):
+            elif isinstance(cmd, CmdFanPolicyCooldown):
                 char = fan_policy_cooldown
-            if isinstance(cmd, CmdFanPolicyVocPassiveMax):
+            elif isinstance(cmd, CmdFanPolicyVocPassiveMax):
                 char = fan_policy_voc_passive_max
-            if isinstance(cmd, CmdFanPolicyVocImproveMin):
+            elif isinstance(cmd, CmdFanPolicyVocImproveMin):
                 char = fan_policy_voc_improve_min
-            if isinstance(cmd, CmdWs2812Length):
+            elif isinstance(cmd, CmdWs2812Length):
                 char = ws2812_length
             else:
                 raise Exception(f"unhandled command {cmd}")
