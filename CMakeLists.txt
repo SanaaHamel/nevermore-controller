@@ -24,6 +24,7 @@ option(BLUETOOTH_LOW_LEVEL_DEBUG "enable bluetooth low level debug logging (very
 
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_CXX_STANDARD 23)
+set(CMAKE_CXX_EXTENSIONS OFF) # -std=c++ instead of -std=gnu++
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 set(PICO_BOARD pico_w)
