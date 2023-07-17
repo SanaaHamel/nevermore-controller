@@ -1,4 +1,5 @@
 #include "async_sensor.hpp"
+#include "pico/async_context.h"
 #include "sdk/async.hpp"
 #include <chrono>
 #include <cstdio>
@@ -23,6 +24,13 @@ void SensorPeriodic::update_enqueue(
     // printf("sensor update enqueue - %s - duration %d us\n", name(), int(update_duration / 1us));
     auto const delay_ms = max<int64_t>((update_period() - update_duration) / 1ms, 0);
     async_using(context, [&]() { async_context_add_at_time_worker_in_ms(&context, &update_task, delay_ms); });
+}
+
+void SensorPeriodic::update_enqueue_immediate(async_context_t& context) {
+    async_using(context, [&]() {
+        async_context_remove_at_time_worker(&context, &update_task);
+        async_context_add_at_time_worker_in_ms(&context, &update_task, 0);
+    });
 }
 
 void SensorDelayedResponse::update(async_context_t& context) {

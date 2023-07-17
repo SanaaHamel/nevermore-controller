@@ -177,9 +177,9 @@ struct RegisterInterruptCallback {
     static void go(uint gpio, [[maybe_unused]] uint32_t event_mask) {
         assert(gpio == PIN_TOUCH_INTERRUPT);
         if (gpio != PIN_TOUCH_INTERRUPT) return;
-        for (auto& instance : g_instances) {
-            if (auto* p = reinterpret_cast<CST816S*>(instance.driver.user_data)) p->read();
-        }
+
+        for (auto& instance : g_instances)
+            if (auto* p = reinterpret_cast<CST816S*>(instance.driver.user_data)) p->interrupt();
     }
 } g_register_interrupt_callback;
 
@@ -225,6 +225,26 @@ void CST816S::read() {
     state.y = byteswap(read->y) & 0x0FFF;        // read in BE, need it in LE order
     state.touch = Touch((read->x & 0xFF) >> 6);  // hi 2 bits in `x` are the event
     // state.gesture = Gesture(read->gesture);
+}
+
+void CST816S::register_(async_context_t& ctx) {
+    SensorPeriodic::register_(ctx);
+    ctx_async = &ctx;
+}
+
+void CST816S::interrupt() {
+    // Can't safely read from the interrupt directly because we might be interrupting
+    // an active I2C read from another sensor.
+    // (They run on a different IRQ and don't preempt one another)
+    if (ctx_async) {
+        update_enqueue_immediate(*ctx_async);
+    }
+}
+
+// We aren't really a periodic sensor, but we need to run as one so we don't
+// interrupt others mid read-response.
+chrono::milliseconds CST816S::update_period() const {
+    return 1min;
 }
 
 unique_ptr<CST816S> CST816S::mk(i2c_inst_t& bus) {

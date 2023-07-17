@@ -2,6 +2,7 @@
 
 #include "async_sensor.hpp"
 #include "hardware/i2c.h"
+#include <chrono>
 #include <cstdint>
 #include <memory>
 
@@ -11,7 +12,7 @@ namespace nevermore::sensors {
 // There doesn't seem to be an official SDK for this device, so this was cobbled
 // from various sources. (Zephyr, WaveShare samples, etc..)
 
-struct CST816S final : Sensor {
+struct CST816S final : SensorPeriodic {
     static std::unique_ptr<CST816S> mk(i2c_inst_t&);
 
     enum class Touch : uint8_t {
@@ -39,9 +40,7 @@ struct CST816S final : Sensor {
         // Gesture gesture = Gesture::None;
     };
 
-    i2c_inst_t* bus;
     State state;
-    uint8_t reading = 0;
 
     CST816S() = delete;
     CST816S(CST816S const&) = delete;
@@ -52,13 +51,16 @@ struct CST816S final : Sensor {
         return "CST816S";
     }
 
-    void read();
+    void read() override;
+    void register_(async_context_t&) override;
+    [[nodiscard]] std::chrono::milliseconds update_period() const override;
 
-    // HACK: no-op. Correct fix would be to `if constexpr <:` check in `sensors_init_bus`
-    // We're an interrupt driven sensor.
-    void register_(async_context_t&) {}
+    void interrupt();
 
 private:
+    i2c_inst_t* bus;
+    async_context_t* ctx_async{};
+
     CST816S(i2c_inst_t&);
 };
 

@@ -23,7 +23,7 @@ struct SensorPeriodic : Sensor {
         return SENSOR_UPDATE_PERIOD;
     }
 
-    void register_(async_context_t& context) {
+    virtual void register_(async_context_t& context) {
         update_enqueue(context, 0ms);
     }
 
@@ -32,6 +32,7 @@ protected:
     virtual void read() = 0;
 
     void update_enqueue(async_context_t&, std::chrono::steady_clock::duration update_duration);
+    void update_enqueue_immediate(async_context_t&);
 
 private:
     static void update_dispatcher(async_context_t*, async_work_on_timeout*);
