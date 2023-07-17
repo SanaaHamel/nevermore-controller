@@ -1,12 +1,12 @@
 #pragma once
 
-#include "gatt/environmental.hpp"
+#include "sensors.hpp"
 #include <chrono>
 
 using namespace std::literals::chrono_literals;
 
 struct FanPolicyEnvironmental {
-    using VOCIndex = EnvironmentService::VOCIndex;
+    using VOCIndex = nevermore::sensors::VOCIndex;
 
     // How long to keep spinning after `should_filter` returns `false`
     BLE::TimeSecond16 cooldown = 60 * 15;
@@ -19,7 +19,7 @@ struct FanPolicyEnvironmental {
 
         // Stateful.
         // Returns fan power [0, 1] based on env state and policy parameters.
-        [[nodiscard]] float operator()(EnvironmentService::Sensors const& state,
+        [[nodiscard]] float operator()(nevermore::sensors::Sensors const& state,
                 std::chrono::system_clock::time_point now = std::chrono::system_clock::now());
     };
 

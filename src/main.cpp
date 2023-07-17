@@ -92,7 +92,7 @@ int main() {
     ws2812_init(ctx_async);
     // display must be init before sensors b/c some sensors are display input devices
     if (!display_and_ui_init_on_second_cpu(*spi)) return -1;
-    if (!sensors_init(ctx_async, EnvironmentService::g_sensors)) return -1;
+    if (!nevermore::sensors::init(ctx_async)) return -1;
     if (!gatt_init(ctx_async)) return -1;
 
     btstack_run_loop_execute();  // !! NO-RETURN

@@ -1,11 +1,11 @@
 #include "fan.hpp"
 #include "config.hpp"
-#include "gatt/environmental.hpp"
 #include "handler_helpers.hpp"
 #include "nevermore.h"
 #include "sdk/ble_data_types.hpp"
 #include "sdk/btstack.hpp"
 #include "sdk/pwm.hpp"
+#include "sensors.hpp"
 #include "sensors/tachometer.hpp"
 #include "utility/fan_policy.hpp"
 #include <cstdint>
@@ -85,7 +85,7 @@ btstack_timer_source_t g_fan_policy_update{.process = [](auto* timer) {
     btstack_run_loop_add_timer(timer);
 
     static auto g_instance = g_fan_policy.instance();
-    fan_power_set(g_instance(EnvironmentService::g_sensors) * 100);
+    fan_power_set(g_instance(nevermore::sensors::g_sensors) * 100);
 }};
 
 void fan_automatic_start() {

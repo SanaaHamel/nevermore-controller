@@ -4,6 +4,7 @@
 #include "nevermore.h"
 #include "sdk/ble_data_types.hpp"
 #include "sdk/btstack.hpp"
+#include "sensors.hpp"
 #include <cstdint>
 
 using namespace std;
@@ -14,8 +15,6 @@ using namespace std;
 #define VOC_INDEX_01 216aa791_97d0_46ac_8752_60bbc00611e1_01
 #define VOC_INDEX_02 216aa791_97d0_46ac_8752_60bbc00611e1_02
 #define ENV_AGGREGATE_01 75134bec_dd06_49b1_bac2_c15e05fd7199_01
-
-EnvironmentService::Sensors EnvironmentService::g_sensors;
 
 namespace {
 
@@ -59,18 +58,18 @@ const ESM ESM_VOC_INDEX{
 // GATT supplementary spec section 2.4 explicitly says everything is little
 // endian unless otherwise noted. Section 4.1 describes `Valid Range` and has
 // nothing to say regarding its endianness.
-const BLE::ValidRange<EnvironmentService::VOCIndex> VALID_RANGE_VOC_INDEX{.min = 0, .max = 500};
+const BLE::ValidRange<nevermore::sensors::VOCIndex> VALID_RANGE_VOC_INDEX{.min = 0, .max = 500};
 
 auto g_notify_aggregate = NotifyState<[](hci_con_handle_t conn) {
-    att_server_notify(conn, HANDLE_ATTR(ENV_AGGREGATE_01, VALUE), EnvironmentService::g_sensors);
+    att_server_notify(conn, HANDLE_ATTR(ENV_AGGREGATE_01, VALUE), nevermore::sensors::g_sensors);
 }>();
 
 // HACK:  We'd like to notify on write changes, but the code base isn't setup
 //        for that yet. Internally poll and update based on diffs for now.
 btstack_timer_source_t g_notify_pump_hack{.process = [](auto* timer) {
-    static EnvironmentService::Sensors g_prev;
-    if (g_prev != EnvironmentService::g_sensors) {
-        g_prev = EnvironmentService::g_sensors;
+    static nevermore::sensors::Sensors g_prev;
+    if (g_prev != nevermore::sensors::g_sensors) {
+        g_prev = nevermore::sensors::g_sensors;
         g_notify_aggregate.notify();
     }
 
@@ -90,7 +89,7 @@ void EnvironmentService::disconnected(hci_con_handle_t conn) {
 
 optional<uint16_t> EnvironmentService::attr_read(
         hci_con_handle_t conn, uint16_t att_handle, uint16_t offset, uint8_t* buffer, uint16_t buffer_size) {
-    auto const& sensors = EnvironmentService::g_sensors;
+    auto const& sensors = nevermore::sensors::g_sensors;
 
     switch (att_handle) {
         // NOLINTBEGIN(bugprone-branch-clone)

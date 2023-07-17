@@ -150,7 +150,7 @@ struct SGP40 final : SensorDelayedResponse {
         assert(0 <= gas_index && gas_index <= 500 && "result out of range?");
         if (gas_index == 0) return;  // 0 -> index not available
 
-        get<EnvironmentService::VOCIndex&>(data) = gas_index;
+        get<nevermore::sensors::VOCIndex&>(data) = gas_index;
     }
 };
 

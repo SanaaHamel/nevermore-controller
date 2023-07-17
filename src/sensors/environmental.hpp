@@ -1,8 +1,6 @@
 #pragma once
 
-#include "gatt/environmental.hpp"
-#include "sdk/ble_data_types.hpp"
-#include <tuple>
+#include "sensors.hpp"
 
 using EnvironmentalSensorData =
-        std::tuple<BLE::Temperature&, BLE::Humidity&, BLE::Pressure&, EnvironmentService::VOCIndex&>;
+        std::tuple<BLE::Temperature&, BLE::Humidity&, BLE::Pressure&, nevermore::sensors::VOCIndex&>;
