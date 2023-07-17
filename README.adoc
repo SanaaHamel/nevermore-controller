@@ -270,6 +270,8 @@ This example configuration is suitable for quickly getting up and running.
 # BOM specifies a 16 pixel ring
 led_colour_order: GBR
 led_chain_count: 16
+# Uncomment if this controller is for a StealthMax
+# sensors_fallback_exhaust_mcu: true
 
 [temperature_sensor nevermore_intake]
 sensor_type: NevermoreSensor
@@ -298,7 +300,7 @@ plot_voc: true
 # Optional - Can omit if you have only one nevermore in range.
 # See <<Finding The BT Address>> for more info.
 # example - `bt_address: 43:43:A2:12:1F:AC`
-# bt_address: <REPLACE WITH YOUR BT DEVICE ADDRESS>
+bt_address: XX:XX:XX:XX:XX:XX
 
 # Optional - LED
 # For the optional LED ring feature.
@@ -317,6 +319,18 @@ fan_policy_cooldown: 900
 fan_policy_voc_passive_max: 125
 # voc index, 0 to disable, filter if the intake exceeds exhaust by at least this much
 fan_policy_voc_improve_min: 5
+
+# Optional - Misc. Sensor Options
+
+# If temperature, humidity, etc, is unavailable on one side of the filter then
+# report the value from the other side (if available).
+# Useful for builds where you only have one temperature or humidity sensor,
+# and you want to use it for both intake/exhaust.
+sensors_fallback: true
+
+# Use the MCU's temperature as an exhaust temperature fallback.
+# Only useful for filters which have the MCU in the exhaust airflow. (e.g. StealthMax)
+sensors_fallback_exhaust_mcu: false
 
 
 [temperature_sensor nevermore_sensor]

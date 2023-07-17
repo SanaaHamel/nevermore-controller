@@ -131,6 +131,7 @@ def short_uuid(x: int):
 
 UUID_SERVICE_GAP = short_uuid(0x1801)
 UUID_SERVICE_ENVIRONMENTAL_SENSING = short_uuid(0x181A)
+UUID_SERVICE_CONFIGURATION = UUID("b5078b20-aea3-4c37-a18f-b370c03f02a6")
 UUID_SERVICE_FAN = UUID("4553d138-1d00-4b6f-bc42-955a89cf8c36")
 UUID_SERVICE_WS2812 = UUID("f62918ab-33b7-4f47-9fba-8ce9de9fecbb")
 UUID_SERVICE_FAN_POLICY = UUID("260a0845-e62f-48c6-aef9-04f62ff8bffd")
@@ -142,6 +143,7 @@ UUID_CHAR_DATA_AGGREGATE = UUID("75134bec-dd06-49b1-bac2-c15e05fd7199")
 UUID_CHAR_FAN_TACHO = UUID("03f61fe0-9fe7-4516-98e6-056de551687f")
 UUID_CHAR_VOC_INDEX = UUID("216aa791-97d0-46ac-8752-60bbc00611e1")
 UUID_CHAR_WS2812_UPDATE = UUID("5d91b6ce-7db1-4e06-b8cb-d75e7dd49aae")
+UUID_CHAR_CONFIG_FLAGS64 = UUID("d4b66bf4-3d8f-4746-b6a2-8a59d2eac3ce")
 
 
 def _clamp(x: _Float, min: _Float, max: _Float) -> _Float:
@@ -440,6 +442,14 @@ class CmdWs2812Length(Command):
         return int(self.n_total_components).to_bytes(2, "little")
 
 
+@dataclass(frozen=True)
+class CmdConfigFlags(Command):
+    flags: int
+
+    def params(self):
+        return self.flags.to_bytes(8, "little")
+
+
 class CmdFanPolicy(PseudoCommand):
     def __init__(self, config: ConfigWrapper) -> None:
         def cfg_int(key: str, min: int, max: int) -> Optional[int]:
@@ -448,6 +458,18 @@ class CmdFanPolicy(PseudoCommand):
         self.cooldown = cfg_int("cooldown", 0, TIMESEC16_MAX)
         self.voc_passive_max = cfg_int("voc_passive_max", 0, VOC_INDEX_MAX)
         self.voc_improve_min = cfg_int("voc_improve_min", 0, VOC_INDEX_MAX)
+
+
+class CmdConfiguration(PseudoCommand):
+    def __init__(self, config: ConfigWrapper) -> None:
+        self.flags = 0
+
+        def cfg_flag(key: str, default: bool, flag_idx: int) -> Optional[int]:
+            if config.getboolean(key, default):
+                self.flags |= 1 << flag_idx
+
+        cfg_flag("sensors_fallback", True, 0)
+        cfg_flag("sensors_fallback_exhaust_mcu", False, 1)
 
 
 # Special pseudo command: Due to the very high frequency of these commands, we don't
@@ -528,6 +550,8 @@ class NevermoreBackgroundWorker:
             send_maybe(CmdFanPolicyVocImproveMin, cmd.voc_improve_min)
         elif isinstance(cmd, CmdWs2812MarkDirty):
             self._led_dirty.set_threadsafe(self._loop)
+        elif isinstance(cmd, CmdConfiguration):
+            send_maybe(CmdConfigFlags, cmd.flags)
         else:
             raise Exception(f"unhandled pseudo-command {cmd}")
 
@@ -619,6 +643,7 @@ class NevermoreBackgroundWorker:
                 raise Exception(f"{client.address} doesn't have required service {id}")
             return x
 
+        service_config = require(UUID_SERVICE_CONFIGURATION)
         service_env = require(UUID_SERVICE_ENVIRONMENTAL_SENSING)
         service_fan = require(UUID_SERVICE_FAN)
         service_fan_policy = require(UUID_SERVICE_FAN_POLICY)
@@ -638,6 +663,7 @@ class NevermoreBackgroundWorker:
         fan_policy_voc_passive_max, fan_policy_voc_improve_min = require_chars(
             service_fan_policy, UUID_CHAR_VOC_INDEX, 2, {P.WRITE}
         )
+        config_flags = require_char(service_config, UUID_CHAR_CONFIG_FLAGS64, {P.WRITE})
 
         self._connected.set()
 
@@ -688,6 +714,8 @@ class NevermoreBackgroundWorker:
                 char = fan_policy_voc_improve_min
             elif isinstance(cmd, CmdWs2812Length):
                 char = ws2812_length
+            elif isinstance(cmd, CmdConfigFlags):
+                char = config_flags
             else:
                 raise Exception(f"unhandled command {cmd}")
 
@@ -790,6 +818,7 @@ class Nevermore:
             config, "led"
         ).setup_helper(config, self._led_update, led_chain_count)
 
+        self._configuration = CmdConfiguration(config)
         self._fan_policy = CmdFanPolicy(config)
         self._interface: Optional[NevermoreBackgroundWorker] = None
         self._handle_request_restart(None)
@@ -826,6 +855,7 @@ class Nevermore:
         self._led_update(self.led_helper.get_status()["color_data"], None)
 
     def handle_controller_connect(self) -> None:
+        self._interface.send_command(self._configuration)
         self._interface.send_command(self._fan_policy)
         self._interface.send_command(CmdWs2812Length(len(self.led_colour_idxs)))
 
