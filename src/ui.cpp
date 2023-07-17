@@ -98,6 +98,18 @@ auto label_set(lv_obj_t* obj, char const* unk, char const* fmt, A&& value, doubl
     lv_label_set_text(obj, buffer);
 };
 
+double lv_arc_get_percent(lv_obj_t const* obj) {
+    auto range = lv_arc_get_max_value(obj) - lv_arc_get_min_value(obj);
+    if (range == 0) return 0;
+
+    return lv_arc_get_value(obj) / double(range);
+}
+
+void lv_arc_set_percent(lv_obj_t* obj, double perc) {
+    auto range = lv_arc_get_max_value(obj) - lv_arc_get_min_value(obj);
+    lv_arc_set_value(obj, int16_t(lv_arc_get_min_value(obj) + perc * range));
+}
+
 // returns point relative to `obj`
 auto chart_pos_for_value(
         lv_obj_t const* obj, lv_chart_series_t const* series, lv_coord_t value, bool last = false) {
@@ -117,6 +129,12 @@ auto chart_pos_for_value(
     return pos;
 };
 
+void fan_power_arc_colour_update() {
+    lv_obj_set_style_arc_color(ui_FanPowerArc,
+            lv_color_hex(gatt::fan::fan_power_override() == BLE::NOT_KNOWN ? 0x00FFFF : 0xFFFF00),
+            LV_PART_INDICATOR | int(LV_STATE_DEFAULT));
+}
+
 auto g_display_content_update_timer = mk_async_worker(DISPLAY_TIMER_LABELS_INTERVAL)([]() {
     auto const& state = nevermore::sensors::g_sensors.with_fallbacks();
 
@@ -131,6 +149,9 @@ auto g_display_content_update_timer = mk_async_worker(DISPLAY_TIMER_LABELS_INTER
     label_set(ui_TempOut, "?.?c", "%.1fc", state.temperature_exhaust);
 
     label_set(ui_FanPower, "", "%.0f%%", BLE::Percentage8(ceil(gatt::fan::fan_power())));
+
+    lv_arc_set_percent(ui_FanPowerArc, gatt::fan::fan_power() / 100);
+    fan_power_arc_colour_update();
 });
 
 auto g_display_chart_update_timer = mk_async_worker(DISPLAY_TIMER_CHART_INTERVAL)([]() {
@@ -334,6 +355,21 @@ bool init(async_context_t& ctx_async) {
                                                       : BLE::NOT_KNOWN);
             },
             LV_EVENT_LONG_PRESSED, {});
+
+    lv_obj_add_event_cb(ui_FanPowerArc,
+            [](lv_event_t* e) {
+                auto state = lv_obj_get_state(ui_FanPowerArc);
+                if (!(state & LV_STATE_PRESSED)) return;
+
+                BLE::Percentage8 power = lv_arc_get_percent(ui_FanPowerArc) * 100;
+                if (power == 0) {
+                    power = BLE::NOT_KNOWN;  // clear override if dragged to zero
+                }
+
+                gatt::fan::fan_power_override(power);
+                fan_power_arc_colour_update();
+            },
+            LV_EVENT_VALUE_CHANGED, {});
 
 #if 0  // DEBUG HELPER - pre-populate chart with some data to test rendering
     lv_chart_set_point_count(ui_Chart, CHART_SERIES_ENTIRES_MAX);

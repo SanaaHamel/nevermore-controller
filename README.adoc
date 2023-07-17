@@ -198,9 +198,11 @@ Can't fix due to how Fluidd interprets Klipper state data. https://github.com/fl
 
 == Touch Display Support
 
-Touch display support is early in development and currently very limited. For now you can:
+Touch display support is early in development and currently very limited.
+For now you can:
 
 * Long press on the center plot to toggle the fan override on/off
+* Press/drag on the fan power ring to set the fan override to a specific percent
 
 == Software Build Requirements
 
