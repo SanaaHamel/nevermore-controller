@@ -17,7 +17,7 @@ namespace EnvironmentService {
 
 // must match declared order of characteristics in environmental service b/c this
 // is copied/presented in the advertised Service Data
-struct [[gnu::packed]] ServiceData {
+struct [[gnu::packed]] Sensors {
     BLE::Temperature temperature_intake;
     BLE::Temperature temperature_exhaust;
     BLE::Temperature temperature_mcu;
@@ -29,10 +29,10 @@ struct [[gnu::packed]] ServiceData {
     VOCIndex voc_index_intake;
     VOCIndex voc_index_exhaust;
 
-    auto operator<=>(ServiceData const&) const = default;
+    auto operator<=>(Sensors const&) const = default;
 };
 
-extern ServiceData g_service_data;
+extern Sensors g_sensors;
 
 // returns none if not handled
 std::optional<uint16_t> attr_read(

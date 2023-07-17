@@ -37,7 +37,7 @@ struct McuTemperature final : SensorPeriodic {
     }
 
     void read() override {
-        EnvironmentService::g_service_data.temperature_mcu = measure();
+        EnvironmentService::g_sensors.temperature_mcu = measure();
     }
 
 private:
@@ -79,7 +79,7 @@ VecSensors sensors_init_bus(async_context_t& ctx_async, i2c_inst_t& bus, Environ
 
 }  // namespace
 
-bool sensors_init(async_context_t& ctx_async, EnvironmentService::ServiceData& state) {
+bool sensors_init(async_context_t& ctx_async, EnvironmentService::Sensors& state) {
     adc_select_input(ADC_CHANNEL_TEMP_SENSOR);
     adc_set_temp_sensor_enabled(true);
     g_mcu_temperature_sensor.register_(ctx_async);

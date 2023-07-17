@@ -85,7 +85,7 @@ btstack_timer_source_t g_fan_policy_update{.process = [](auto* timer) {
     btstack_run_loop_add_timer(timer);
 
     static auto g_instance = g_fan_policy.instance();
-    fan_power_set(g_instance(EnvironmentService::g_service_data) * 100);
+    fan_power_set(g_instance(EnvironmentService::g_sensors) * 100);
 }};
 
 void fan_automatic_start() {

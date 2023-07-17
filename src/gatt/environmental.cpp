@@ -15,7 +15,7 @@ using namespace std;
 #define VOC_INDEX_02 216aa791_97d0_46ac_8752_60bbc00611e1_02
 #define ENV_AGGREGATE_01 75134bec_dd06_49b1_bac2_c15e05fd7199_01
 
-EnvironmentService::ServiceData EnvironmentService::g_service_data;
+EnvironmentService::Sensors EnvironmentService::g_sensors;
 
 namespace {
 
@@ -62,15 +62,15 @@ const ESM ESM_VOC_INDEX{
 const BLE::ValidRange<EnvironmentService::VOCIndex> VALID_RANGE_VOC_INDEX{.min = 0, .max = 500};
 
 auto g_notify_aggregate = NotifyState<[](hci_con_handle_t conn) {
-    att_server_notify(conn, HANDLE_ATTR(ENV_AGGREGATE_01, VALUE), EnvironmentService::g_service_data);
+    att_server_notify(conn, HANDLE_ATTR(ENV_AGGREGATE_01, VALUE), EnvironmentService::g_sensors);
 }>();
 
 // HACK:  We'd like to notify on write changes, but the code base isn't setup
 //        for that yet. Internally poll and update based on diffs for now.
 btstack_timer_source_t g_notify_pump_hack{.process = [](auto* timer) {
-    static EnvironmentService::ServiceData g_service_data_prev;
-    if (g_service_data_prev != EnvironmentService::g_service_data) {
-        g_service_data_prev = EnvironmentService::g_service_data;
+    static EnvironmentService::Sensors g_prev;
+    if (g_prev != EnvironmentService::g_sensors) {
+        g_prev = EnvironmentService::g_sensors;
         g_notify_aggregate.notify();
     }
 
@@ -90,7 +90,7 @@ void EnvironmentService::disconnected(hci_con_handle_t conn) {
 
 optional<uint16_t> EnvironmentService::attr_read(
         hci_con_handle_t conn, uint16_t att_handle, uint16_t offset, uint8_t* buffer, uint16_t buffer_size) {
-    auto const& sensors = EnvironmentService::g_service_data;
+    auto const& sensors = EnvironmentService::g_sensors;
 
     switch (att_handle) {
         // NOLINTBEGIN(bugprone-branch-clone)

@@ -116,7 +116,7 @@ auto chart_pos_for_value(
 };
 
 auto g_display_content_update_timer = mk_async_worker(DISPLAY_TIMER_LABELS_INTERVAL)([]() {
-    auto& state = EnvironmentService::g_service_data;
+    auto& state = EnvironmentService::g_sensors;
 
     label_set(ui_PressureIn, "??? kPa", "%.1f kPa", state.pressure_intake, 1e3);
     label_set(ui_PressureOut, "??? kPa", "%.1f kPa", state.pressure_exhaust, 1e3);
@@ -132,7 +132,7 @@ auto g_display_content_update_timer = mk_async_worker(DISPLAY_TIMER_LABELS_INTER
 });
 
 auto g_display_chart_update_timer = mk_async_worker(DISPLAY_TIMER_CHART_INTERVAL)([]() {
-    auto& state = EnvironmentService::g_service_data;
+    auto& state = EnvironmentService::g_sensors;
 
     if (lv_chart_get_point_count(ui_Chart) < CHART_SERIES_ENTIRES_MAX) {
         // extend # of points until maximum
