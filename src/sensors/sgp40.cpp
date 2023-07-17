@@ -12,7 +12,7 @@
 #include <cstdio>
 #include <utility>
 
-#define DBG_SGP40_TEMP_HUMIDITY_BREAKDOWN 1
+#define DBG_SGP40_TEMP_HUMIDITY_BREAKDOWN 0
 #if DBG_SGP40_TEMP_HUMIDITY_BREAKDOWN
 #include <array>
 #endif
