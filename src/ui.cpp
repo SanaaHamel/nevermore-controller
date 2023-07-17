@@ -111,7 +111,7 @@ auto chart_pos_for_value(
     return pos;
 };
 
-auto g_display_content_update_timer = mk_async_worker<DISPLAY_TIMER_LABELS_INTERVAL / 1ms>([]() {
+auto g_display_content_update_timer = mk_async_worker(DISPLAY_TIMER_LABELS_INTERVAL)([]() {
     auto& state = EnvironmentService::g_service_data;
 
     label_set(ui_PressureIn, "??? kPa", "%.1f kPa", state.pressure_intake, 1e3);
@@ -127,7 +127,7 @@ auto g_display_content_update_timer = mk_async_worker<DISPLAY_TIMER_LABELS_INTER
     label_set(ui_FanPower, "", "%.0f%%", BLE::Percentage8(ceil(FanService::fan_power())));
 });
 
-auto g_display_chart_update_timer = mk_async_worker<uint32_t(DISPLAY_TIMER_CHART_INTERVAL / 1ms)>([]() {
+auto g_display_chart_update_timer = mk_async_worker(DISPLAY_TIMER_CHART_INTERVAL)([]() {
     auto& state = EnvironmentService::g_service_data;
 
     if (lv_chart_get_point_count(ui_Chart) < CHART_SERIES_ENTIRES_MAX) {

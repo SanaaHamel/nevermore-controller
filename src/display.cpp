@@ -29,7 +29,7 @@ lv_disp_drv_t g_driver;
 lv_disp_t* g_display;
 spi_inst_t* g_display_spi;
 
-auto g_display_timer = mk_async_worker<DISPLAY_TIMER_INTERVAL / 1ms>(lv_timer_handler);
+auto g_display_timer = mk_async_worker(DISPLAY_TIMER_INTERVAL)(lv_timer_handler);
 
 }  // namespace
 
