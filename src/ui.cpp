@@ -101,7 +101,11 @@ auto chart_pos_for_value(
         lv_obj_t const* obj, lv_chart_series_t const* series, lv_coord_t value, bool last = false) {
     // HACK: there is no API to do this, so we have to mug an existing value (temporarily)
     auto id = last ? lv_chart_get_point_count(obj) - 1 : 0;
-    auto* y_value = series->y_points + id;  // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+    auto id_start = lv_chart_get_x_start_point(  // NOLINTNEXTLINE(cppcoreguidelines-pro-type-const-cast)
+            obj, const_cast<lv_chart_series_t*>(series));
+    auto id_storage = ((int32_t)id_start + id) % lv_chart_get_point_count(obj);
+
+    auto* y_value = series->y_points + id_storage;  // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
     auto old = *y_value;
     *y_value = value;
     lv_point_t pos;
