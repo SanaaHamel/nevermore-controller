@@ -25,7 +25,7 @@ using namespace std;
 
 namespace {
 
-BLE_DECLARE_SCALAR_TYPE(RPM16, uint16_t, 1, 0, 0);
+BLE_DECL_SCALAR(RPM16, uint16_t, 1, 0, 0);
 
 constexpr uint8_t FAN_POLICY_UPDATE_RATE_HZ = 10;
 

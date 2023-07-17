@@ -7,13 +7,7 @@
 
 namespace EnvironmentService {
 
-BLE_DECLARE_SCALAR_TYPE(VOCIndex, uint16_t, 1, 0, 0);  // range [0, 500], 0 = not-known;
-
-}  // namespace EnvironmentService
-
-BLE_DECLARE_NOT_KNOWN_VALUE_FROM_RAW(EnvironmentService::VOCIndex, 0);
-
-namespace EnvironmentService {
+BLE_DECL_SCALAR_OPTIONAL(VOCIndex, uint16_t, 1, 0, 0, 0);  // range [0, 500], 0 = not-known;
 
 // must match declared order of characteristics in environmental service b/c this
 // is copied/presented in the advertised Service Data
