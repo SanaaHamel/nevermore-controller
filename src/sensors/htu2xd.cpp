@@ -11,6 +11,7 @@
 #include <utility>
 
 using namespace std;
+using namespace BLE;
 
 namespace nevermore::sensors {
 
@@ -106,10 +107,10 @@ optional<tuple<HTU2xD_Measure, double>> htu2xd_read_compensated(
 }
 
 struct HTU2xDSensor final : SensorPeriodic {
-    i2c_inst_t& bus;               // NOLINT(cppcoreguidelines-avoid-const-or-ref-data-members)
-    EnvironmentalSensorData data;  // tiny bit wasteful, but terser to manage
+    i2c_inst_t& bus;  // NOLINT(cppcoreguidelines-avoid-const-or-ref-data-members)
+    EnvironmentalFilter side;
 
-    HTU2xDSensor(i2c_inst_t& bus, EnvironmentalSensorData data) : bus(bus), data(std::move(data)) {}
+    HTU2xDSensor(i2c_inst_t& bus, EnvironmentalFilter side) : bus(bus), side(side) {}
 
     [[nodiscard]] char const* name() const override {
         return "HTU2xD";
@@ -120,21 +121,19 @@ struct HTU2xDSensor final : SensorPeriodic {
     //       For now, just bite the bullet, we're spending ~66ms blocked.
     void read() override {
         auto htu2xd_fetch = [&](auto kind, auto delay) {
-            [[maybe_unused]] auto&& [temperature, humidity, pressure, voc_index] = data;
-
             htu2xd_issue(bus, kind);
             busy_wait(delay);  // must busy wait, can't sleep inside an interrupt handler
 
             // the sensor could return either data. take what we can get.
             auto response = htu2xd_read_compensated(
-                    bus, temperature.value_or(HTU2xD_HUMIDITY_COMPENSATION_ZERO_POINT));
+                    bus, side.get<Temperature>().value_or(HTU2xD_HUMIDITY_COMPENSATION_ZERO_POINT));
             if (!response) return;
 
             auto [response_kind, value] = *response;
             assert(kind == response_kind && "htu2xd_fetch - response kind mismatch");
             switch (response_kind) {
-            case HTU2xD_Measure::Temperature: temperature = value; break;
-            case HTU2xD_Measure::Humidity: humidity = value; break;
+            case HTU2xD_Measure::Temperature: side.set(Temperature(value)); break;
+            case HTU2xD_Measure::Humidity: side.set(Humidity(value)); break;
             }
         };
 
@@ -149,10 +148,10 @@ bool htu2xd_exists(i2c_inst_t& bus) {
 
 }  // namespace
 
-unique_ptr<SensorPeriodic> htu2xd(i2c_inst_t& bus, EnvironmentalSensorData state) {
+unique_ptr<SensorPeriodic> htu2xd(i2c_inst_t& bus, EnvironmentalFilter side) {
     if (!htu2xd_exists(bus)) return {};  // nothing found
 
-    return make_unique<HTU2xDSensor>(bus, state);
+    return make_unique<HTU2xDSensor>(bus, side);
 }
 
 }  // namespace nevermore::sensors

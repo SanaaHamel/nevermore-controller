@@ -84,10 +84,10 @@ optional<bme280_dev> init(i2c_inst_t& bus) {
 // This could update more/less frequently, based on the update period (see `bme280_cal_meas_delay`).
 // Current update period of 1s should be more than enough to compute results.
 struct BME280 final : SensorPeriodic {
-    EnvironmentalSensorData data;  // tiny bit wasteful, but terser to manage
+    EnvironmentalFilter side;
     bme280_dev dev;
 
-    BME280(bme280_dev dev, EnvironmentalSensorData data) : data(std::move(data)), dev(dev) {}
+    BME280(bme280_dev dev, EnvironmentalFilter side) : side(side), dev(dev) {}
 
     [[nodiscard]] char const* name() const override {
         return "BME280";
@@ -100,19 +100,19 @@ struct BME280 final : SensorPeriodic {
             return;
         }
 
-        get<BLE::Temperature&>(data) = comp_data.temperature;
-        get<BLE::Humidity&>(data) = comp_data.humidity;
-        get<BLE::Pressure&>(data) = comp_data.pressure;
+        side.set(BLE::Temperature(comp_data.temperature));
+        side.set(BLE::Humidity(comp_data.humidity));
+        side.set(BLE::Pressure(comp_data.pressure));
     }
 };
 
 }  // namespace
 
-unique_ptr<SensorPeriodic> bme280(i2c_inst_t& bus, EnvironmentalSensorData state) {
+unique_ptr<SensorPeriodic> bme280(i2c_inst_t& bus, EnvironmentalFilter side) {
     auto dev = init(bus);
     if (!dev) return {};  // nothing found
 
-    return make_unique<BME280>(*dev, state);
+    return make_unique<BME280>(*dev, side);
 }
 
 }  // namespace nevermore::sensors

@@ -4,6 +4,7 @@
 #include "sdk/ble_data_types.hpp"
 #include "sdk/i2c.hpp"
 #include "sdk/timer.hpp"
+#include "sensors/environmental.hpp"
 #include "utility/numeric_suffixes.hpp"
 #include "utility/packed_tuple.hpp"
 #include <bit>
@@ -11,12 +12,13 @@
 #include <cstdio>
 #include <utility>
 
-#define DBG_SGP40_TEMP_HUMIDITY_BREAKDOWN 0
+#define DBG_SGP40_TEMP_HUMIDITY_BREAKDOWN 1
 #if DBG_SGP40_TEMP_HUMIDITY_BREAKDOWN
 #include <array>
 #endif
 
 using namespace std;
+using namespace BLE;
 
 namespace nevermore::sensors {
 
@@ -72,8 +74,7 @@ bool sgp40_measure_issue(i2c_inst_t& bus, double temperature, double humidity) {
     return sizeof(cmd) == i2c_write_blocking(bus, SGP40_ADDRESS, cmd);
 }
 
-bool sgp40_measure_issue(
-        i2c_inst_t& bus, BLE::Temperature const& temperature, BLE::Humidity const& humidity) {
+bool sgp40_measure_issue(i2c_inst_t& bus, Temperature const& temperature, Humidity const& humidity) {
     return sgp40_measure_issue(bus, temperature.value_or(25), humidity.value_or(50));
 }
 
@@ -90,9 +91,9 @@ bool sgp40_exists(i2c_inst_t& bus) {
 }
 
 struct SGP40 final : SensorDelayedResponse {
-    i2c_inst_t& bus;               // NOLINT(cppcoreguidelines-avoid-const-or-ref-data-members)
-    EnvironmentalSensorData data;  // tiny bit wasteful, but terser to manage
+    i2c_inst_t& bus;  // NOLINT(cppcoreguidelines-avoid-const-or-ref-data-members)
     GasIndexAlgorithmParams gas_index_algorithm{};
+    EnvironmentalFilter side;
 
 #if DBG_SGP40_TEMP_HUMIDITY_BREAKDOWN
     uint8_t state = 0;
@@ -103,7 +104,7 @@ struct SGP40 final : SensorDelayedResponse {
     }
 #endif
 
-    SGP40(i2c_inst_t& bus, EnvironmentalSensorData data) : bus(bus), data(std::move(data)) {
+    SGP40(i2c_inst_t& bus, EnvironmentalFilter side) : bus(bus), side(side) {
         GasIndexAlgorithm_init(&gas_index_algorithm, GasIndexAlgorithm_ALGORITHM_TYPE_VOC);
     }
 
@@ -119,13 +120,13 @@ struct SGP40 final : SensorDelayedResponse {
 #if DBG_SGP40_TEMP_HUMIDITY_BREAKDOWN
         switch (state) {
         case 0: break;
-        case 1: return sgp40_measure_issue(bus, get<BLE::Temperature&>(data), BLE::NOT_KNOWN);
-        case 2: return sgp40_measure_issue(bus, BLE::NOT_KNOWN, get<BLE::Humidity&>(data));
-        case 3: return sgp40_measure_issue(bus, BLE::NOT_KNOWN, BLE::NOT_KNOWN);
+        case 1: return sgp40_measure_issue(bus, side.get<Temperature>(), NOT_KNOWN);
+        case 2: return sgp40_measure_issue(bus, NOT_KNOWN, side.get<Humidity>());
+        case 3: return sgp40_measure_issue(bus, NOT_KNOWN, NOT_KNOWN);
         }
 #endif
 
-        return sgp40_measure_issue(bus, get<BLE::Temperature&>(data), get<BLE::Humidity&>(data));
+        return sgp40_measure_issue(bus, side.get<Temperature>(), side.get<Humidity>());
     }
 
     void read() override {
@@ -152,20 +153,20 @@ struct SGP40 final : SensorDelayedResponse {
         assert(0 <= gas_index && gas_index <= 500 && "result out of range?");
         if (gas_index == 0) return;  // 0 -> index not available
 
-        get<nevermore::sensors::VOCIndex&>(data) = gas_index;
+        side.set(VOCIndex(gas_index));
     }
 };
 
 }  // namespace
 
-unique_ptr<SensorPeriodic> sgp40(i2c_inst_t& bus, EnvironmentalSensorData state) {
+unique_ptr<SensorPeriodic> sgp40(i2c_inst_t& bus, EnvironmentalFilter side) {
     if (!sgp40_exists(bus)) return {};  // nothing found
     if (!sgp40_self_test(bus)) {
         printf("Found SGP40, but failed self-test\n");
         return {};
     }
 
-    return make_unique<SGP40>(bus, state);
+    return make_unique<SGP40>(bus, side);
 }
 
 }  // namespace nevermore::sensors

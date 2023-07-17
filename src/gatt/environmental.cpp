@@ -69,9 +69,10 @@ auto g_notify_aggregate = NotifyState<[](hci_con_handle_t conn) {
 // HACK:  We'd like to notify on write changes, but the code base isn't setup
 //        for that yet. Internally poll and update based on diffs for now.
 btstack_timer_source_t g_notify_pump_hack{.process = [](auto* timer) {
+    auto const& current = nevermore::sensors::g_sensors.with_fallbacks();
     static nevermore::sensors::Sensors g_prev;
-    if (g_prev != nevermore::sensors::g_sensors) {
-        g_prev = nevermore::sensors::g_sensors;
+    if (g_prev != current) {
+        g_prev = current;
         g_notify_aggregate.notify();
     }
 
@@ -92,7 +93,7 @@ void disconnected(hci_con_handle_t conn) {
 
 optional<uint16_t> attr_read(
         hci_con_handle_t conn, uint16_t att_handle, uint16_t offset, uint8_t* buffer, uint16_t buffer_size) {
-    auto const& sensors = nevermore::sensors::g_sensors;
+    auto sensors = []() { return nevermore::sensors::g_sensors.with_fallbacks(); };
 
     switch (att_handle) {
         // NOLINTBEGIN(bugprone-branch-clone)
@@ -121,16 +122,16 @@ optional<uint16_t> attr_read(
         HANDLE_READ_BLOB(VOC_INDEX_02, VALID_RANGE, VALID_RANGE_VOC_INDEX)
         // NOLINTEND(bugprone-branch-clone)
 
-        READ_VALUE(BT(TEMPERATURE_01), sensors.temperature_intake)
-        READ_VALUE(BT(TEMPERATURE_02), sensors.temperature_exhaust)
-        READ_VALUE(BT(TEMPERATURE_03), sensors.temperature_mcu)
-        READ_VALUE(BT(HUMIDITY_01), sensors.humidity_intake)
-        READ_VALUE(BT(HUMIDITY_02), sensors.humidity_exhaust)
-        READ_VALUE(BT(PRESSURE_01), sensors.pressure_intake)
-        READ_VALUE(BT(PRESSURE_02), sensors.pressure_exhaust)
-        READ_VALUE(VOC_INDEX_01, sensors.voc_index_intake)
-        READ_VALUE(VOC_INDEX_02, sensors.voc_index_exhaust)
-        READ_VALUE(ENV_AGGREGATE_01, sensors)
+        READ_VALUE(BT(TEMPERATURE_01), sensors().temperature_intake)
+        READ_VALUE(BT(TEMPERATURE_02), sensors().temperature_exhaust)
+        READ_VALUE(BT(TEMPERATURE_03), sensors().temperature_mcu)
+        READ_VALUE(BT(HUMIDITY_01), sensors().humidity_intake)
+        READ_VALUE(BT(HUMIDITY_02), sensors().humidity_exhaust)
+        READ_VALUE(BT(PRESSURE_01), sensors().pressure_intake)
+        READ_VALUE(BT(PRESSURE_02), sensors().pressure_exhaust)
+        READ_VALUE(VOC_INDEX_01, sensors().voc_index_intake)
+        READ_VALUE(VOC_INDEX_02, sensors().voc_index_exhaust)
+        READ_VALUE(ENV_AGGREGATE_01, sensors())
 
         READ_CLIENT_CFG(ENV_AGGREGATE_01, g_notify_aggregate)
 

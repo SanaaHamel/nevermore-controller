@@ -33,6 +33,7 @@
         "Hamel",
         "klipper",
         "NEOPIXEL",
+        "Nevermores",
         "sancheck"
     ],
     "python.autoComplete.extraPaths": [

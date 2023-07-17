@@ -1,3 +1,4 @@
+// b5078b20-aea3-4c37-a18f-b370c03f02a6 Service - Configuration
 // 7be8ac4b-7eb4-4e09-b134-91a46b622832 Service - Display
 // 4553d138-1d00-4b6f-bc42-955a89cf8c36 Service - Fan
 // 260a0845-e62f-48c6-aef9-04f62ff8bffd Service - Fan Control Policy
@@ -8,7 +9,7 @@
 // 03f61fe0-9fe7-4516-98e6-056de551687f Tachometer
 // 3886216a-d971-4c71-afc4-19f8fba8fb92 WS2812 Config
 // 5d91b6ce-7db1-4e06-b8cb-d75e7dd49aae WS2812 Update Span
-
+// d4b66bf4-3d8f-4746-b6a2-8a59d2eac3ce Config - Flags
 
 // #define ORG_BLUETOOTH_CHARACTERISTIC_NON_METHANE_VOLATILE_ORGANIC_COMPOUNDS_CONCENTRATION 0x2BD3
 // uint16, PPB w/ resolution of 1, sadly we can't really use it since SGP40 gives us an arbitrary index in 0 to 500
@@ -129,4 +130,12 @@ CHARACTERISTIC_USER_DESCRIPTION, READ | DYNAMIC
 PRIMARY_SERVICE, 7be8ac4b-7eb4-4e09-b134-91a46b622832
 // Display Brightness %
 CHARACTERISTIC, 2B04, READ | WRITE | DYNAMIC
+CHARACTERISTIC_USER_DESCRIPTION, READ | DYNAMIC
+
+/////////////////////////////
+// Configuration Service
+/////////////////////////////
+
+PRIMARY_SERVICE, b5078b20-aea3-4c37-a18f-b370c03f02a6
+CHARACTERISTIC, d4b66bf4-3d8f-4746-b6a2-8a59d2eac3ce, READ | WRITE | DYNAMIC
 CHARACTERISTIC_USER_DESCRIPTION, READ | DYNAMIC

@@ -6,6 +6,7 @@
 #include "sensors/async_sensor.hpp"
 #include "sensors/bme280.hpp"
 #include "sensors/cst816s.hpp"
+#include "sensors/environmental.hpp"
 #include "sensors/htu2xd.hpp"
 #include "sensors/sgp40.hpp"
 #include <algorithm>
@@ -18,6 +19,7 @@ using namespace std;
 namespace nevermore::sensors {
 
 Sensors g_sensors;
+Config g_config;
 
 namespace {
 
@@ -61,7 +63,7 @@ private:
     }
 } g_mcu_temperature_sensor;
 
-VecSensors sensors_init_bus(async_context_t& ctx_async, i2c_inst_t& bus, EnvironmentalSensorData state) {
+VecSensors sensors_init_bus(async_context_t& ctx_async, i2c_inst_t& bus, EnvironmentalFilter state) {
     VecSensors sensors;
     auto probe_for = [&](auto p) {
         if (!p) return;
@@ -82,9 +84,23 @@ VecSensors sensors_init_bus(async_context_t& ctx_async, i2c_inst_t& bus, Environ
 
 }  // namespace
 
-bool init(async_context_t& ctx_async) {
-    auto& state = g_sensors;
+Sensors Sensors::with_fallbacks(Config const& config) const {
+    EnvironmentalFilter intake{EnvironmentalFilter::Kind::Intake};
+    EnvironmentalFilter exhaust{EnvironmentalFilter::Kind::Exhaust};
+    auto apply = [&]<typename A>(A& x, EnvironmentalFilter side) { x = side.get<A>(*this, config); };
+    Sensors sensors = *this;
+    apply(sensors.temperature_intake, intake);
+    apply(sensors.humidity_intake, intake);
+    apply(sensors.pressure_intake, intake);
+    apply(sensors.voc_index_intake, intake);
+    apply(sensors.temperature_exhaust, exhaust);
+    apply(sensors.humidity_exhaust, exhaust);
+    apply(sensors.pressure_exhaust, exhaust);
+    apply(sensors.voc_index_exhaust, exhaust);
+    return sensors;
+}
 
+bool init(async_context_t& ctx_async) {
     adc_select_input(ADC_CHANNEL_TEMP_SENSOR);
     adc_set_temp_sensor_enabled(true);
     g_mcu_temperature_sensor.register_(ctx_async);
@@ -93,13 +109,10 @@ bool init(async_context_t& ctx_async) {
     busy_wait(SENSOR_POWER_ON_DELAY);
 
     printf("I2C0 - initializing sensors...\n");
-    g_sensors_intake = sensors_init_bus(ctx_async, *i2c0,
-            {state.temperature_intake, state.humidity_intake, state.pressure_intake, state.voc_index_intake});
+    g_sensors_intake = sensors_init_bus(ctx_async, *i2c0, {EnvironmentalFilter::Kind::Intake});
 
     printf("I2C1 - initializing sensors...\n");
-    g_sensors_exhaust = sensors_init_bus(ctx_async, *i2c1,
-            {state.temperature_exhaust, state.humidity_exhaust, state.pressure_exhaust,
-                    state.voc_index_exhaust});
+    g_sensors_exhaust = sensors_init_bus(ctx_async, *i2c1, {EnvironmentalFilter::Kind::Exhaust});
 
     // wait again b/c probing might be implemented by sending a reset command to the sensor
     busy_wait(SENSOR_POWER_ON_DELAY);

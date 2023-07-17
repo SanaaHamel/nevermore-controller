@@ -8,6 +8,16 @@ namespace nevermore::sensors {
 
 BLE_DECL_SCALAR_OPTIONAL(VOCIndex, uint16_t, 1, 0, 0, 0);  // range [0, 500], 0 = not-known;
 
+struct Config {
+    // If a sensor in a `FilterSide` is missing, then try to fall back to the other side's sensor.
+    bool fallback = true;
+    // StealthMax MCU is positioned inside the exhaust airflow.
+    // Disabled by default because not all Nevermores are StealthMaxes.
+    bool fallback_exhaust_mcu = false;
+};
+
+extern Config g_config;
+
 // Requirements:
 // * Must match declared order of characteristics in environmental service
 // * Must be packed.
@@ -22,6 +32,8 @@ struct [[gnu::packed]] Sensors {
     BLE::Pressure pressure_exhaust;
     VOCIndex voc_index_intake;
     VOCIndex voc_index_exhaust;
+
+    [[nodiscard]] Sensors with_fallbacks(Config const& config = g_config) const;
 
     auto operator<=>(Sensors const&) const = default;
 };
