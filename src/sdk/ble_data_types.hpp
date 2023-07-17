@@ -205,7 +205,7 @@ struct [[gnu::packed]] Scalar {
     }
 
     [[nodiscard]] constexpr double value_or(double x) const
-    // requires has_not_known<Scalar> /* require disable b/c of GCC 11+ bug */
+        requires(has_not_known<Scalar>)
     {
         return *this == NOT_KNOWN ? x : double(*this);
     }
