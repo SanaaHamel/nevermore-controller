@@ -283,7 +283,7 @@ void on_chart_draw(bool begin, lv_event_t* e) {
         // fade from line being drawn to 100-voc-index line
         lv_draw_mask_fade_param_t fade_mask_param{};
         lv_draw_mask_fade_init(
-                &fade_mask_param, &obj->coords, LV_OPA_30, y_fade_top, LV_OPA_TRANSP, y_fade_bot);
+                &fade_mask_param, &obj->coords, CHART_RED_ZONE_HI, y_fade_top, LV_OPA_TRANSP, y_fade_bot);
         auto fade_mask_id = lv_draw_mask_add(&fade_mask_param, {});
 
         lv_draw_rect_dsc_t draw_rect_dsc{};
