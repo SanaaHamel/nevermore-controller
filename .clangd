@@ -1,2 +1,7 @@
 Diagnostics:
   UnusedIncludes: Strict
+CompileFlags:
+  Remove:
+    - "-std=c++23"
+  Add:
+    - "-std=c++2b"
