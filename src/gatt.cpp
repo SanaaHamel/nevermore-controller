@@ -9,7 +9,7 @@
 #include "gatt/environmental.hpp"
 #include "gatt/fan.hpp"
 #include "gatt/handler_helpers.hpp"
-#include "gatt/neopixel.hpp"
+#include "gatt/ws2812.hpp"
 #include "hci_dump.h"
 #include "hci_dump_embedded_stdout.h"
 #include "l2cap.h"
@@ -24,6 +24,8 @@
 
 using namespace std;
 using namespace bt::advert;
+
+namespace nevermore::gatt {
 
 namespace {
 
@@ -60,10 +62,10 @@ void hci_handler(uint8_t packet_type, uint16_t channel, uint8_t* packet, uint16_
 
     case ATT_EVENT_DISCONNECTED: {
         auto conn = att_event_disconnected_get_handle(packet);
-        DisplayService::disconnected(conn);
-        EnvironmentService::disconnected(conn);
-        FanService::disconnected(conn);
-        NeoPixelService::disconnected(conn);
+        display::disconnected(conn);
+        environmental::disconnected(conn);
+        fan::disconnected(conn);
+        ws2812::disconnected(conn);
     };
     }
 }
@@ -71,10 +73,10 @@ void hci_handler(uint8_t packet_type, uint16_t channel, uint8_t* packet, uint16_
 uint16_t attr_read(
         hci_con_handle_t conn, uint16_t attr, uint16_t offset, uint8_t* buffer, uint16_t buffer_size) {
     constexpr array HANDLERS{
-            DisplayService::attr_read,
-            EnvironmentService::attr_read,
-            FanService::attr_read,
-            NeoPixelService::attr_read,
+            display::attr_read,
+            environmental::attr_read,
+            fan::attr_read,
+            ws2812::attr_read,
     };
     for (auto handler : HANDLERS)
         if (auto r = handler(conn, attr, offset, buffer, buffer_size)) return *r;
@@ -94,10 +96,10 @@ int attr_write(hci_con_handle_t conn, uint16_t attr, uint16_t transaction_mode, 
     }
 
     constexpr array HANDLERS{
-            DisplayService::attr_write,
-            EnvironmentService::attr_write,
-            FanService::attr_write,
-            NeoPixelService::attr_write,
+            display::attr_write,
+            environmental::attr_write,
+            fan::attr_write,
+            ws2812::attr_write,
     };
 
     try {
@@ -124,7 +126,7 @@ btstack_timer_source_t g_led_blink{.process = [](auto* timer) {
 
 }  // namespace
 
-bool gatt_init(async_context_t& ctx_async) {
+bool init(async_context_t& ctx_async) {
     // must explicitly set, otherwise we get no error/info/debug msgs from btstack
     hci_dump_init(hci_dump_embedded_stdout_get_instance());
 
@@ -135,8 +137,10 @@ bool gatt_init(async_context_t& ctx_async) {
     l2cap_init();
     sm_init();  // FUTURE WORK: do we even need a security manager? can we ditch this?
 
-    EnvironmentService::init();
-    if (!FanService::init(ctx_async)) return false;
+    if (!display::init(ctx_async)) return false;
+    if (!environmental::init(ctx_async)) return false;
+    if (!fan::init(ctx_async)) return false;
+    if (!ws2812::init(ctx_async)) return false;
 
     hci_add_event_handler(&g_hci_handler);
 
@@ -155,3 +159,5 @@ bool gatt_init(async_context_t& ctx_async) {
     g_led_blink.process(&g_led_blink);
     return true;
 }
+
+}  // namespace nevermore::gatt

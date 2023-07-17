@@ -17,40 +17,47 @@ using namespace std;
 using namespace std::literals::chrono_literals;
 
 namespace {
+spi_inst_t* g_display_spi;
+}
+
+namespace nevermore::display {
+
+namespace {
 
 constexpr auto DISPLAY_TIMER_INTERVAL = 5ms;
 constexpr auto DISPLAY_BACKLIGHT_FREQ = 1'000;
 
 float g_display_brightness = 1;
 
-lv_color_t g_draw_scratch_buffer[DISPLAY_RESOLUTION.width * DISPLAY_RESOLUTION.height];
+lv_color_t g_draw_scratch_buffer[RESOLUTION.width * RESOLUTION.height];
 lv_disp_draw_buf_t g_draw_buffer;
 lv_disp_drv_t g_driver;
 lv_disp_t* g_display;
-spi_inst_t* g_display_spi;
 
 auto g_display_timer = mk_async_worker(DISPLAY_TIMER_INTERVAL)(lv_timer_handler);
 
 }  // namespace
 
-void display_brightness(float power) {
+void brightness(float power) {
     g_display_brightness = clamp(power, 0.f, 1.f);
     pwm_set_gpio_duty(PIN_DISPLAY_BRIGHTNESS, UINT16_MAX * g_display_brightness);
 }
 
-float display_brightness() {
+float brightness() {
     return g_display_brightness;
 }
 
 // Initialises the UI. Everything else should be hands off after that.
-bool display_and_ui_init(spi_inst_t& spi, async_context_t& ctx_async) {
+// FUTURE WORK: Move to second core if we ever run into perf issues.
+//              Have a care regarding potential issues w/ interrupts/timers w/ core 0.
+bool init_with_ui(async_context_t& ctx_async, spi_inst_t& spi) {
     assert(!g_display_spi && "already initialised?");  // likely an error to attempt repeat init
     g_display_spi = &spi;
 
     auto cfg_display_brightness = pwm_get_default_config();
     pwm_config_set_freq_hz(cfg_display_brightness, DISPLAY_BACKLIGHT_FREQ);
     pwm_init(pwm_gpio_to_slice_num_(PIN_DISPLAY_BRIGHTNESS), &cfg_display_brightness, true);
-    display_brightness(1);
+    brightness(1);
 
     if (auto e = GC9A01_init(); e != 0) {
         printf("ERR - ui_init - GC9A01_init failed = %d\n", e);
@@ -60,8 +67,8 @@ bool display_and_ui_init(spi_inst_t& spi, async_context_t& ctx_async) {
     lv_init();
     lv_disp_draw_buf_init(&g_draw_buffer, g_draw_scratch_buffer, nullptr, size(g_draw_scratch_buffer));
     lv_disp_drv_init(&g_driver);
-    g_driver.hor_res = DISPLAY_RESOLUTION.width;
-    g_driver.ver_res = DISPLAY_RESOLUTION.height;
+    g_driver.hor_res = RESOLUTION.width;
+    g_driver.ver_res = RESOLUTION.height;
     g_driver.draw_buf = &g_draw_buffer;
     // FUTURE WORK: use non-blocking SPI (DMA + interrupt) for faster flush (and add 2-buffer mode?)
     // FUTURE WORK: use 2-data mode + PIO to double tx bandwidth
@@ -74,16 +81,13 @@ bool display_and_ui_init(spi_inst_t& spi, async_context_t& ctx_async) {
     }
 
     // must finish init-ing the UI *before* we setup the display timer (which could otherwise interrupt)
-    if (!ui_init(ctx_async)) return false;
+    if (!ui::init(ctx_async)) return false;
 
     g_display_timer.register_(ctx_async);
     return true;
 }
 
-bool display_and_ui_init_on_second_cpu(spi_inst_t& spi) {
-    // FUTURE WORK: actually move to second core if we ever run into perf issues.
-    return display_and_ui_init(spi, *cyw43_arch_async_context());
-}
+}  // namespace nevermore::display
 
 ////////////////////////////////////
 // LVGL DRIVER INTERFACE FUNCTIONS

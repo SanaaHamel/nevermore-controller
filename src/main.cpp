@@ -89,11 +89,11 @@ int main() {
     auto& ctx_async = *cyw43_arch_async_context();
 
     pins_setup();
-    ws2812_init(ctx_async);
+    nevermore::ws2812::init(ctx_async);
     // display must be init before sensors b/c some sensors are display input devices
-    if (!display_and_ui_init_on_second_cpu(*spi)) return -1;
+    if (!nevermore::display::init_with_ui(ctx_async, *spi)) return -1;
     if (!nevermore::sensors::init(ctx_async)) return -1;
-    if (!gatt_init(ctx_async)) return -1;
+    if (!nevermore::gatt::init(ctx_async)) return -1;
 
     btstack_run_loop_execute();  // !! NO-RETURN
     return 0;

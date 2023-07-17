@@ -15,7 +15,9 @@
 
 using namespace std;
 
-nevermore::sensors::Sensors nevermore::sensors::g_sensors;
+namespace nevermore::sensors {
+
+Sensors g_sensors;
 
 namespace {
 
@@ -79,8 +81,6 @@ VecSensors sensors_init_bus(async_context_t& ctx_async, i2c_inst_t& bus, Environ
 }
 
 }  // namespace
-
-namespace nevermore::sensors {
 
 bool init(async_context_t& ctx_async) {
     auto& state = g_sensors;

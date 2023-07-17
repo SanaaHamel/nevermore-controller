@@ -30,6 +30,8 @@
 using namespace std;
 using namespace std::literals::chrono_literals;
 
+namespace nevermore::ws2812 {
+
 namespace {
 
 // Fixed sized simplifies memory & error handling.
@@ -151,7 +153,7 @@ btstack_timer_source_t g_dbg_animate{.process = [](auto* timer) {
 
 }  // namespace
 
-void ws2812_init(async_context_t& ctx_async) {
+void init(async_context_t& ctx_async) {
     sem_init(&g_update_requested, 0, 1);
     sem_init(&g_update_in_progress, 1, 1);
 
@@ -165,18 +167,18 @@ void ws2812_init(async_context_t& ctx_async) {
     // Initialise to max by default.
     // Upside: Clients can skip setup (useful if we lose power and reset)
     // Downside: We waste time writing to pixels that don't exist.
-    ws2812_setup(N_PIXEL_COMPONENTS_MAX);
+    setup(N_PIXEL_COMPONENTS_MAX);
 
 #if DEBUG_WS2812_PATTERN
     g_dbg_animate.process(&g_dbg_animate);
 #endif
 }
 
-size_t ws2812_components_total() {
+size_t components_total() {
     return g_pixel_data_size;
 }
 
-bool ws2812_setup(size_t num_components_total) {
+bool setup(size_t num_components_total) {
     if (g_pixel_data_size == num_components_total) return true;  // no-op
 
     if (g_pixel_data.size() < num_components_total) {
@@ -207,7 +209,7 @@ bool ws2812_setup(size_t num_components_total) {
     return true;
 }
 
-bool ws2812_update(size_t offset, span<uint8_t const> pixel_data) {
+bool update(size_t offset, span<uint8_t const> pixel_data) {
     size_t write_end;
     if (__builtin_add_overflow(offset, pixel_data.size(), &write_end) || g_pixel_data_size < write_end) {
         printf("ERR - ws2812_update - offset=%u len=%u is not within declared bounds max=%u\n", offset,
@@ -222,3 +224,5 @@ bool ws2812_update(size_t offset, span<uint8_t const> pixel_data) {
     update_or_defer();
     return true;
 }
+
+}  // namespace nevermore::ws2812

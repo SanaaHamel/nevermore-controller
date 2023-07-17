@@ -16,10 +16,12 @@
 using namespace std;
 using namespace std::literals::chrono_literals;
 
+namespace nevermore::ui {
+
 namespace {
 
 constexpr auto CHART_X_AXIS_LENGTH = 1.h;
-constexpr uint8_t CHART_SERIES_ENTIRES_MAX = DISPLAY_RESOLUTION.width / 3;
+constexpr uint8_t CHART_SERIES_ENTIRES_MAX = display::RESOLUTION.width / 3;
 
 constexpr auto DISPLAY_TIMER_CHART_INTERVAL = CHART_X_AXIS_LENGTH / CHART_SERIES_ENTIRES_MAX;
 constexpr auto DISPLAY_TIMER_LABELS_INTERVAL = 1s;
@@ -128,7 +130,7 @@ auto g_display_content_update_timer = mk_async_worker(DISPLAY_TIMER_LABELS_INTER
     label_set(ui_TempIn, "?.?c", "%.1fc", state.temperature_intake);
     label_set(ui_TempOut, "?.?c", "%.1fc", state.temperature_exhaust);
 
-    label_set(ui_FanPower, "", "%.0f%%", BLE::Percentage8(ceil(FanService::fan_power())));
+    label_set(ui_FanPower, "", "%.0f%%", BLE::Percentage8(ceil(gatt::fan::fan_power())));
 });
 
 auto g_display_chart_update_timer = mk_async_worker(DISPLAY_TIMER_CHART_INTERVAL)([]() {
@@ -312,7 +314,7 @@ void on_chart_draw(bool begin, lv_event_t* e) {
 
 }  // namespace
 
-bool ui_init(async_context_t& ctx_async) {
+bool init(async_context_t& ctx_async) {
     ui_init();  // invoke generated code setup
 
     // HACK: Need at least 2 points to draw the 100-VOC line.
@@ -327,9 +329,9 @@ bool ui_init(async_context_t& ctx_async) {
 
     lv_obj_add_event_cb(ui_Chart,
             [](auto*) {
-                FanService::fan_power_override(FanService::fan_power_override() == BLE::NOT_KNOWN
-                                                       ? BLE::Percentage8(100)
-                                                       : BLE::NOT_KNOWN);
+                gatt::fan::fan_power_override(gatt::fan::fan_power_override() == BLE::NOT_KNOWN
+                                                      ? BLE::Percentage8(100)
+                                                      : BLE::NOT_KNOWN);
             },
             LV_EVENT_LONG_PRESSED, {});
 
@@ -347,3 +349,5 @@ bool ui_init(async_context_t& ctx_async) {
     g_display_chart_update_timer.register_(ctx_async, 1s);
     return true;
 }
+
+}  // namespace nevermore::ui

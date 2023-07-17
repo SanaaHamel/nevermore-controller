@@ -3,6 +3,8 @@
 #include "config.hpp"
 #include "pico/async_context.h"
 
+namespace nevermore::sensors {
+
 struct Sensor {
     virtual ~Sensor() = default;
 
@@ -53,3 +55,5 @@ private:
     std::chrono::steady_clock::time_point update_bgn{};
     async_at_time_worker_t read_task{.do_work = read_dispatcher, .user_data = this};
 };
+
+}  // namespace nevermore::sensors

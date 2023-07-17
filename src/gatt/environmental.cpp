@@ -16,6 +16,8 @@ using namespace std;
 #define VOC_INDEX_02 216aa791_97d0_46ac_8752_60bbc00611e1_02
 #define ENV_AGGREGATE_01 75134bec_dd06_49b1_bac2_c15e05fd7199_01
 
+namespace nevermore::gatt::environmental {
+
 namespace {
 
 using ESM = BLE::EnvironmentalSensorMeasurementDesc;
@@ -79,15 +81,16 @@ btstack_timer_source_t g_notify_pump_hack{.process = [](auto* timer) {
 
 }  // namespace
 
-void EnvironmentService::init() {
+bool init(async_context_t&) {
     g_notify_pump_hack.process(&g_notify_pump_hack);
+    return true;
 }
 
-void EnvironmentService::disconnected(hci_con_handle_t conn) {
+void disconnected(hci_con_handle_t conn) {
     g_notify_aggregate.unregister(conn);
 }
 
-optional<uint16_t> EnvironmentService::attr_read(
+optional<uint16_t> attr_read(
         hci_con_handle_t conn, uint16_t att_handle, uint16_t offset, uint8_t* buffer, uint16_t buffer_size) {
     auto const& sensors = nevermore::sensors::g_sensors;
 
@@ -136,8 +139,8 @@ optional<uint16_t> EnvironmentService::attr_read(
 }
 
 // No attrs are writable.
-optional<int> EnvironmentService::attr_write(hci_con_handle_t conn, uint16_t att_handle, uint16_t offset,
-        uint8_t const* buffer, uint16_t buffer_size) {
+optional<int> attr_write(hci_con_handle_t conn, uint16_t att_handle, uint16_t offset, uint8_t const* buffer,
+        uint16_t buffer_size) {
     if (buffer_size < offset) return ATT_ERROR_INVALID_OFFSET;
     WriteConsumer consume{offset, buffer, buffer_size};
 
@@ -147,3 +150,5 @@ optional<int> EnvironmentService::attr_write(hci_con_handle_t conn, uint16_t att
     default: return {};
     }
 }
+
+}  // namespace nevermore::gatt::environmental

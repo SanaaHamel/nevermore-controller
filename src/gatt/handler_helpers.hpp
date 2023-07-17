@@ -13,6 +13,8 @@
 #include <span>
 #include <type_traits>
 
+namespace nevermore::gatt {
+
 constexpr uint16_t GATT_CLIENT_CFG_NOTIFY_FLAG = 0b0000'0001;
 
 #define BT(x) ORG_BLUETOOTH_CHARACTERISTIC_##x
@@ -163,3 +165,5 @@ struct NotifyState {
         return 0;
     }
 };
+
+}  // namespace nevermore::gatt

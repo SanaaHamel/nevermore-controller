@@ -14,6 +14,8 @@
 
 using namespace std;
 
+namespace nevermore::sensors {
+
 static_assert(I2C_BAUD_RATE <= 400'000, "CST816S only supports up to 400 k baud/s");
 
 namespace {
@@ -250,3 +252,5 @@ unique_ptr<CST816S> CST816S::mk(i2c_inst_t& bus) {
 
     return unique_ptr<CST816S>{new CST816S(bus)};
 }
+
+}  // namespace nevermore::sensors

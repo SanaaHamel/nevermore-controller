@@ -9,6 +9,8 @@
 
 using namespace std;
 
+namespace nevermore::sensors {
+
 // don't want to include the big library header via our own header, so just double check it matches here
 static_assert(BME280_POWER_ON_DELAY == chrono::microseconds(BME280_STARTUP_DELAY));
 
@@ -112,3 +114,5 @@ unique_ptr<SensorPeriodic> bme280(i2c_inst_t& bus, EnvironmentalSensorData state
 
     return make_unique<BME280>(*dev, state);
 }
+
+}  // namespace nevermore::sensors

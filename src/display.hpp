@@ -3,21 +3,22 @@
 #include "hardware/spi.h"
 #include "pico/async_context.h"
 
+namespace nevermore::display {
+
 // Initialises the display and the UI.
-bool display_and_ui_init(spi_inst_t&, async_context_t&);
+bool init_with_ui(async_context_t&, spi_inst_t&);
 
-// `display_and_ui_init`, but on core 1.
-bool display_and_ui_init_on_second_cpu(spi_inst_t&);
+void brightness(float power);  // range: [0, 1]
+float brightness();            // range: [0, 1]
 
-void display_brightness(float power);  // range: [0, 1]
-float display_brightness();            // range: [0, 1]
-
-struct DisplayResolution {
+struct Resolution {
     uint16_t width;
     uint16_t height;
 };
 
-constexpr DisplayResolution DISPLAY_RESOLUTION{
+constexpr Resolution RESOLUTION{
         .width = 240,
         .height = 240,
 };
+
+};  // namespace nevermore::display

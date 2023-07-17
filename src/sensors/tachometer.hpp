@@ -5,6 +5,8 @@
 #include <chrono>
 #include <cstdint>
 
+namespace nevermore::sensors {
+
 using namespace std::literals::chrono_literals;
 
 struct Tachometer final : SensorDelayedResponse {
@@ -55,3 +57,5 @@ private:
     double revolutions_per_second_ = 0;
     std::chrono::steady_clock::time_point begin{};
 };
+
+}  // namespace nevermore::sensors

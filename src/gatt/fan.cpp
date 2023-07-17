@@ -23,6 +23,8 @@ using namespace std;
 #define FAN_POLICY_VOC_PASSIVE_MAX 216aa791_97d0_46ac_8752_60bbc00611e1_03
 #define FAN_POLICY_VOC_IMPROVE_MIN 216aa791_97d0_46ac_8752_60bbc00611e1_04
 
+namespace nevermore::gatt::fan {
+
 namespace {
 
 BLE_DECL_SCALAR(RPM16, uint16_t, 1, 0, 0);
@@ -41,7 +43,7 @@ FanPolicyEnvironmental g_fan_policy;
 
 BLE::Percentage8 g_fan_power = 0;
 BLE::Percentage8 g_fan_power_override;  // not-known -> automatic control
-Tachometer g_tachometer{PIN_FAN_TACHOMETER, TACHOMETER_PULSE_PER_REVOLUTION};
+nevermore::sensors::Tachometer g_tachometer{PIN_FAN_TACHOMETER, TACHOMETER_PULSE_PER_REVOLUTION};
 
 struct Aggregate {
     BLE::Percentage8 power = g_fan_power;
@@ -100,11 +102,11 @@ void fan_automatic_stop() {
 
 }  // namespace
 
-double FanService::fan_power() {
+double fan_power() {
     return g_fan_power.value_or(0);
 }
 
-void FanService::fan_power_override(BLE::Percentage8 power) {
+void fan_power_override(BLE::Percentage8 power) {
     if (g_fan_power_override == power) return;
 
     if (g_fan_power_override == BLE::NOT_KNOWN) {
@@ -120,11 +122,11 @@ void FanService::fan_power_override(BLE::Percentage8 power) {
         fan_automatic_start();
 }
 
-BLE::Percentage8 FanService::fan_power_override() {
+BLE::Percentage8 fan_power_override() {
     return g_fan_power_override;
 }
 
-bool FanService::init(async_context& ctx_async) {
+bool init(async_context& ctx_async) {
     // setup PWM configurations for fan PWM and fan tachometer
     auto cfg_pwm = pwm_get_default_config();
     pwm_config_set_freq_hz(cfg_pwm, FAN_PWN_HZ);
@@ -144,11 +146,11 @@ bool FanService::init(async_context& ctx_async) {
     return true;
 }
 
-void FanService::disconnected(hci_con_handle_t conn) {
+void disconnected(hci_con_handle_t conn) {
     g_notify_aggregate.unregister(conn);
 }
 
-optional<uint16_t> FanService::attr_read(
+optional<uint16_t> attr_read(
         hci_con_handle_t conn, uint16_t att_handle, uint16_t offset, uint8_t* buffer, uint16_t buffer_size) {
     switch (att_handle) {
         USER_DESCRIBE(FAN_POWER, "Fan %")
@@ -175,8 +177,8 @@ optional<uint16_t> FanService::attr_read(
     }
 }
 
-optional<int> FanService::attr_write(hci_con_handle_t conn, uint16_t att_handle, uint16_t offset,
-        uint8_t const* buffer, uint16_t buffer_size) {
+optional<int> attr_write(hci_con_handle_t conn, uint16_t att_handle, uint16_t offset, uint8_t const* buffer,
+        uint16_t buffer_size) {
     if (buffer_size < offset) return ATT_ERROR_INVALID_OFFSET;
     WriteConsumer consume{offset, buffer, buffer_size};
 
@@ -195,3 +197,5 @@ optional<int> FanService::attr_write(hci_con_handle_t conn, uint16_t att_handle,
     default: return {};
     }
 }
+
+}  // namespace nevermore::gatt::fan

@@ -5,6 +5,8 @@
 
 using namespace std;
 
+namespace nevermore::sensors {
+
 void SensorPeriodic::update_dispatcher(async_context_t* context, async_work_on_timeout* work) {
     reinterpret_cast<SensorPeriodic*>(work->user_data)->update(*context);
 }
@@ -43,3 +45,5 @@ void SensorDelayedResponse::read_dispatcher(async_context_t* context, async_work
     self.read();
     self.update_enqueue(*context, chrono::steady_clock::now() - self.update_bgn);
 }
+
+}  // namespace nevermore::sensors

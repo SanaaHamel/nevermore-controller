@@ -5,6 +5,8 @@
 #include <cstdint>
 #include <memory>
 
+namespace nevermore::sensors {
+
 // Driver for the CST816S capacitive touch sensor.
 // There doesn't seem to be an official SDK for this device, so this was cobbled
 // from various sources. (Zephyr, WaveShare samples, etc..)
@@ -59,3 +61,5 @@ struct CST816S final : Sensor {
 private:
     CST816S(i2c_inst_t&);
 };
+
+}  // namespace nevermore::sensors

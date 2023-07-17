@@ -12,6 +12,8 @@
 
 using namespace std;
 
+namespace nevermore::sensors {
+
 // HTU21D supports "up to 400 kbits/s"
 static_assert(
         I2C_BAUD_RATE <= 400 * 1000, "`config.hpp`'s `I2C_BAUD_RATE` is too high for SGP40 (max 400 kbit/s)");
@@ -152,3 +154,5 @@ unique_ptr<SensorPeriodic> htu2xd(i2c_inst_t& bus, EnvironmentalSensorData state
 
     return make_unique<HTU2xDSensor>(bus, state);
 }
+
+}  // namespace nevermore::sensors
