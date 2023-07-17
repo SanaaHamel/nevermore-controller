@@ -315,7 +315,8 @@ void on_chart_draw(bool begin, lv_event_t* e) {
 bool ui_init(async_context_t& ctx_async) {
     ui_init();  // invoke generated code setup
 
-    lv_chart_set_point_count(ui_Chart, 1);
+    // HACK: Need at least 2 points to draw the 100-VOC line.
+    lv_chart_set_point_count(ui_Chart, 2);
     ui_chart_voc_intake.setup(ui_Chart, LV_CHART_AXIS_PRIMARY_Y, 0xFFFF00);
     ui_chart_voc_exhaust.setup(ui_Chart, LV_CHART_AXIS_PRIMARY_Y, 0x00FFFF);
     ui_chart_temp_intake.setup(ui_Chart, LV_CHART_AXIS_SECONDARY_Y, 0x808000);
