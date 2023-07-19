@@ -5,6 +5,7 @@
 #include "sdk/timer.hpp"
 #include "sensors/async_sensor.hpp"
 #include "sensors/bme280.hpp"
+#include "sensors/bme68x.hpp"
 #include "sensors/cst816s.hpp"
 #include "sensors/environmental.hpp"
 #include "sensors/htu2xd.hpp"
@@ -27,6 +28,7 @@ constexpr uint32_t ADC_CHANNEL_TEMP_SENSOR = 4;
 
 constexpr auto SENSOR_POWER_ON_DELAY = max({
         BME280_POWER_ON_DELAY,
+        BME68x_POWER_ON_DELAY,
         HTU21D_POWER_ON_DELAY,
         SGP40_POWER_ON_DELAY,
 });
@@ -75,6 +77,7 @@ VecSensors sensors_init_bus(async_context_t& ctx_async, i2c_inst_t& bus, Environ
     // order matters since they'll be updated in whatever order they were found/probed for
     probe_for(htu2xd(bus, state));
     probe_for(bme280(bus, state));
+    probe_for(bme68x(bus, state));
     probe_for(sgp40(bus, state));
     probe_for(CST816S::mk(bus));
 
