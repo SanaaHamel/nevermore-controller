@@ -58,7 +58,7 @@ bool sgp40_self_test(i2c_inst_t& bus) {
     case 0x4B: return false;  // tests failed
     }
 
-    printf("WARN - unexpected response code from SGP40 self-test: 0x%02x\n", int(code));
+    printf("WARN - SGP40 - unexpected response code from self-test: 0x%02x\n", int(code));
     return false;
 }
 
@@ -132,7 +132,7 @@ struct SGP40 final : SensorDelayedResponse {
     void read() override {
         auto voc_raw = sgp40_measure_read(bus);
         if (!voc_raw) {
-            printf("SGP40 - read back failed\n");
+            printf("ERR - SGP40 - failed read\n");
             return;
         }
 
@@ -162,7 +162,7 @@ struct SGP40 final : SensorDelayedResponse {
 unique_ptr<SensorPeriodic> sgp40(i2c_inst_t& bus, EnvironmentalFilter side) {
     if (!sgp40_exists(bus)) return {};  // nothing found
     if (!sgp40_self_test(bus)) {
-        printf("Found SGP40, but failed self-test\n");
+        printf("ERR - SGP40 - failed self-test\n");
         return {};
     }
 

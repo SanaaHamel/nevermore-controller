@@ -256,7 +256,7 @@ unique_ptr<CST816S> CST816S::mk(i2c_inst_t& bus) {
     if (!id) return {};  // nothing on the bus or error
 
     if (!contains(KNOWN_CHIP_IDS, *id)) {
-        printf("ERR - unrecognised CST816S chip ID 0x%02x\n", *id);
+        printf("ERR - CST816S - unrecognised chip ID 0x%02x\n", *id);
         return {};
     }
 

@@ -62,19 +62,20 @@ optional<bme280_dev> init(i2c_inst_t& bus) {
     if (auto r = bme280_init(&dev); r != BME280_OK) {
         // suppress error msg & assume this just means there's no one on the bus
         if (r == BME280_E_COMM_FAIL) return {};
+        if (r == BME280_E_DEV_NOT_FOUND) return {};  // whatever we found wasn't a BME280 (maybe a BME68x?)
 
-        printf("BME280 - Failed to initialize the device (code %+d).\n", r);
+        printf("ERR - BME280 - failed to initialize the device (code %+d).\n", r);
         return {};
     }
 
     if (auto r = bme280_set_sensor_settings(BME280_SEL_ALL_SETTINGS, &BME280_SETTINGS, &dev);
             r != BME280_OK) {
-        printf("BME280 - Failed to set device settings (code %+d).\n", r);
+        printf("ERR - BME280 - failed to set device settings (code %+d).\n", r);
         return {};
     }
 
     if (auto r = bme280_set_sensor_mode(BME280_POWERMODE_NORMAL, &dev); r < 0) {
-        printf("BME280 - Failed to set normal mode (code %+d).\n", r);
+        printf("ERR - BME280 - failed to set normal mode (code %+d).\n", r);
         return {};
     }
 
@@ -96,7 +97,7 @@ struct BME280 final : SensorPeriodic {
     void read() override {
         bme280_data comp_data{};
         if (auto r = bme280_get_sensor_data(BME280_ALL, &comp_data, &dev); r < 0) {
-            printf("BME280 error whilst reading data: %d\n", r);
+            printf("ERR - BME280 - failed read: %d\n", r);
             return;
         }
 
