@@ -12,7 +12,6 @@
 #include "gatt/handler_helpers.hpp"
 #include "gatt/ws2812.hpp"
 #include "hci_dump.h"
-#include "hci_dump_embedded_stdout.h"
 #include "l2cap.h"
 #include "nevermore.h"
 #include "pico/cyw43_arch.h"
@@ -131,9 +130,6 @@ btstack_timer_source_t g_led_blink{.process = [](auto* timer) {
 }  // namespace
 
 bool init(async_context_t& ctx_async) {
-    // must explicitly set, otherwise we get no error/info/debug msgs from btstack
-    hci_dump_init(hci_dump_embedded_stdout_get_instance());
-
 #ifndef ENABLE_LOG_DEBUG
     hci_dump_enable_packet_log(false);  // don't spam out packet logs unless we're low level debugging
 #endif
