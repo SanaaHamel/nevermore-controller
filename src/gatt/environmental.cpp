@@ -63,7 +63,8 @@ const ESM ESM_VOC_INDEX{
 const BLE::ValidRange<nevermore::sensors::VOCIndex> VALID_RANGE_VOC_INDEX{.min = 0, .max = 500};
 
 auto g_notify_aggregate = NotifyState<[](hci_con_handle_t conn) {
-    att_server_notify(conn, HANDLE_ATTR(ENV_AGGREGATE_01, VALUE), nevermore::sensors::g_sensors);
+    att_server_notify(
+            conn, HANDLE_ATTR(ENV_AGGREGATE_01, VALUE), nevermore::sensors::g_sensors.with_fallbacks());
 }>();
 
 // HACK:  We'd like to notify on write changes, but the code base isn't setup
