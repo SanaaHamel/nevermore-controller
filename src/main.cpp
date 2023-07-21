@@ -114,7 +114,7 @@ int main() {
 
         ws2812::init();
         // display must be init before sensors b/c some sensors are display input devices
-        if (!display::init_with_ui(*spi_gpio_bus(PINS_DISPLAY_SPI[0]))) return;
+        if (!display::init_with_ui()) return;
         if (!sensors::init()) return;
         if (!gatt::init()) return;
 
