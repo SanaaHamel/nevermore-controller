@@ -19,7 +19,7 @@ consteval TickType_t to_ticks_safe(std::chrono::duration<A, Ratio> delay, bool a
     if (std::numeric_limits<TickType_t>::max() < delay_ms.count()) throw "invalid delay value";
 
     auto delay_ticks = pdMS_TO_TICKS(delay_ms / 1ms);
-    if (!allow_underflow && delay_ticks == 0) throw "tick rate too large for delay";
+    if (!allow_underflow && delay_ticks == 0) throw "delay too small for tick rate";
 
     return delay_ticks;
 }
