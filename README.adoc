@@ -503,6 +503,6 @@ WARNING: Setting the fan speed to 0 in Mainsail/Fluidd UI does **not** clear the
 == Credits
 
 * https://github.com/julianschill/klipper-led_effect[Julian Schill] - installation script (derived)
-* https://github.com/boschsensortec/BME280_driver[Bosch Sensors] - BME280 library (included)
+* https://github.com/boschsensortec/BME280_driver[Bosch Sensors] - BME280, BME68x library (included)
 * https://github.com/Sensirion/gas-index-algorithm[Sensirion] - SGP40 gas index library (included)
 * https://github.com/0ndsk4[0ndsk4] - Donated hardware for testing
