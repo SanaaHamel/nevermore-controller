@@ -109,7 +109,7 @@ int main() {
 
     mk_task("main", Priority::Idle, 1024)([]() {
         if (auto err = cyw43_arch_init()) {
-            panic("cyw43_arch_init failed = 0x%08x\n", err);
+            panic("ERR - cyw43_arch_init failed = 0x%08x\n", err);
         }
 
         ws2812::init();
