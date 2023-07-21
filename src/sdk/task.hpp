@@ -11,7 +11,7 @@
 namespace nevermore {
 
 template <typename A, typename Ratio>
-consteval TickType_t to_ticks_safe(std::chrono::duration<A, Ratio> delay, bool allow_underflow = true) {
+consteval TickType_t to_ticks_safe(std::chrono::duration<A, Ratio> delay, bool allow_underflow = false) {
     using namespace std::literals::chrono_literals;
 
     auto delay_ms = std::chrono::duration_cast<std::chrono::duration<int64_t, std::milli>>(delay);
