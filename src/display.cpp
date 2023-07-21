@@ -77,10 +77,7 @@ bool init_with_ui(spi_inst_t& spi) {
         return false;
     }
 
-    // must finish init-ing the UI *before* we setup the display timer (which could otherwise interrupt)
-    if (!ui::init()) return false;
-
-    return true;
+    return ui::init();
 }
 
 }  // namespace nevermore::display

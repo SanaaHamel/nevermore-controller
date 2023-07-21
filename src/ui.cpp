@@ -402,6 +402,7 @@ bool init() {
         periodic(period)([] { using_semaphore(g_ui_lock)(go); }); \
     }).release()
 
+    // must finish init-ing the UI *before* we start `lv_timer_handler` (which could otherwise interrupt)
     DISPLAY_TASK("display", DISPLAY_REFRESH_INTERVAL, 1024, lv_timer_handler);
     DISPLAY_TASK("display-label", DISPLAY_TIMER_LABELS_INTERVAL, 1024, display_update_labels);
     DISPLAY_TASK("display-plot", DISPLAY_TIMER_PLOT_INTERVAL, 1024, display_update_plot);
