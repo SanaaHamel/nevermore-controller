@@ -1,3 +1,4 @@
+#include "FreeRTOS.h"  // IWYU pragma: keep
 #include "btstack_run_loop.h"
 #include "config.hpp"
 #include "display.hpp"
@@ -7,12 +8,30 @@
 #include "hardware/i2c.h"
 #include "pico/cyw43_arch.h"
 #include "pico/stdio.h"
+#include "sdk/i2c.hpp"
 #include "sdk/spi.hpp"
 #include "sensors.hpp"
+#include "task.h"  // IWYU pragma: keep
 #include "utility/square_wave.hpp"
+#include "utility/task.hpp"
+#include "utility/timer.hpp"
 #include "ws2812.hpp"
 #include <cstdint>
 #include <cstdio>
+
+using namespace nevermore;
+
+extern "C" {
+void vApplicationTickHook() {}
+
+void vApplicationStackOverflowHook(TaskHandle_t Task, char* pcTaskName) {
+    panic("PANIC - stack overflow in task %s\n", pcTaskName);
+}
+
+void vApplicationMallocFailedHook() {
+    panic("PANIC - heap alloc failed\n");
+}
+}
 
 namespace {
 
@@ -63,13 +82,12 @@ void pins_setup() {
 }  // namespace
 
 int main() {
+    for (auto& lock : g_i2c_locks)
+        lock = xSemaphoreCreateMutex();
+
     stdio_init_all();
     adc_init();
-
-    if (auto err = cyw43_arch_init()) {
-        printf("cyw43_arch_init failed = 0x%08x\n", err);
-        return -1;
-    }
+    pins_setup();
 
     // GCC 12.2.1 bug: -Werror=format reports that `I2C_BAUD_RATE` is a `long unsigned int`.
     // This is technically true on this platform, see static-assert below, but it is benign since
@@ -86,15 +104,26 @@ int main() {
     printf("SPI bus %d running at %u baud/s (requested %u baud/s)\n", spi_gpio_bus_num(PINS_DISPLAY_SPI[0]),
             spi_init(spi, SPI_BAUD_RATE_DISPLAY), unsigned(SPI_BAUD_RATE_DISPLAY));
 
-    auto& ctx_async = *cyw43_arch_async_context();
+    mk_task("main", Priority::Idle, 1024)([]() {
+        if (auto err = cyw43_arch_init()) {
+            panic("cyw43_arch_init failed = 0x%08x\n", err);
+        }
 
-    pins_setup();
-    nevermore::ws2812::init(ctx_async);
-    // display must be init before sensors b/c some sensors are display input devices
-    if (!nevermore::display::init_with_ui(ctx_async, *spi)) return -1;
-    if (!nevermore::sensors::init(ctx_async)) return -1;
-    if (!nevermore::gatt::init(ctx_async)) return -1;
+        ws2812::init();
+        // display must be init before sensors b/c some sensors are display input devices
+        if (!display::init_with_ui(*spi_gpio_bus(PINS_DISPLAY_SPI[0]))) return;
+        if (!sensors::init()) return;
+        if (!gatt::init()) return;
 
-    btstack_run_loop_execute();  // !! NO-RETURN
+        mk_timer("led-blink", SENSOR_UPDATE_PERIOD)([](TimerHandle_t) {
+            static bool led_on = false;
+            led_on = !led_on;
+            cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, led_on);
+        });
+
+        btstack_run_loop_execute();  // !! NO-RETURN
+    }).release();
+
+    vTaskStartScheduler();  // !! NO-RETURN
     return 0;
 }

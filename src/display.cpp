@@ -4,17 +4,17 @@
 #include "hardware/gpio.h"
 #include "hardware/spi.h"
 #include "lvgl.h"
-#include "pico/cyw43_arch.h"
 #include "sdk/pwm.hpp"
 #include "sdk/timer.hpp"
 #include "ui.hpp"
-#include "utility/async_worker.hpp"
+#include "utility/task.hpp"
 #include <chrono>
 #include <cstdint>
 #include <cstdio>
 
 using namespace std;
 using namespace std::literals::chrono_literals;
+using namespace nevermore;
 
 namespace {
 spi_inst_t* g_display_spi;
@@ -24,7 +24,6 @@ namespace nevermore::display {
 
 namespace {
 
-constexpr auto DISPLAY_TIMER_INTERVAL = 5ms;
 constexpr auto DISPLAY_BACKLIGHT_FREQ = 1'000;
 
 float g_display_brightness = 1;
@@ -33,8 +32,6 @@ lv_color_t g_draw_scratch_buffer[RESOLUTION.width * RESOLUTION.height];
 lv_disp_draw_buf_t g_draw_buffer;
 lv_disp_drv_t g_driver;
 lv_disp_t* g_display;
-
-auto g_display_timer = mk_async_worker(DISPLAY_TIMER_INTERVAL)(lv_timer_handler);
 
 }  // namespace
 
@@ -50,7 +47,7 @@ float brightness() {
 // Initialises the UI. Everything else should be hands off after that.
 // FUTURE WORK: Move to second core if we ever run into perf issues.
 //              Have a care regarding potential issues w/ interrupts/timers w/ core 0.
-bool init_with_ui(async_context_t& ctx_async, spi_inst_t& spi) {
+bool init_with_ui(spi_inst_t& spi) {
     assert(!g_display_spi && "already initialised?");  // likely an error to attempt repeat init
     g_display_spi = &spi;
 
@@ -81,9 +78,8 @@ bool init_with_ui(async_context_t& ctx_async, spi_inst_t& spi) {
     }
 
     // must finish init-ing the UI *before* we setup the display timer (which could otherwise interrupt)
-    if (!ui::init(ctx_async)) return false;
+    if (!ui::init()) return false;
 
-    g_display_timer.register_(ctx_async);
     return true;
 }
 

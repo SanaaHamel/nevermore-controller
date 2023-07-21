@@ -8,6 +8,7 @@
 #include "sensors.hpp"
 #include "sensors/tachometer.hpp"
 #include "utility/fan_policy.hpp"
+#include "utility/timer.hpp"
 #include <cstdint>
 #include <limits>
 
@@ -65,41 +66,6 @@ void fan_power_set(BLE::Percentage8 power) {
     pwm_set_gpio_duty(PIN_FAN_PWM, duty);
 }
 
-// HACK:  We'd like to notify on write to tachometer changes, but the code base isn't setup
-//        for that yet. Internally poll and update based on diffs for now.
-btstack_timer_source_t g_notify_pump_hack{.process = [](auto* timer) {
-    btstack_run_loop_set_timer(timer, SENSOR_UPDATE_PERIOD / 1ms);
-    btstack_run_loop_add_timer(timer);
-
-    static double g_prev;
-    if (g_prev == g_tachometer.revolutions_per_second()) return;
-
-    g_prev = g_tachometer.revolutions_per_second();
-    g_notify_aggregate.notify();
-}};
-
-btstack_timer_source_t g_fan_policy_update{.process = [](auto* timer) {
-    // fan is manually controlled, no need to schedule any further updates until this changes
-    if (g_fan_power_override != BLE::NOT_KNOWN) return;
-
-    static_assert(0 < FAN_POLICY_UPDATE_RATE_HZ, "`FAN_POLICY_UPDATE_RATE_HZ` cannot be zero");
-    btstack_run_loop_set_timer(timer, 1000 / FAN_POLICY_UPDATE_RATE_HZ);
-    btstack_run_loop_add_timer(timer);
-
-    static auto g_instance = g_fan_policy.instance();
-    fan_power_set(g_instance(nevermore::sensors::g_sensors) * 100);
-}};
-
-void fan_automatic_start() {
-    // not quite idempotent, but close. won't cause a buildup of pending timers
-    g_fan_policy_update.process(&g_fan_policy_update);
-}
-
-void fan_automatic_stop() {
-    // idempotent
-    btstack_run_loop_remove_timer(&g_fan_policy_update);
-}
-
 }  // namespace
 
 double fan_power() {
@@ -109,24 +75,19 @@ double fan_power() {
 void fan_power_override(BLE::Percentage8 power) {
     if (g_fan_power_override == power) return;
 
-    if (g_fan_power_override == BLE::NOT_KNOWN) {
-        fan_automatic_stop();
-    }
-
     g_fan_power_override = power;
     g_notify_aggregate.notify();
 
-    if (power != BLE::NOT_KNOWN)
+    if (power != BLE::NOT_KNOWN) {
         fan_power_set(power);  // apply override
-    else
-        fan_automatic_start();
+    }
 }
 
 BLE::Percentage8 fan_power_override() {
     return g_fan_power_override;
 }
 
-bool init(async_context& ctx_async) {
+bool init() {
     // setup PWM configurations for fan PWM and fan tachometer
     auto cfg_pwm = pwm_get_default_config();
     pwm_config_set_freq_hz(cfg_pwm, FAN_PWN_HZ);
@@ -138,10 +99,25 @@ bool init(async_context& ctx_async) {
 
     // set fan PWM level
     fan_power_set(g_fan_power);
-    fan_automatic_start();
 
-    g_tachometer.register_(ctx_async);
-    g_notify_pump_hack.process(&g_notify_pump_hack);
+    g_tachometer.start();
+
+    // HACK:  We'd like to notify on write to tachometer changes, but the code base isn't setup
+    //        for that yet. Internally poll and update based on diffs for now.
+    mk_timer("gatt-fan-tachometer-notify", SENSOR_UPDATE_PERIOD)([](auto*) {
+        static double g_prev;
+        if (g_prev == g_tachometer.revolutions_per_second()) return;
+
+        g_prev = g_tachometer.revolutions_per_second();
+        g_notify_aggregate.notify();
+    });
+
+    mk_timer("fan-policy", 1.s / FAN_POLICY_UPDATE_RATE_HZ)([](auto*) {
+        static auto g_instance = g_fan_policy.instance();
+        if (g_fan_power_override != BLE::NOT_KNOWN) return;
+
+        fan_power_set(g_instance(nevermore::sensors::g_sensors) * 100);
+    });
 
     return true;
 }

@@ -16,7 +16,7 @@ using namespace BLE;
 
 namespace nevermore::gatt::display {
 
-bool init(async_context_t&) {
+bool init() {
     return true;
 }
 

@@ -4,6 +4,12 @@ include(FetchContent)
 include(cmake/GetGitRevisionDescription.cmake)
 include(cmake/pico_sdk_import.cmake)
 
+FetchContent_Declare(freertos_kernel
+  GIT_REPOSITORY https://github.com/FreeRTOS/FreeRTOS-Kernel.git
+  GIT_TAG smp # V202110.00-SMP
+  GIT_SHALLOW ON
+  SOURCE_SUBDIR "this path doesn't exist. it is here to disable the auto build inclusion"
+)
 FetchContent_Declare(lvgl
   GIT_REPOSITORY git@github.com:lvgl/lvgl.git
   GIT_TAG release/v8.3
@@ -16,6 +22,17 @@ FetchContent_Declare(lv_drivers
 )
 
 FetchContent_MakeAvailable(lvgl lv_drivers)
+
+set(FREERTOS_HEAP "4" CACHE STRING "" FORCE)
+set(FREERTOS_PORT "GCC_POSIX" CACHE STRING "" FORCE) # Select the native compile PORT
+set(FREERTOS_KERNEL_PATH "${CMAKE_BINARY_DIR}/_deps/freertos_kernel-src")
+
+if(CMAKE_CROSSCOMPILING) # Select the cross-compile PORT
+  set(FREERTOS_PORT "GCC_ARM_CA9" CACHE STRING "" FORCE)
+endif()
+
+FetchContent_MakeAvailable(freertos_kernel)
+include(cmake/FreeRTOS_Kernel_import.cmake)
 
 project(nevermore-controller C CXX ASM)
 
@@ -45,6 +62,7 @@ target_link_libraries(lvgl pico_time) # add `pico_time` dependency so lvgl can g
 target_include_directories(lvgl_demos PRIVATE ${SRC_CONFIG_DIR})
 target_include_directories(lvgl_examples PRIVATE ${SRC_CONFIG_DIR})
 
+# target_include_directories(FreeRTOS-Kernel PRIVATE ${SRC_CONFIG_DIR})
 file(GLOB_RECURSE SRC_H ${SRC_DIR}/*.h)
 file(GLOB_RECURSE SRC_C ${SRC_DIR}/*.c)
 file(GLOB_RECURSE SRC_HPP ${SRC_DIR}/*.hpp)
@@ -61,6 +79,7 @@ set(SRC_FILES ${SRC_H} ${SRC_C} ${SRC_HPP} ${SRC_CPP})
 add_compile_options(-Wall -Wno-psabi -Wno-trigraphs)
 add_compile_definitions(PARAM_ASSERTIONS_ENABLE_ALL=1)
 add_compile_definitions(WANT_HCI_DUMP=1)
+add_compile_definitions(CYW43_LWIP=0)
 
 # default is 4.
 # Current users: tinyusb (1), stdio w/ USB (1), CYW43 driver (1), WS2812 (1), CST816S (1)
@@ -88,7 +107,7 @@ target_link_libraries(nevermore-controller
   lvgl::lvgl
   lvgl::drivers
   pico_stdlib
-  pico_cyw43_arch_none
+  pico_cyw43_arch_sys_freertos
   pico_btstack_ble
   pico_btstack_cyw43
   hardware_adc
@@ -96,6 +115,8 @@ target_link_libraries(nevermore-controller
   hardware_pio
   hardware_pwm
   hardware_spi
+  FreeRTOS-Kernel
+  FreeRTOS-Kernel-Heap4
 )
 
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")

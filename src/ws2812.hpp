@@ -1,12 +1,11 @@
 #pragma once
 
-#include "pico/async_context.h"
 #include <cstdint>
 #include <span>
 
 namespace nevermore::ws2812 {
 
-void init(async_context_t&);
+void init();
 
 // returns false if the update couldn't be applied for whatever reason
 bool update(size_t offset, std::span<uint8_t const> pixel_data);

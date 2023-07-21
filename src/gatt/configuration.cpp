@@ -23,7 +23,7 @@ constexpr array FLAGS{
 
 }  // namespace
 
-bool init(async_context_t&) {
+bool init() {
     return true;
 }
 

@@ -65,12 +65,12 @@ private:
     }
 } g_mcu_temperature_sensor;
 
-VecSensors sensors_init_bus(async_context_t& ctx_async, i2c_inst_t& bus, EnvironmentalFilter state) {
+VecSensors sensors_init_bus(i2c_inst_t& bus, EnvironmentalFilter state) {
     VecSensors sensors;
     auto probe_for = [&](auto p) {
         if (!p) return;
         printf("Found %s\n", p->name());
-        p->register_(ctx_async);
+        p->start();
         sensors.push_back(std::move(p));
     };
 
@@ -103,19 +103,19 @@ Sensors Sensors::with_fallbacks(Config const& config) const {
     return sensors;
 }
 
-bool init(async_context_t& ctx_async) {
+bool init() {
     adc_select_input(ADC_CHANNEL_TEMP_SENSOR);
     adc_set_temp_sensor_enabled(true);
-    g_mcu_temperature_sensor.register_(ctx_async);
+    g_mcu_temperature_sensor.start();
 
     printf("Waiting %u ms for sensor init\n", unsigned(SENSOR_POWER_ON_DELAY / 1ms));
     busy_wait(SENSOR_POWER_ON_DELAY);
 
     printf("I2C0 - initializing sensors...\n");
-    g_sensors_intake = sensors_init_bus(ctx_async, *i2c0, {EnvironmentalFilter::Kind::Intake});
+    g_sensors_intake = sensors_init_bus(*i2c0, {EnvironmentalFilter::Kind::Intake});
 
     printf("I2C1 - initializing sensors...\n");
-    g_sensors_exhaust = sensors_init_bus(ctx_async, *i2c1, {EnvironmentalFilter::Kind::Exhaust});
+    g_sensors_exhaust = sensors_init_bus(*i2c1, {EnvironmentalFilter::Kind::Exhaust});
 
     // wait again b/c probing might be implemented by sending a reset command to the sensor
     busy_wait(SENSOR_POWER_ON_DELAY);

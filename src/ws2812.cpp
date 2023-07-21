@@ -17,9 +17,9 @@
 // Useful for determining if a problem lies with DMA, the PIO program, or data layout.
 #define DEBUG_WS2812_PATTERN 0
 #if DEBUG_WS2812_PATTERN
-#include "btstack_run_loop.h"
-#include "utility/misc.hpp"
+#include "utility/timer.hpp"
 #include <cstring>
+#include <numeric>
 #endif
 
 #define DEBUG_WS2812_UPDATE_DEFERRED_RATE 0
@@ -113,7 +113,7 @@ void update_or_defer() {
 }
 
 #if DEBUG_WS2812_PATTERN
-btstack_timer_source_t g_dbg_animate{.process = [](auto* timer) {
+void dbg_animate(TimerHandle_t) {
     struct GRB {
         uint8_t g, r, b;
     };
@@ -145,15 +145,12 @@ btstack_timer_source_t g_dbg_animate{.process = [](auto* timer) {
 #else  // dump buffer to PIO via DMA
     update_or_defer();
 #endif
-
-    btstack_run_loop_set_timer(timer, 100);
-    btstack_run_loop_add_timer(timer);
-}};
+}
 #endif
 
 }  // namespace
 
-void init(async_context_t& ctx_async) {
+void init() {
     sem_init(&g_update_requested, 0, 1);
     sem_init(&g_update_in_progress, 1, 1);
 
@@ -170,7 +167,7 @@ void init(async_context_t& ctx_async) {
     setup(N_PIXEL_COMPONENTS_MAX);
 
 #if DEBUG_WS2812_PATTERN
-    g_dbg_animate.process(&g_dbg_animate);
+    mk_timer("dbg-ws2812-blink", 100ms)(dbg_animate);
 #endif
 }
 

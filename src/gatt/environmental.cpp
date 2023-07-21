@@ -5,6 +5,7 @@
 #include "sdk/ble_data_types.hpp"
 #include "sdk/btstack.hpp"
 #include "sensors.hpp"
+#include "utility/timer.hpp"
 #include <cstdint>
 
 using namespace std;
@@ -67,24 +68,20 @@ auto g_notify_aggregate = NotifyState<[](hci_con_handle_t conn) {
             conn, HANDLE_ATTR(ENV_AGGREGATE_01, VALUE), nevermore::sensors::g_sensors.with_fallbacks());
 }>();
 
-// HACK:  We'd like to notify on write changes, but the code base isn't setup
-//        for that yet. Internally poll and update based on diffs for now.
-btstack_timer_source_t g_notify_pump_hack{.process = [](auto* timer) {
-    auto const& current = nevermore::sensors::g_sensors.with_fallbacks();
-    static nevermore::sensors::Sensors g_prev;
-    if (g_prev != current) {
-        g_prev = current;
-        g_notify_aggregate.notify();
-    }
-
-    btstack_run_loop_set_timer(timer, SENSOR_UPDATE_PERIOD / 2ms);
-    btstack_run_loop_add_timer(timer);
-}};
-
 }  // namespace
 
-bool init(async_context_t&) {
-    g_notify_pump_hack.process(&g_notify_pump_hack);
+bool init() {
+    // HACK:  We'd like to notify on write changes, but the code base isn't setup
+    //        for that yet. Internally poll and update based on diffs for now.
+    mk_timer("gatt-env-notify", SENSOR_UPDATE_PERIOD / 2.)([](auto*) {
+        auto const& current = nevermore::sensors::g_sensors.with_fallbacks();
+        static nevermore::sensors::Sensors g_prev;
+        if (g_prev != current) {
+            g_prev = current;
+            g_notify_aggregate.notify();
+        }
+    });
+
     return true;
 }
 

@@ -1,6 +1,5 @@
 #pragma once
 
-#include "pico/async_context.h"
 #include "sdk/ble_data_types.hpp"
 #include <cstdint>
 
@@ -41,6 +40,6 @@ struct [[gnu::packed]] Sensors {
 extern Sensors g_sensors;
 
 // Sensors are registered as periodic workers for the context.
-bool init(async_context_t&);
+bool init();
 
 }  // namespace nevermore::sensors

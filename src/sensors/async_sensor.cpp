@@ -1,6 +1,5 @@
 #include "async_sensor.hpp"
-#include "pico/async_context.h"
-#include "sdk/async.hpp"
+#include "utility/task.hpp"
 #include <chrono>
 #include <cstdio>
 
@@ -8,50 +7,32 @@ using namespace std;
 
 namespace nevermore::sensors {
 
-void SensorPeriodic::update_dispatcher(async_context_t* context, async_work_on_timeout* work) {
-    reinterpret_cast<SensorPeriodic*>(work->user_data)->update(*context);
+namespace {
+
+constexpr uint32_t SENSOR_STACK_DEPTH = 1024;
+
 }
 
-void SensorPeriodic::update(async_context_t& context) {
-    auto const bgn = chrono::steady_clock::now();
-    read();
-    auto const end = chrono::steady_clock::now();
-    update_enqueue(context, end - bgn);
+void SensorPeriodic::start() {
+    if (task) return;  // already started
+
+    // honestly coroutines would probably be nicer than allocating big stacks...
+    auto go = [](void* self_) {
+        auto* self = reinterpret_cast<SensorPeriodic*>(self_);
+        auto last_wake = xTaskGetTickCount();
+        for (;;) {
+            self->read();
+
+            auto delay_ticks = pdMS_TO_TICKS(self->update_period() / 1ms);
+            xTaskDelayUntil(&last_wake, delay_ticks);
+        }
+    };
+
+    task = Task(go, name(), SENSOR_STACK_DEPTH, this, Priority::Sensors);
 }
 
-void SensorPeriodic::update_enqueue(
-        async_context_t& context, chrono::steady_clock::duration update_duration) {
-    // printf("sensor update enqueue - %s - duration %d us\n", name(), int(update_duration / 1us));
-    auto const delay_ms = max<int64_t>((update_period() - update_duration) / 1ms, 0);
-    async_using(context, [&]() { async_context_add_at_time_worker_in_ms(&context, &update_task, delay_ms); });
-}
-
-void SensorPeriodic::update_enqueue_immediate(async_context_t& context) {
-    async_using(context, [&]() {
-        async_context_remove_at_time_worker(&context, &update_task);
-        async_context_add_at_time_worker_in_ms(&context, &update_task, 0);
-    });
-}
-
-void SensorDelayedResponse::update(async_context_t& context) {
-    update_bgn = chrono::steady_clock::now();
-
-    if (!issue()) {
-        // Something went wrong during sensor cmd issue -> skip this update cycle and hope it is temporary.
-        // TODO: Should we re-issue ASAP instead of trying to follow the normal update period?
-        printf("SensorDelayedResponse::update - %s - issue failed\n", name());
-        update_enqueue(context, chrono::steady_clock::now() - update_bgn);
-        return;
-    }
-
-    async_using(context,
-            [&]() { async_context_add_at_time_worker_in_ms(&context, &read_task, read_delay() / 1ms); });
-}
-
-void SensorDelayedResponse::read_dispatcher(async_context_t* context, async_work_on_timeout* work) {
-    auto& self = *reinterpret_cast<SensorDelayedResponse*>(work->user_data);
-    self.read();
-    self.update_enqueue(*context, chrono::steady_clock::now() - self.update_bgn);
+void SensorPeriodic::stop() {
+    task = {};
 }
 
 }  // namespace nevermore::sensors

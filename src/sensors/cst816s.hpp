@@ -40,7 +40,7 @@ struct CST816S final : SensorPeriodic {
         // Gesture gesture = Gesture::None;
     };
 
-    State state;
+    State state;  // NOLINT(cppcoreguidelines-non-private-member-variables-in-classes)
 
     CST816S() = delete;
     CST816S(CST816S const&) = delete;
@@ -51,15 +51,17 @@ struct CST816S final : SensorPeriodic {
         return "CST816S";
     }
 
-    void read() override;
-    void register_(async_context_t&) override;
-    [[nodiscard]] std::chrono::milliseconds update_period() const override;
-
     void interrupt();
+
+    [[nodiscard]] std::chrono::milliseconds update_period() const override {
+        return 5ms;
+    }
+
+protected:
+    void read() override;
 
 private:
     i2c_inst_t* bus;
-    async_context_t* ctx_async{};
 
     CST816S(i2c_inst_t&);
 };

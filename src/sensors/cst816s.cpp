@@ -1,10 +1,11 @@
 #include "cst816s.hpp"
+#include "FreeRTOS.h"  // IWYU pragma: keep
 #include "config.hpp"
 #include "hardware/gpio.h"
 #include "hardware/i2c.h"
-#include "lvgl.h"
+#include "lvgl.h"  // IWYU pragma: keep
 #include "sdk/i2c.hpp"
-#include "sdk/timer.hpp"
+#include "timers.h"  // IWYU pragma: keep [xTimerPend....]
 #include <algorithm>
 #include <array>
 #include <cassert>
@@ -126,9 +127,9 @@ optional<uint8_t> reg_write(i2c_inst_t& bus, Cmd const cmd, uint8_t value, uint8
 
 void reset() {
     gpio_put(PIN_TOUCH_RESET, false);  // trigger on low
-    sleep(5ms);
+    task_delay(5ms);
     gpio_put(PIN_TOUCH_RESET, true);
-    sleep(50ms);
+    task_delay(50ms);
 }
 
 // FIXME: HACK: This blows on so many levels:
@@ -171,13 +172,29 @@ struct RegisterInterruptCallback {
         // NOT IDEMPOTENT. Will consume a shared interrupt handler each time.
         // This is a horrible foot-gun of an API.
         gpio_set_irq_enabled_with_callback(
-                PIN_TOUCH_INTERRUPT, GPIO_IRQ_EDGE_RISE | GPIO_IRQ_EDGE_FALL, true, &go);
+                PIN_TOUCH_INTERRUPT, GPIO_IRQ_EDGE_RISE | GPIO_IRQ_EDGE_FALL, true, &isr);
     }
 
-    static void go(uint gpio, [[maybe_unused]] uint32_t event_mask) {
+    static void isr(uint gpio, [[maybe_unused]] uint32_t event_mask) {
         assert(gpio == PIN_TOUCH_INTERRUPT);
         if (gpio != PIN_TOUCH_INTERRUPT) return;
 
+        /* The actual processing is to be deferred to a task.  Request the
+        vProcessInterface() callback function is executed, passing in the
+        number of the interface that needs processing.  The interface to
+        service is passed in the second parameter.  The first parameter is
+        not used in this case. */
+        BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+        xTimerPendFunctionCallFromISR(handle_isr, {}, {}, &xHigherPriorityTaskWoken);
+
+        /* If xHigherPriorityTaskWoken is now set to pdTRUE then a context
+        switch should be requested.  The macro used is port specific and will
+        be either portYIELD_FROM_ISR() or portEND_SWITCHING_ISR() - refer to
+        the documentation page for the port being used. */
+        portYIELD_FROM_ISR(xHigherPriorityTaskWoken);  // NOLINT
+    }
+
+    static void handle_isr(void*, uint32_t) {
         for (auto& instance : g_instances)
             if (auto* p = reinterpret_cast<CST816S*>(instance.driver.user_data)) p->interrupt();
     }
@@ -206,6 +223,10 @@ CST816S::~CST816S() {
     }
 }
 
+void CST816S::interrupt() {
+    task.resume();
+}
+
 void CST816S::read() {
     struct [[gnu::packed]] Batch {
         // for now we don't care/bother to populate these
@@ -225,26 +246,7 @@ void CST816S::read() {
     state.y = byteswap(read->y) & 0x0FFF;        // read in BE, need it in LE order
     state.touch = Touch((read->x & 0xFF) >> 6);  // hi 2 bits in `x` are the event
     // state.gesture = Gesture(read->gesture);
-}
-
-void CST816S::register_(async_context_t& ctx) {
-    SensorPeriodic::register_(ctx);
-    ctx_async = &ctx;
-}
-
-void CST816S::interrupt() {
-    // Can't safely read from the interrupt directly because we might be interrupting
-    // an active I2C read from another sensor.
-    // (They run on a different IRQ and don't preempt one another)
-    if (ctx_async) {
-        update_enqueue_immediate(*ctx_async);
-    }
-}
-
-// We aren't really a periodic sensor, but we need to run as one so we don't
-// interrupt others mid read-response.
-chrono::milliseconds CST816S::update_period() const {
-    return 1min;
+    task.suspend();  // wait until next time we're called...
 }
 
 unique_ptr<CST816S> CST816S::mk(i2c_inst_t& bus) {

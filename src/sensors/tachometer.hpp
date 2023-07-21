@@ -9,7 +9,7 @@ namespace nevermore::sensors {
 
 using namespace std::literals::chrono_literals;
 
-struct Tachometer final : SensorDelayedResponse {
+struct Tachometer final : SensorPeriodic {
     constexpr static auto TACHOMETER_READ_PERIOD = SENSOR_UPDATE_PERIOD;
     static_assert(100ms <= TACHOMETER_READ_PERIOD && "need at least 100ms to get a good sampling");
 
@@ -27,18 +27,14 @@ struct Tachometer final : SensorDelayedResponse {
         return "Tachometer";
     }
 
-    [[nodiscard]] std::chrono::milliseconds read_delay() const override {
-        return TACHOMETER_READ_PERIOD;
-    }
-
-    [[nodiscard]] bool issue() override {
+protected:
+    void read() override {
         pwm_set_counter(slice_num, 0);
         begin = std::chrono::steady_clock::now();
         pwm_set_enabled(slice_num, true);
-        return true;
-    }
 
-    void read() override {
+        task_delay(TACHOMETER_READ_PERIOD);
+
         pwm_set_enabled(slice_num, false);
         auto end = std::chrono::steady_clock::now();
 

@@ -1,11 +1,13 @@
 #include "ui.hpp"
+#include "FreeRTOS.h"
 #include "display.hpp"
 #include "gatt/fan.hpp"
 #include "lvgl.h"
 #include "sdk/ble_data_types.hpp"
+#include "semphr.h"
 #include "sensors.hpp"
 #include "ui/ui.h"
-#include "utility/async_worker.hpp"
+#include "utility/task.hpp"
 #include <algorithm>
 #include <chrono>
 #include <cstdio>
@@ -23,8 +25,9 @@ namespace {
 constexpr auto CHART_X_AXIS_LENGTH = 1.h;
 constexpr uint8_t CHART_SERIES_ENTIRES_MAX = display::RESOLUTION.width / 3;
 
-constexpr auto DISPLAY_TIMER_CHART_INTERVAL = CHART_X_AXIS_LENGTH / CHART_SERIES_ENTIRES_MAX;
+constexpr auto DISPLAY_TIMER_PLOT_INTERVAL = CHART_X_AXIS_LENGTH / CHART_SERIES_ENTIRES_MAX;
 constexpr auto DISPLAY_TIMER_LABELS_INTERVAL = 1s;
+constexpr auto DISPLAY_REFRESH_INTERVAL = 5ms;
 
 struct ChartDivY {
     uint8_t min;
@@ -135,7 +138,7 @@ void fan_power_arc_colour_update() {
             LV_PART_INDICATOR | int(LV_STATE_DEFAULT));
 }
 
-auto g_display_content_update_timer = mk_async_worker(DISPLAY_TIMER_LABELS_INTERVAL)([]() {
+void display_update_labels() {
     auto const& state = nevermore::sensors::g_sensors.with_fallbacks();
 
     label_set(ui_PressureIn, "??? kPa", "%.1f kPa", state.pressure_intake, 1e3);
@@ -152,9 +155,9 @@ auto g_display_content_update_timer = mk_async_worker(DISPLAY_TIMER_LABELS_INTER
 
     lv_arc_set_percent(ui_FanPowerArc, gatt::fan::fan_power() / 100);
     fan_power_arc_colour_update();
-});
+}
 
-auto g_display_chart_update_timer = mk_async_worker(DISPLAY_TIMER_CHART_INTERVAL)([]() {
+void display_update_plot() {
     auto const& state = nevermore::sensors::g_sensors.with_fallbacks();
 
     if (lv_chart_get_point_count(ui_Chart) < CHART_SERIES_ENTIRES_MAX) {
@@ -165,7 +168,7 @@ auto g_display_chart_update_timer = mk_async_worker(DISPLAY_TIMER_CHART_INTERVAL
         //        (Sane if the # of points goes down, but not so much for our case.)
         reinterpret_cast<lv_chart_t*>(ui_Chart)->point_cnt = n;
 
-        lv_label_set_text(ui_XAxisScale, pretty_print_time(n * DISPLAY_TIMER_CHART_INTERVAL).c_str());
+        lv_label_set_text(ui_XAxisScale, pretty_print_time(n * DISPLAY_TIMER_PLOT_INTERVAL).c_str());
     }
 
     auto set_next_value = [&](auto* series, auto&& value) {
@@ -203,7 +206,7 @@ auto g_display_chart_update_timer = mk_async_worker(DISPLAY_TIMER_CHART_INTERVAL
     char buffer[256];
     sprintf(buffer, "%u VOC\n%uc", max_voc, max_temp);
     lv_label_set_text(ui_ChartMax, buffer);
-});
+}
 
 // Code more or less ripped from LVGL's `lv_chart.c`.
 void chart_draw_hdivs(lv_draw_ctx_t& draw_ctx, lv_draw_line_dsc_t const& line_desc, lv_chart_t const& chart,
@@ -333,9 +336,22 @@ void on_chart_draw(bool begin, lv_event_t* e) {
     }
 }
 
+SemaphoreHandle_t g_ui_lock;
+auto using_semaphore(SemaphoreHandle_t& lock, TickType_t ticks_to_wait = portMAX_DELAY) {
+    return [=](auto&& go) {
+        if (!xSemaphoreTake(lock, ticks_to_wait)) return false;
+
+        go();
+        xSemaphoreGive(lock);
+        return true;
+    };
+}
+
 }  // namespace
 
-bool init(async_context_t& ctx_async) {
+bool init() {
+    g_ui_lock = xSemaphoreCreateMutex();  // we panic on alloc failures, no need to handle null
+
     ui_init();  // invoke generated code setup
 
     // HACK: Need at least 2 points to draw the 100-VOC line.
@@ -381,8 +397,14 @@ bool init(async_context_t& ctx_async) {
     }
 #endif
 
-    g_display_content_update_timer.register_(ctx_async);
-    g_display_chart_update_timer.register_(ctx_async, 1s);
+#define DISPLAY_TASK(name, period, stack_size, go)                \
+    mk_task(name, Priority::Display, stack_size)([]() {           \
+        periodic(period)([] { using_semaphore(g_ui_lock)(go); }); \
+    }).release()
+
+    DISPLAY_TASK("display", DISPLAY_REFRESH_INTERVAL, 1024, lv_timer_handler);
+    DISPLAY_TASK("display-label", DISPLAY_TIMER_LABELS_INTERVAL, 1024, display_update_labels);
+    DISPLAY_TASK("display-plot", DISPLAY_TIMER_PLOT_INTERVAL, 1024, display_update_plot);
     return true;
 }
 

@@ -1,7 +1,10 @@
 #pragma once
 
 #include "hardware/timer.h"
+#include "pico/time.h"
 #include <chrono>
+
+namespace nevermore {
 
 using namespace std::literals::chrono_literals;
 
@@ -19,3 +22,5 @@ template <typename T, typename U>
 void sleep(std::chrono::duration<T, U> dur) {
     sleep_us(dur / 1us);
 }
+
+}  // namespace nevermore

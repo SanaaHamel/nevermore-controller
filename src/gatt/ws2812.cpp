@@ -60,7 +60,7 @@ void DBG_update_rate_log() {
 
 }  // namespace
 
-bool init(async_context_t&) {
+bool init() {
     return true;
 }
 

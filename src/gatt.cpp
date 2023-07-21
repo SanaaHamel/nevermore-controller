@@ -118,18 +118,9 @@ int attr_write(hci_con_handle_t conn, uint16_t attr, uint16_t transaction_mode, 
 
 btstack_packet_callback_registration_t g_hci_handler{.callback = &hci_handler};
 
-btstack_timer_source_t g_led_blink{.process = [](auto* timer) {
-    static bool led_on = false;
-    led_on = !led_on;
-    cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, led_on);
-
-    btstack_run_loop_set_timer(timer, SENSOR_UPDATE_PERIOD / 1ms);
-    btstack_run_loop_add_timer(timer);
-}};
-
 }  // namespace
 
-bool init(async_context_t& ctx_async) {
+bool init() {
 #ifndef ENABLE_LOG_DEBUG
     hci_dump_enable_packet_log(false);  // don't spam out packet logs unless we're low level debugging
 #endif
@@ -137,10 +128,10 @@ bool init(async_context_t& ctx_async) {
     l2cap_init();
     sm_init();  // FUTURE WORK: do we even need a security manager? can we ditch this?
 
-    if (!display::init(ctx_async)) return false;
-    if (!environmental::init(ctx_async)) return false;
-    if (!fan::init(ctx_async)) return false;
-    if (!ws2812::init(ctx_async)) return false;
+    if (!display::init()) return false;
+    if (!environmental::init()) return false;
+    if (!fan::init()) return false;
+    if (!ws2812::init()) return false;
 
     hci_add_event_handler(&g_hci_handler);
 
@@ -156,7 +147,6 @@ bool init(async_context_t& ctx_async) {
         return false;
     }
 
-    g_led_blink.process(&g_led_blink);
     return true;
 }
 

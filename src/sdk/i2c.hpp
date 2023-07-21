@@ -1,11 +1,16 @@
 #pragma once
 
+#include "FreeRTOS.h"
 #include "hardware/i2c.h"
+#include "semphr.h"  // IWYU pragma: keep [doesn't notice `SemaphoreHandle_t`]
 #include "utility/crc.hpp"
 #include "utility/packed_tuple.hpp"
+#include "utility/scope_guard.hpp"
 #include <cstdio>
 #include <optional>
 #include <type_traits>
+
+// NB: These variants are lock guarded to prevent both cores from using the same bus.
 
 namespace nevermore {
 
@@ -17,6 +22,13 @@ constexpr uint8_t i2c_gpio_bus_num(uint8_t pin) {
 
 constexpr I2C_Pin i2c_gpio_kind(uint8_t pin) {
     return I2C_Pin(pin % 2);
+}
+
+extern SemaphoreHandle_t g_i2c_locks[NUM_I2CS];
+
+inline auto i2c_guard(i2c_inst_t& i2c) {
+    auto& lock = g_i2c_locks[&i2c == i2c0 ? 0 : 1];  // NOLINT
+    return ScopeGuard{[&] { xSemaphoreGive(lock); }};
 }
 
 // I2C reserves some addresses for special purposes.
@@ -31,6 +43,7 @@ template <typename A>
 int i2c_write_blocking(i2c_inst_t& i2c, uint8_t addr, A const& blob, bool nostop = false)
     requires(!std::is_pointer_v<A>)
 {
+    auto _ = i2c_guard(i2c);
     return i2c_write_blocking(&i2c, addr, reinterpret_cast<uint8_t const*>(&blob), sizeof(A), nostop);
 }
 
@@ -38,6 +51,7 @@ template <typename A>
 int i2c_read_blocking(i2c_inst_t& i2c, uint8_t addr, A& blob, bool nostop = false)
     requires(!std::is_pointer_v<A>)
 {
+    auto _ = i2c_guard(i2c);
     return i2c_read_blocking(&i2c, addr, reinterpret_cast<uint8_t*>(&blob), sizeof(A), nostop);
 }
 

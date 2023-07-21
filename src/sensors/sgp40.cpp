@@ -3,7 +3,7 @@
 #include "lib/sensirion_gas_index_algorithm.h"
 #include "sdk/ble_data_types.hpp"
 #include "sdk/i2c.hpp"
-#include "sdk/timer.hpp"
+#include "sensors/async_sensor.hpp"
 #include "sensors/environmental.hpp"
 #include "utility/numeric_suffixes.hpp"
 #include "utility/packed_tuple.hpp"
@@ -47,7 +47,7 @@ bool sgp4x_heater_off(i2c_inst_t& bus) {
 bool sgp40_self_test(i2c_inst_t& bus) {
     if (2 != i2c_write_blocking(bus, SGP40_ADDRESS, Cmd::SGP40_SELF_TEST)) return false;
 
-    sleep(320ms);  // spec says max delay of 320ms
+    task_delay(320ms);  // spec says max delay of 320ms
 
     auto response = i2c_read_blocking_crc<0xFF, uint8_t, uint8_t>(bus, SGP40_ADDRESS);
     if (!response) return false;
@@ -90,7 +90,7 @@ bool sgp40_exists(i2c_inst_t& bus) {
     return sgp4x_heater_off(bus);  // FUTURE WORK: better way of doing this?
 }
 
-struct SGP40 final : SensorDelayedResponse {
+struct SGP40 final : SensorPeriodic {
     i2c_inst_t& bus;  // NOLINT(cppcoreguidelines-avoid-const-or-ref-data-members)
     GasIndexAlgorithmParams gas_index_algorithm{};
     EnvironmentalFilter side;
@@ -112,11 +112,7 @@ struct SGP40 final : SensorDelayedResponse {
         return "SGP40";
     }
 
-    [[nodiscard]] chrono::milliseconds read_delay() const override {
-        return 320ms;
-    }
-
-    bool issue() override {
+    bool issue() {
 #if DBG_SGP40_TEMP_HUMIDITY_BREAKDOWN
         switch (state) {
         case 0: break;
@@ -125,11 +121,17 @@ struct SGP40 final : SensorDelayedResponse {
         case 3: return sgp40_measure_issue(bus, NOT_KNOWN, NOT_KNOWN);
         }
 #endif
-
         return sgp40_measure_issue(bus, side.get<Temperature>(), side.get<Humidity>());
     }
 
     void read() override {
+        if (!issue()) {
+            printf("ERR - SGP40 - failed read request\n");
+            return;
+        }
+
+        task_delay(320ms);
+
         auto voc_raw = sgp40_measure_read(bus);
         if (!voc_raw) {
             printf("ERR - SGP40 - failed read\n");

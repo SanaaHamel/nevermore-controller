@@ -1,7 +1,6 @@
 #pragma once
 
 #include "bluetooth.h"
-#include "pico/async_context.h"
 #include "sdk/ble_data_types.hpp"
 #include <cstdint>
 #include <optional>
@@ -14,7 +13,7 @@ std::optional<uint16_t> attr_read(
 std::optional<int> attr_write(
         hci_con_handle_t, uint16_t att_handle, uint16_t offset, uint8_t const* buffer, uint16_t buffer_size);
 
-bool init(async_context_t&);
+bool init();
 void disconnected(hci_con_handle_t);
 
 // Current fan power. [0, 100]
