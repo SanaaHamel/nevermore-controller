@@ -12,12 +12,15 @@
 #include "sdk/spi.hpp"
 #include "sensors.hpp"
 #include "task.h"  // IWYU pragma: keep
-#include "utility/square_wave.hpp"
 #include "utility/task.hpp"
 #include "utility/timer.hpp"
 #include "ws2812.hpp"
 #include <cstdint>
 #include <cstdio>
+
+#ifndef NDEBUG
+#include "utility/square_wave.hpp"
+#endif
 
 using namespace nevermore;
 

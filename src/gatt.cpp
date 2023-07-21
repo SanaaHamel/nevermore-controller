@@ -2,7 +2,6 @@
 #include "ble/att_server.h"
 #include "ble/sm.h"
 #include "bluetooth_gatt.h"
-#include "boards/pico_w.h"
 #include "btstack_event.h"
 #include "config.hpp"
 #include "gatt/configuration.hpp"
@@ -14,7 +13,6 @@
 #include "hci_dump.h"
 #include "l2cap.h"
 #include "nevermore.h"
-#include "pico/cyw43_arch.h"
 #include "sdk/gap.hpp"
 #include "utility/bt_advert.hpp"
 #include <array>

@@ -16,7 +16,7 @@ struct FanPolicyEnvironmental {
     VOCIndex voc_improve_min = 5;    // <= (intake - exhaust)    -> things are improving, keep filtering
 
     struct Instance {
-        FanPolicyEnvironmental const& params;
+        FanPolicyEnvironmental const& params;  // NOLINT(cppcoreguidelines-avoid-const-or-ref-data-members)
         std::chrono::system_clock::time_point last_filter = std::chrono::system_clock::time_point::min();
 
         // Stateful.

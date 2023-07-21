@@ -3,7 +3,7 @@
 #include "display/GC9A01.h"
 #include "hardware/gpio.h"
 #include "hardware/spi.h"
-#include "lvgl.h"
+#include "lvgl.h"  // IWYU pragma: keep
 #include "sdk/pwm.hpp"
 #include "sdk/timer.hpp"
 #include "ui.hpp"

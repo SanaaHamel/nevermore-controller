@@ -44,7 +44,7 @@ constexpr auto WS2812_TIME_PER_BIT = 1.25us;
 
 static_assert(50us <= WS2812_TIME_RESET, "datasheet says quiet period must be >= 50us");
 
-auto* const WS2812_PIO = pio0;
+auto* const WS2812_PIO = pio0;  // NOLINT
 constexpr auto WS2812_SM = 0;
 
 auto const g_dma_channel = dma_claim_unused_channel(true);

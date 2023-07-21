@@ -5,7 +5,7 @@
 #include "btstack_config.h"
 #include "btstack_defines.h"
 #include "hci.h"
-#include "sdk/btstack.hpp"
+#include "sdk/btstack.hpp"  // IWYU pragma: keep [doesn't find overloads]
 #include <algorithm>
 #include <array>
 #include <cassert>
@@ -118,7 +118,7 @@ struct NotifyState {
         for (auto&& cb : callbacks) {
             if (uintptr_t(cb.context) != HCI_CON_HANDLE_INVALID) continue;
 
-            cb.context = reinterpret_cast<void*>(conn);
+            cb.context = reinterpret_cast<void*>(conn);  // NOLINT(performance-no-int-to-ptr)
             return true;
         }
 

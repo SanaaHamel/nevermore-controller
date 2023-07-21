@@ -1,5 +1,4 @@
 #include "fan_policy.hpp"
-#include "gatt/environmental.hpp"
 #include "sdk/ble_data_types.hpp"
 #include <chrono>
 #include <cmath>

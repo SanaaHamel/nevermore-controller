@@ -95,7 +95,7 @@ template <typename A = uint8_t>
 optional<A> reg_read(i2c_inst_t& bus, Cmd const cmd, bool nostop = false) {
     if (1 != i2c_write_blocking(bus, ADDRESS, cmd)) return {};
 
-    A result;
+    A result{};
     if (sizeof(A) != i2c_read_blocking(bus, ADDRESS, result)) return {};
 
     return result;
@@ -148,7 +148,7 @@ struct InstanceMetadata {
         driver.read_cb = read;
     }
 
-    lv_indev_drv_t driver;  // `user_data` must point to CST816S instance
+    lv_indev_drv_t driver{};  // `user_data` must point to CST816S instance
     lv_indev_t* device = nullptr;
 
 private:
