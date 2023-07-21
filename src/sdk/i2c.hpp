@@ -7,6 +7,8 @@
 #include <optional>
 #include <type_traits>
 
+namespace nevermore {
+
 enum class I2C_Pin : uint8_t { SDA = 0, SCL = 1 };
 
 constexpr uint8_t i2c_gpio_bus_num(uint8_t pin) {
@@ -54,3 +56,5 @@ std::optional<PackedTuple<A...>> i2c_read_blocking_crc(i2c_inst_t& i2c, uint8_t 
 
     return response.data;
 }
+
+}  // namespace nevermore

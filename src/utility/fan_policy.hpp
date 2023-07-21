@@ -3,6 +3,8 @@
 #include "sensors.hpp"
 #include <chrono>
 
+namespace nevermore {
+
 using namespace std::literals::chrono_literals;
 
 struct FanPolicyEnvironmental {
@@ -28,3 +30,5 @@ struct FanPolicyEnvironmental {
         return {*this};
     }
 };
+
+}  // namespace nevermore

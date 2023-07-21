@@ -10,6 +10,8 @@ using namespace std::literals::chrono_literals;
 using namespace BLE;
 using nevermore::sensors::VOCIndex;
 
+namespace nevermore {
+
 namespace {
 
 constexpr bool policy_voc_too_high(VOCIndex voc_passive_max, VOCIndex intake, VOCIndex exhaust) {
@@ -79,3 +81,5 @@ static_assert(!policy_voc_improving(2, 3, NOT_KNOWN));          // basic case - 
 static_assert(!policy_voc_improving(2, NOT_KNOWN, 1));          // basic case - need both sensors
 static_assert(!policy_voc_improving(NOT_KNOWN, 3, 1));          // disabled
 static_assert(!policy_voc_improving(2, NOT_KNOWN, NOT_KNOWN));  // sensors not connected
+
+}  // namespace nevermore

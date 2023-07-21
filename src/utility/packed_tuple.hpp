@@ -5,6 +5,8 @@
 #include <initializer_list>
 #include <utility>
 
+namespace nevermore {
+
 template <typename... A>
     requires(std::is_trivially_copyable_v<A> && ...)
 class [[gnu::packed]] PackedTuple final {
@@ -80,13 +82,16 @@ auto& get(PackedTuple<A...> const& xs) noexcept {
     return xs.template get<I>();
 }
 
+}  // namespace nevermore
+
 template <typename... A>
-struct std::tuple_size<PackedTuple<A...>> : std::integral_constant<std::size_t, sizeof...(A)> {};
+struct std::tuple_size<nevermore::PackedTuple<A...>> : std::integral_constant<std::size_t, sizeof...(A)> {};
 
 template <size_t I, typename A, typename... B>
-struct std::tuple_element<I, PackedTuple<A, B...>> : std::tuple_element<I - 1, PackedTuple<B...>> {};
+struct std::tuple_element<I, nevermore::PackedTuple<A, B...>>
+        : std::tuple_element<I - 1, nevermore::PackedTuple<B...>> {};
 
 template <typename A, typename... B>
-struct std::tuple_element<0, PackedTuple<A, B...>> {
+struct std::tuple_element<0, nevermore::PackedTuple<A, B...>> {
     using type = A;
 };

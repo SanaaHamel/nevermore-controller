@@ -10,6 +10,8 @@
 #include <ratio>
 #include <utility>
 
+namespace nevermore {
+
 namespace async_worker {
 
 template <typename F, typename... Args>
@@ -87,3 +89,5 @@ consteval auto mk_async_worker(std::chrono::duration<A, Ratio> delay) {
 
     return [=]<Invocable F>(F go) { return Worker(std::move(go), delay_ms); };
 }
+
+}  // namespace nevermore

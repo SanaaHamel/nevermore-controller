@@ -4,6 +4,8 @@
 #include <cassert>
 #include <chrono>
 
+namespace nevermore {
+
 using namespace std::literals::chrono_literals;
 
 // BlueTooth advertisement API is specified in terms of ticks, where a tick is 0.625 ms
@@ -19,3 +21,5 @@ void gap_advertisements_set_params(Dur0 const& advert_min, Dur1 const& advert_ma
     ::gap_advertisements_set_params(advert_min / BT_ADVERTISEMENT_INTERVAL_TICK,
             advert_max / BT_ADVERTISEMENT_INTERVAL_TICK, 0, 0, null_addr, 0b0111, 0x00);
 }
+
+}  // namespace nevermore

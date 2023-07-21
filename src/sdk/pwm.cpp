@@ -2,6 +2,8 @@
 #include "hardware/clocks.h"
 #include "hardware/pwm.h"
 
+namespace nevermore {
+
 namespace {
 
 constexpr auto TOP_MAX = UINT16_MAX - 1;  // - 1 to allow 100% duty w/ UINT16_MAX level
@@ -58,3 +60,5 @@ void pwm_config_set_freq_hz(pwm_config& c, uint32_t const freq_hz) {
     pwm_config_set_clkdiv_int_frac(&c, div16 / 16, div16 & 0b1111);
     pwm_config_set_wrap(&c, top - 1);  // - 1 to enable 100% duty using `top`
 }
+
+}  // namespace nevermore

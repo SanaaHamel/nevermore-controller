@@ -8,6 +8,8 @@
 #include <cstdint>
 #include <optional>
 
+namespace nevermore {
+
 // sets up a PWM to emit a square wave with the given frequency
 void square_wave_pwm_init(GPIO_Pin, uint32_t hz, float duty = .5f);
 
@@ -26,3 +28,5 @@ constexpr std::optional<GPIO_Pin> square_wave_pwm_first_available_pin() {
 }
 
 constexpr auto PIN_DBG_SQUARE_WAVE = square_wave_pwm_first_available_pin();
+
+}  // namespace nevermore

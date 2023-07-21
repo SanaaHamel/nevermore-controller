@@ -4,6 +4,8 @@
 #include <chrono>
 #include <cstdio>
 
+namespace nevermore {
+
 #define DBG_PROFILE_EXPR(desc, unit, expr) \
     DBG_profile_time(desc " %d " #unit "\n", 1##unit, [&]() { return expr; })
 
@@ -17,3 +19,5 @@ auto DBG_profile_time(char const* msg, Dur const& unit, F&& go) {
 
     return go();
 }
+
+}  // namespace nevermore

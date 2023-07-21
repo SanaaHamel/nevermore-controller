@@ -2,6 +2,8 @@
 
 #include <utility>
 
+namespace nevermore {
+
 template <typename F>
 class ScopeGuard {
     F f;
@@ -32,3 +34,5 @@ auto operator+(ScopeGuardBuilder, F&& f) {
 #define SCOPE_GUARD_ANON_VAR_CONCAT_(x, y) x##y
 #define SCOPE_GUARD_ANON_VAR_CONCAT(x, y) SCOPE_GUARD_ANON_VAR_CONCAT_(x, y)
 #define SCOPE_GUARD auto SCOPE_GUARD_ANON_VAR_CONCAT(scope_guard__, __COUNTER__) = ScopeGuardBuilder{} + [&]()
+
+}  // namespace nevermore

@@ -3,6 +3,8 @@
 #include "pico/async_context.h"
 #include "utility/scope_guard.hpp"
 
+namespace nevermore {
+
 template <typename F>
 auto async_using(async_context_t& context, F&& go) {
     async_context_acquire_lock_blocking(&context);
@@ -12,3 +14,5 @@ auto async_using(async_context_t& context, F&& go) {
 
     return go();
 }
+
+}  // namespace nevermore

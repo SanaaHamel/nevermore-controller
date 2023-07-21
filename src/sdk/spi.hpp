@@ -3,6 +3,8 @@
 #include "hardware/spi.h"
 #include <cstdint>
 
+namespace nevermore {
+
 enum class SPI_Pin : uint8_t { RECV = 0, SELECT = 1, CLOCK = 2, SEND = 3 };
 
 constexpr uint8_t spi_gpio_bus_num(uint8_t pin) {
@@ -20,3 +22,5 @@ inline spi_inst_t* spi_gpio_bus(uint8_t pin) {
     case 1: return spi1;  // NOLINT(cppcoreguidelines-pro-type-cstyle-cast)
     }
 }
+
+}  // namespace nevermore

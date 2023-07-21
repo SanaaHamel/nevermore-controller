@@ -3,6 +3,8 @@
 #include <cstdint>
 #include <span>
 
+namespace nevermore {
+
 using CRC8_t = uint8_t;
 
 // polynomial x^8 + x^5 + x^4 + 1
@@ -38,3 +40,5 @@ struct [[gnu::packed]] ResponseCRC {
         return crc == crc8(data, CRC_INIT);
     };
 };
+
+}  // namespace nevermore

@@ -6,6 +6,8 @@
 
 // Toy helpers for debugging/testing. Not intended for general use.
 
+namespace nevermore {
+
 template <typename A>
 constexpr A remap(A const& x, A const& min, A const& max, A const& lo, A const& hi) {
     auto p = (x - min) / (max - min);
@@ -22,3 +24,5 @@ double time_saw(std::chrono::duration<float> period) {
                    period.count()) /
            period.count();
 }
+
+}  // namespace nevermore

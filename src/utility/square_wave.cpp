@@ -6,6 +6,8 @@
 #include <climits>
 #include <cstdio>
 
+namespace nevermore {
+
 void square_wave_pwm_init(GPIO_Pin pin, uint32_t hz, float duty_f) {
     assert(0 < hz);
     assert(0 <= duty_f && duty_f <= 1);
@@ -29,3 +31,5 @@ void square_wave_pwm_init(GPIO_Pin pin, uint32_t hz, float duty_f) {
             int(pin), unsigned(hz), duty_f * 100, int(slice_hw.div / 16), int(slice_hw.div & 0b1111),
             int(slice_hw.top), int(level));
 }
+
+}  // namespace nevermore

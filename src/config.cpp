@@ -12,6 +12,8 @@
 
 using namespace std;
 
+namespace nevermore {
+
 static_assert(PIN_MAX == 30, "Told you not to alter this!");
 
 static_assert(ADVERTISE_INTERVAL_MIN <= ADVERTISE_INTERVAL_MAX,
@@ -107,3 +109,5 @@ static_assert(
 static_assert(spi_has_at_least(PINS_DISPLAY_SPI, {SPI_Pin::CLOCK, SPI_Pin::SEND}),
         "`config.hpp`'s `PINS_DISPLAY_SPI` doesn't specify at least a clock and send pin");
 }  // namespace
+
+}  // namespace nevermore

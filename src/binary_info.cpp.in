@@ -2,6 +2,8 @@
 #include "config.hpp"
 #include "sdk/i2c.hpp"
 
+namespace nevermore {
+
 namespace {
 
 constexpr GPIO_Pin first_i2c_pin(uint8_t bus, I2C_Pin kind) {
@@ -40,3 +42,5 @@ bi_decl(bi_2pins_with_names(
 bi_decl(bi_1pin_with_name(
     PIN_NEOPIXEL_DATA_IN, "NeoPixel Data In"));
 // clang-format on
+
+}  // namespace nevermore
