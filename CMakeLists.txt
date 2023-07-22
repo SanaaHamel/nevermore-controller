@@ -56,11 +56,12 @@ target_include_directories(lvgl PRIVATE ${SRC_CONFIG_DIR})
 target_include_directories(lv_drivers PRIVATE ${SRC_CONFIG_DIR})
 target_link_libraries(lvgl pico_time) # add `pico_time` dependency so lvgl can get a millisecond tick
 
-# HACK: Also modify `lvgl_demos` & `lvgl_examples` for config include to suppress warnings/errors.
-# TODO: Find a way to completely exclude `lvgl_demos` & `lvgl_examples` from being built.
+# Completely exclude `lvgl_demos` & `lvgl_examples` from being built.
 # Even if they're not linked it's annoying.
-target_include_directories(lvgl_demos PRIVATE ${SRC_CONFIG_DIR})
-target_include_directories(lvgl_examples PRIVATE ${SRC_CONFIG_DIR})
+set_target_properties(lvgl_demos lvgl_examples
+  PROPERTIES
+  EXCLUDE_FROM_ALL TRUE
+)
 
 # target_include_directories(FreeRTOS-Kernel PRIVATE ${SRC_CONFIG_DIR})
 file(GLOB_RECURSE SRC_H ${SRC_DIR}/*.h)
