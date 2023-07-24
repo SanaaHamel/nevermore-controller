@@ -86,10 +86,6 @@ LOG = LogPrefixed(
 )
 
 
-# How long to wait for a BLE connection to the controller (sec)
-TIMEOUT_CONNECT = 10.0
-
-
 # (measure-time, temperature) -> None
 SensorCallback = Callable[[float, float], None]
 
@@ -562,7 +558,16 @@ class NevermoreBackgroundWorker:
 
         self._thread.name = nevermore.name
         device_address = nevermore.bt_address
+        timeout = nevermore.connection_initial_timeout
         nevermore = None  # release reference otherwise call frame keeps it alive
+
+        # if it's 0 (i.e. no-initial-timeout), then it doesn't matter how long we try
+        if timeout == 0:
+            timeout = 10
+        else:
+            # * 0.75 b/c scan must finish before main thread times out waiting
+            # for initial connection check
+            timeout *= 0.75
 
         worker_log = LogPrefixed(LOG, lambda x: f"{self._thread.name} - {x}")
 
@@ -570,11 +575,7 @@ class NevermoreBackgroundWorker:
             # Attempt (re)connection. Might have to do this multiple times if we lose connection.
             while True:
                 try:
-                    # TIMEOUT_CONNECT * 0.75 b/c scan must finish before main thread
-                    # times out waiting for initial connection check
-                    devices = await discover_controllers(
-                        device_address, timeout=TIMEOUT_CONNECT * 0.75
-                    )
+                    devices = await discover_controllers(device_address, timeout)
                     if not devices:
                         continue  # no devices found, try again
 
@@ -803,6 +804,10 @@ class Nevermore:
                     f"invalid bluetooth address for `bt_address`, given `{self.bt_address}`"
                 )
 
+        self.connection_initial_timeout: float = config.getfloat(
+            "connection_initial_timeout", 10, minval=0
+        )
+
         # LED-specific code.
         # Ripped from `extras/neopixel.py` because the processing code is entangled with MCU transmission.
         # Modified to remove minor absurdities & fit our use case.
@@ -857,10 +862,13 @@ class Nevermore:
         if self._interface is None:
             raise Exception("precondition - `self._interface` must not be None")
 
-        if not self._interface.wait_for_connection(TIMEOUT_CONNECT):
-            raise self.printer.config_error("nevermore failed to connect - timed out")
-
         self._led_update(self.led_helper.get_status()["color_data"], None)
+
+        if (
+            self.connection_initial_timeout != 0
+            and not self._interface.wait_for_connection(self.connection_initial_timeout)
+        ):
+            raise self.printer.config_error("nevermore failed to connect - timed out")
 
     def handle_controller_connect(self) -> None:
         self._interface.send_command(self._configuration)

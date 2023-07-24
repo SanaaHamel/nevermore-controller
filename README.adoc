@@ -341,6 +341,15 @@ This section lists all options and defaults. Some minor examples are also provid
 # example - `bt_address: 43:43:A2:12:1F:AC`
 bt_address: XX:XX:XX:XX:XX:XX
 
+# Optional
+# seconds, how long to wait before reporting that the Nevermore is missing.
+# If set to 0, this will disable the startup check and instead of an error,
+# it'll keep trying to connect in the background.
+# WARNING:  Don't use 0 unless you've already tested that it can connect to the Nevermore.
+# WARNING:  If you set this < 5 you will likely have trouble connecting to the Nevermore.
+# NOTE:     The module always quietly keeps trying to reconnect if connection is lost after startup.
+connection_initial_timeout: 10
+
 # Optional - LED
 # For the optional LED ring feature.
 # Members generally behaves like the WS2812 klipper module.
