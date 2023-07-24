@@ -87,7 +87,7 @@ NOTE: Make sure you meet the xref:klipper-requirements[Klipper requirements].
 
 Instructions:
 
-. Build or download the controller `uf2` binaries, flash to Pico W.
+. Build or https://github.com/SanaaHamel/nevermore-controller/releases[download the controller `uf2` binary], flash to Pico W.
 +
 The Pico W's LED should start flashing once the controller has booted.
 
