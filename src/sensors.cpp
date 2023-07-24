@@ -74,9 +74,9 @@ VecSensors sensors_init_bus(i2c_inst_t& bus, EnvironmentalFilter state) {
         sensors.push_back(std::move(p));
     };
 
-    probe_for(htu2xd(bus, state));
     probe_for(bme280(bus, state));
     probe_for(bme68x(bus, state));
+    probe_for(htu2xd(bus, state));
     probe_for(sgp40(bus, state));
     probe_for(CST816S::mk(bus));
 
