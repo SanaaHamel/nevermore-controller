@@ -83,8 +83,8 @@ add_compile_definitions(WANT_HCI_DUMP=1)
 add_compile_definitions(CYW43_LWIP=0)
 
 # default is 4.
-# Current users: tinyusb (1), stdio w/ USB (1), CYW43 driver (1), WS2812 (1), CST816S (1)
-add_compile_definitions(PICO_MAX_SHARED_IRQ_HANDLERS=5)
+# Current users: tinyusb w/ DCD (1), stdio w/ USB (1), CYW43 driver (1), WS2812 (1), CST816S (1), GC9A01 (1)
+add_compile_definitions(PICO_MAX_SHARED_IRQ_HANDLERS=6)
 
 if(BLUETOOTH_DEBUG)
   add_compile_definitions(CMAKE_BLUETOOTH_DEBUG=1)
