@@ -7,6 +7,7 @@
 #include "sensors/bme280.hpp"
 #include "sensors/bme68x.hpp"
 #include "sensors/cst816s.hpp"
+#include "sensors/ens16x.hpp"
 #include "sensors/environmental.hpp"
 #include "sensors/htu2xd.hpp"
 #include "sensors/sgp40.hpp"
@@ -29,6 +30,7 @@ constexpr uint32_t ADC_CHANNEL_TEMP_SENSOR = 4;
 constexpr auto SENSOR_POWER_ON_DELAY = max({
         BME280_POWER_ON_DELAY,
         BME68x_POWER_ON_DELAY,
+        ENS16x_POWER_ON_DELAY,
         HTU21D_POWER_ON_DELAY,
         SGP40_POWER_ON_DELAY,
 });
@@ -76,6 +78,7 @@ VecSensors sensors_init_bus(i2c_inst_t& bus, EnvironmentalFilter state) {
 
     probe_for(bme280(bus, state));
     probe_for(bme68x(bus, state));
+    probe_for(ens16x(bus, state));
     probe_for(htu2xd(bus, state));
     probe_for(sgp40(bus, state));
     probe_for(CST816S::mk(bus));
