@@ -177,11 +177,16 @@ Discovery started
 +
 If `bluetoothctl` works fine and the scan lists the Nevermore controller then something probably went wrong with the Klipper module. Go find me on the Nevermore Discord for help.
 
-* I'm using Mainsail-OS and...
+[#faq-mainsail-os]
+* I'm using MainsailOS and...
 +
-This distro disables BlueTooth by default. Unless you're very familiar with Linux, it'll likely be easier to install a new OS. I suggest using a recent Debian and https://github.com/th33xitus/kiauh[KIAUH].
+This distro disables BlueTooth by default. footnote:[Mainsail OS disabled BlueTooth to enable hardware UART on Raspberry Pi SBCs.] Unless you're very familiar with Linux, it'll likely be easier to install a new OS. I suggest using a recent Debian and https://github.com/th33xitus/kiauh[KIAUH].
 +
-NOTE: Make sure you back up the `~/printer_data` directory!
+WARNING: Make sure you back up the `~/printer_data` directory!
++
+Alternatively, you can flash Klipper to the Pico and use it like any other Klipper MCU.
++
+NOTE: I intend to improve the experience for people using a wired connection instead of wireless (via the Klipper MCU), but have no concrete timeline.
 
 * Mainsail doesn't show sensor values other than temperature.
 +
@@ -256,6 +261,9 @@ WARNING: The default assignments are tentative and will probably change after we
 [#klipper-requirements]
 === Requirements
 
+NOTE: xref:faq-mainsail-os[MainsailOS deliberately disables BlueTooth.]
+
+* xref:faq-is-the-bluetooth-on[Working BlueTooth on your Klipper host.]
 * Klipper using Python 3.7+
 * KIAUH-like installation (required by installation script)
 
