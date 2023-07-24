@@ -35,7 +35,7 @@ import janus
 from bleak import BleakClient, BleakError, BleakScanner
 from bleak.backends.device import BLEDevice
 from bleak.backends.service import BleakGATTCharacteristic, BleakGATTService
-from bleak.exc import BleakDeviceNotFoundError
+from bleak.exc import BleakDBusError, BleakDeviceNotFoundError
 from configfile import ConfigWrapper
 from extras.led import LEDHelper
 from gcode import GCodeCommand, GCodeDispatch
@@ -605,6 +605,14 @@ class NevermoreBackgroundWorker:
                     pass  # ignore, keep trying to (re)connect
                 except BleakDeviceNotFoundError:
                     pass  # ignore, keep trying to (re)connect
+                except BleakDBusError as e:
+                    # potentially caused by noisy environments or poor timing
+                    transient = (
+                        e.dbus_error == "org.bluez.Error.Failed"
+                        and e.dbus_error_details == "Software caused connection abort"
+                    )
+                    if not transient:
+                        raise
 
         async def go():
             # set this up ASAP once we're in an asyncio loop
