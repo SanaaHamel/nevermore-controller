@@ -74,7 +74,6 @@ VecSensors sensors_init_bus(i2c_inst_t& bus, EnvironmentalFilter state) {
         sensors.push_back(std::move(p));
     };
 
-    // order matters since they'll be updated in whatever order they were found/probed for
     probe_for(htu2xd(bus, state));
     probe_for(bme280(bus, state));
     probe_for(bme68x(bus, state));
