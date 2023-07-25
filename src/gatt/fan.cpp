@@ -46,7 +46,7 @@ BLE::Percentage8 g_fan_power = 0;
 BLE::Percentage8 g_fan_power_override;  // not-known -> automatic control
 nevermore::sensors::Tachometer g_tachometer{PIN_FAN_TACHOMETER, TACHOMETER_PULSE_PER_REVOLUTION};
 
-struct Aggregate {
+struct [[gnu::packed]] Aggregate {
     BLE::Percentage8 power = g_fan_power;
     BLE::Percentage8 power_override = g_fan_power_override;
     RPM16 tachometer = g_tachometer.revolutions_per_second() * 60;
