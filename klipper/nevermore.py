@@ -137,6 +137,7 @@ UUID_CHAR_COUNT16 = short_uuid(0x2AEA)
 UUID_CHAR_TIMESEC16 = short_uuid(0x2B16)
 UUID_CHAR_DATA_AGGREGATE = UUID("75134bec-dd06-49b1-bac2-c15e05fd7199")
 UUID_CHAR_FAN_TACHO = UUID("03f61fe0-9fe7-4516-98e6-056de551687f")
+UUID_CHAR_FAN_AGGREGATE = UUID("79cd747f-91af-49a6-95b2-5b597c683129")
 UUID_CHAR_VOC_INDEX = UUID("216aa791-97d0-46ac-8752-60bbc00611e1")
 UUID_CHAR_WS2812_UPDATE = UUID("5d91b6ce-7db1-4e06-b8cb-d75e7dd49aae")
 UUID_CHAR_CONFIG_FLAGS64 = UUID("d4b66bf4-3d8f-4746-b6a2-8a59d2eac3ce")
@@ -660,7 +661,7 @@ class NevermoreBackgroundWorker:
 
         P = CharacteristicProperty
         aggregate_env = require_char(service_env, UUID_CHAR_DATA_AGGREGATE, {P.NOTIFY})
-        aggregate_fan = require_char(service_fan, UUID_CHAR_DATA_AGGREGATE, {P.NOTIFY})
+        aggregate_fan = require_char(service_fan, UUID_CHAR_FAN_AGGREGATE, {P.NOTIFY})
         fan_power_override = require_char(service_fan, UUID_CHAR_PERCENT8, {P.WRITE})
         ws2812_length = require_char(service_ws2812, UUID_CHAR_COUNT16, {P.WRITE})
         ws2812_update = require_char(
@@ -708,7 +709,6 @@ class NevermoreBackgroundWorker:
             # HACK: Abuse GIL to keep this thread-safe
             # show the current fan power even if it isn't overridden
             nevermore.state.fan_power = params.percentage8() / 100.0  # need it in [0,1]
-            _ = params.percentage8()  # power-override
             nevermore.state.fan_tacho = params.tachometer()
 
         async def handle_commands():

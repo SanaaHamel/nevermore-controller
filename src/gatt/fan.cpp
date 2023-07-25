@@ -17,6 +17,7 @@ using namespace std;
 #define FAN_POWER 2B04_01
 #define FAN_POWER_OVERRIDE 2B04_02
 #define TACHOMETER 03f61fe0_9fe7_4516_98e6_056de551687f_01
+#define FAN_POWER_TACHO_AGGREGATE 79cd747f_91af_49a6_95b2_5b597c683129_01
 // NB: Error prone, but we're the 2nd aggregation char instance in the DB
 #define FAN_AGGREGATE 75134bec_dd06_49b1_bac2_c15e05fd7199_02
 
@@ -46,11 +47,20 @@ BLE::Percentage8 g_fan_power = 0;
 BLE::Percentage8 g_fan_power_override;  // not-known -> automatic control
 nevermore::sensors::Tachometer g_tachometer{PIN_FAN_TACHOMETER, TACHOMETER_PULSE_PER_REVOLUTION};
 
+struct [[gnu::packed]] FanPowerTachoAggregate {
+    BLE::Percentage8 power = g_fan_power;
+    RPM16 tachometer = g_tachometer.revolutions_per_second() * 60;
+};
+
 struct [[gnu::packed]] Aggregate {
     BLE::Percentage8 power = g_fan_power;
     BLE::Percentage8 power_override = g_fan_power_override;
-    RPM16 tachometer = g_tachometer.revolutions_per_second() * 60;
+    RPM16 tachometer = FanPowerTachoAggregate{}.tachometer;
 };
+
+auto g_notify_fan_power_tacho_aggregate = NotifyState<[](hci_con_handle_t conn) {
+    att_server_notify(conn, HANDLE_ATTR(FAN_POWER_TACHO_AGGREGATE, VALUE), FanPowerTachoAggregate{});
+}>();
 
 auto g_notify_aggregate = NotifyState<[](hci_con_handle_t conn) {
     att_server_notify(conn, HANDLE_ATTR(FAN_AGGREGATE, VALUE), Aggregate{});
@@ -59,7 +69,8 @@ auto g_notify_aggregate = NotifyState<[](hci_con_handle_t conn) {
 void fan_power_set(BLE::Percentage8 power) {
     if (g_fan_power == power) return;
     g_fan_power = power;
-    g_notify_aggregate.notify();  // `g_fan_power` changed
+    g_notify_fan_power_tacho_aggregate.notify();  // `g_fan_power` changed
+    g_notify_aggregate.notify();                  // `g_fan_power` changed
 
     auto scale = power.value_or(0) / 100;  // enable automatic control if `NOT_KNOWN`
     auto duty = uint16_t(numeric_limits<uint16_t>::max() * scale);
@@ -109,6 +120,7 @@ bool init() {
         if (g_prev == g_tachometer.revolutions_per_second()) return;
 
         g_prev = g_tachometer.revolutions_per_second();
+        g_notify_fan_power_tacho_aggregate.notify();
         g_notify_aggregate.notify();
     });
 
@@ -123,6 +135,7 @@ bool init() {
 }
 
 void disconnected(hci_con_handle_t conn) {
+    g_notify_fan_power_tacho_aggregate.unregister(conn);
     g_notify_aggregate.unregister(conn);
 }
 
@@ -132,6 +145,7 @@ optional<uint16_t> attr_read(
         USER_DESCRIBE(FAN_POWER, "Fan %")
         USER_DESCRIBE(FAN_POWER_OVERRIDE, "Fan % - Override")
         USER_DESCRIBE(TACHOMETER, "Fan RPM")
+        USER_DESCRIBE(FAN_POWER_TACHO_AGGREGATE, "Aggregated Fan % and RPM")
         USER_DESCRIBE(FAN_AGGREGATE, "Aggregated Service Data")
 
         USER_DESCRIBE(FAN_POLICY_COOLDOWN, "How long to continue filtering after conditions are acceptable")
@@ -140,13 +154,15 @@ optional<uint16_t> attr_read(
 
         READ_VALUE(FAN_POWER, g_fan_power)
         READ_VALUE(FAN_POWER_OVERRIDE, g_fan_power_override)
-        READ_VALUE(TACHOMETER, Aggregate{}.tachometer)
+        READ_VALUE(TACHOMETER, FanPowerTachoAggregate{}.tachometer)
+        READ_VALUE(FAN_POWER_TACHO_AGGREGATE, FanPowerTachoAggregate{})
         READ_VALUE(FAN_AGGREGATE, Aggregate{});  // default init populate from global state
 
         READ_VALUE(FAN_POLICY_COOLDOWN, g_fan_policy.cooldown)
         READ_VALUE(FAN_POLICY_VOC_PASSIVE_MAX, g_fan_policy.voc_passive_max)
         READ_VALUE(FAN_POLICY_VOC_IMPROVE_MIN, g_fan_policy.voc_improve_min)
 
+        READ_CLIENT_CFG(FAN_POWER_TACHO_AGGREGATE, g_notify_fan_power_tacho_aggregate)
         READ_CLIENT_CFG(FAN_AGGREGATE, g_notify_aggregate)
 
     default: return {};
@@ -163,6 +179,7 @@ optional<int> attr_write(hci_con_handle_t conn, uint16_t att_handle, uint16_t of
         WRITE_VALUE(FAN_POLICY_VOC_PASSIVE_MAX, g_fan_policy.voc_passive_max)
         WRITE_VALUE(FAN_POLICY_VOC_IMPROVE_MIN, g_fan_policy.voc_improve_min)
 
+        WRITE_CLIENT_CFG(FAN_POWER_TACHO_AGGREGATE, g_notify_fan_power_tacho_aggregate)
         WRITE_CLIENT_CFG(FAN_AGGREGATE, g_notify_aggregate)
 
     case HANDLE_ATTR(FAN_POWER_OVERRIDE, VALUE): {
