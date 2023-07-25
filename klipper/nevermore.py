@@ -395,8 +395,7 @@ class Command:
         raise NotImplemented
 
 
-@dataclass(frozen=True)
-class CmdFanPower(Command):
+class CmdFanPowerAbstract(Command):
     percent: Optional[float]
 
     def params(self):
@@ -405,6 +404,21 @@ class CmdFanPower(Command):
 
         p = _clamp(self.percent, 0, 1) * 100
         return int(p * 2).to_bytes(1, "little")
+
+
+@dataclass(frozen=True)
+class CmdFanPowerOverride(CmdFanPowerAbstract):
+    percent: Optional[float]
+
+
+@dataclass(frozen=True)
+class CmdFanPowerAuto(CmdFanPowerAbstract):
+    percent: float
+
+
+@dataclass(frozen=True)
+class CmdFanPowerCoeff(CmdFanPowerAbstract):
+    percent: float
 
 
 @dataclass(frozen=True)
@@ -532,8 +546,10 @@ class NevermoreBackgroundWorker:
         self._loop_exit.set_threadsafe(self._loop)
 
     # PRECONDITION: `self._connected` is set
-    def send_command(self, cmd: Union[Command, PseudoCommand]):
+    def send_command(self, cmd: Optional[Union[Command, PseudoCommand]]):
         assert self._command_queue is not None, "cannot send commands before connecting"
+        if cmd is None:  # simplify client control flow
+            return
 
         def send_maybe(wrapper: Callable[[_A], Command], x: Optional[_A]):
             if x is not None:
@@ -662,7 +678,10 @@ class NevermoreBackgroundWorker:
         P = CharacteristicProperty
         aggregate_env = require_char(service_env, UUID_CHAR_DATA_AGGREGATE, {P.NOTIFY})
         aggregate_fan = require_char(service_fan, UUID_CHAR_FAN_AGGREGATE, {P.NOTIFY})
-        fan_power_override = require_char(service_fan, UUID_CHAR_PERCENT8, {P.WRITE})
+        # HACK: it's the first one in the list (ordered by handle #). this is brittle.
+        fan_power_override, fan_power_auto, fan_power_coeff = require_chars(
+            service_fan, UUID_CHAR_PERCENT8, 3, {P.WRITE}
+        )
         ws2812_length = require_char(service_ws2812, UUID_CHAR_COUNT16, {P.WRITE})
         ws2812_update = require_char(
             service_ws2812, UUID_CHAR_WS2812_UPDATE, {P.WRITE_NO_RESPONSE}
@@ -713,8 +732,12 @@ class NevermoreBackgroundWorker:
 
         async def handle_commands():
             cmd = await self._command_queue.async_q.get()
-            if isinstance(cmd, CmdFanPower):
+            if isinstance(cmd, CmdFanPowerOverride):
                 char = fan_power_override
+            elif isinstance(cmd, CmdFanPowerAuto):
+                char = fan_power_auto
+            elif isinstance(cmd, CmdFanPowerCoeff):
+                char = fan_power_coeff
             elif isinstance(cmd, CmdFanPolicyCooldown):
                 char = fan_policy_cooldown
             elif isinstance(cmd, CmdFanPolicyVocPassiveMax):
@@ -831,8 +854,14 @@ class Nevermore:
             config, "led"
         ).setup_helper(config, self._led_update, led_chain_count)
 
+        def cfg_fan_power(mk: Callable[[float], CmdFanPowerAbstract], name: str):
+            x = config.getfloat(name, default=None, minval=0, maxval=1)
+            return mk(x) if x is not None else None
+
         self._configuration = CmdConfiguration(config)
         self._fan_policy = CmdFanPolicy(config)
+        self._fan_power_auto = cfg_fan_power(CmdFanPowerAuto, "fan_power_automatic")
+        self._fan_power_coeff = cfg_fan_power(CmdFanPowerCoeff, "fan_power_coefficient")
         self._interface: Optional[NevermoreBackgroundWorker] = None
         self._handle_request_restart(None)
 
@@ -845,7 +874,7 @@ class Nevermore:
 
     def set_fan_power(self, percent: Optional[float]):
         if self._interface is not None:
-            self._interface.send_command(CmdFanPower(percent))
+            self._interface.send_command(CmdFanPowerOverride(percent))
 
     def _led_update(self, led_state: List[RGBW], print_time: Optional[float]) -> None:
         for i, (led, clr) in enumerate(self.led_colour_idxs):
@@ -876,6 +905,8 @@ class Nevermore:
 
         self._interface.send_command(self._configuration)
         self._interface.send_command(self._fan_policy)
+        self._interface.send_command(self._fan_power_auto)
+        self._interface.send_command(self._fan_power_coeff)
         self._interface.send_command(CmdWs2812Length(len(self.led_colour_idxs)))
         self._interface.send_command(CmdWs2812MarkDirty())
 

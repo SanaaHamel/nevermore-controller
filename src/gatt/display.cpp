@@ -10,7 +10,7 @@
 using namespace std;
 using namespace BLE;
 
-#define DISPLAY_BRIGHTNESS 2B04_03
+#define DISPLAY_BRIGHTNESS 2B04_05
 
 namespace nevermore::gatt::display {
 

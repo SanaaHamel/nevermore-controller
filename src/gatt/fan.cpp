@@ -16,6 +16,8 @@ using namespace std;
 
 #define FAN_POWER 2B04_01
 #define FAN_POWER_OVERRIDE 2B04_02
+#define FAN_POWER_AUTOMATIC 2B04_03
+#define FAN_POWER_COEFFICIENT 2B04_04
 #define TACHOMETER 03f61fe0_9fe7_4516_98e6_056de551687f_01
 #define FAN_POWER_TACHO_AGGREGATE 79cd747f_91af_49a6_95b2_5b597c683129_01
 // NB: Error prone, but we're the 2nd aggregation char instance in the DB
@@ -44,7 +46,9 @@ static_assert(pwm_gpio_to_channel_(PIN_FAN_TACHOMETER) == PWM_CHAN_B, "can only 
 FanPolicyEnvironmental g_fan_policy;
 
 BLE::Percentage8 g_fan_power = 0;
-BLE::Percentage8 g_fan_power_override;  // not-known -> automatic control
+BLE::Percentage8 g_fan_power_override;           // not-known -> automatic control
+BLE::Percentage8 g_fan_power_automatic = 100;    // not-known -> disallowed
+BLE::Percentage8 g_fan_power_coefficient = 100;  // not-known -> disallowed
 nevermore::sensors::Tachometer g_tachometer{PIN_FAN_TACHOMETER, TACHOMETER_PULSE_PER_REVOLUTION};
 
 struct [[gnu::packed]] FanPowerTachoAggregate {
@@ -55,6 +59,8 @@ struct [[gnu::packed]] FanPowerTachoAggregate {
 struct [[gnu::packed]] Aggregate {
     BLE::Percentage8 power = g_fan_power;
     BLE::Percentage8 power_override = g_fan_power_override;
+    BLE::Percentage8 power_automatic = g_fan_power_automatic;
+    BLE::Percentage8 power_coefficient = g_fan_power_coefficient;
     RPM16 tachometer = FanPowerTachoAggregate{}.tachometer;
 };
 
@@ -67,12 +73,13 @@ auto g_notify_aggregate = NotifyState<[](hci_con_handle_t conn) {
 }>();
 
 void fan_power_set(BLE::Percentage8 power) {
-    if (g_fan_power == power) return;
-    g_fan_power = power;
-    g_notify_fan_power_tacho_aggregate.notify();  // `g_fan_power` changed
-    g_notify_aggregate.notify();                  // `g_fan_power` changed
+    if (g_fan_power != power) {
+        g_fan_power = power;
+        g_notify_fan_power_tacho_aggregate.notify();  // `g_fan_power` changed
+        g_notify_aggregate.notify();                  // `g_fan_power` changed
+    }
 
-    auto scale = power.value_or(0) / 100;  // enable automatic control if `NOT_KNOWN`
+    auto scale = (power.value_or(0) / 100.) * (g_fan_power_coefficient.value_or(0) / 100.);
     auto duty = uint16_t(numeric_limits<uint16_t>::max() * scale);
     pwm_set_gpio_duty(PIN_FAN_PWM, duty);
 }
@@ -128,7 +135,7 @@ bool init() {
         static auto g_instance = g_fan_policy.instance();
         if (g_fan_power_override != BLE::NOT_KNOWN) return;
 
-        fan_power_set(g_instance(nevermore::sensors::g_sensors) * 100);
+        fan_power_set(g_instance(nevermore::sensors::g_sensors) * g_fan_power_automatic.value_or(0));
     });
 
     return true;
@@ -144,6 +151,8 @@ optional<uint16_t> attr_read(
     switch (att_handle) {
         USER_DESCRIBE(FAN_POWER, "Fan %")
         USER_DESCRIBE(FAN_POWER_OVERRIDE, "Fan % - Override")
+        USER_DESCRIBE(FAN_POWER_AUTOMATIC, "Fan % - Automatic Coefficient")
+        USER_DESCRIBE(FAN_POWER_COEFFICIENT, "Fan % - Limiting Coefficient")
         USER_DESCRIBE(TACHOMETER, "Fan RPM")
         USER_DESCRIBE(FAN_POWER_TACHO_AGGREGATE, "Aggregated Fan % and RPM")
         USER_DESCRIBE(FAN_AGGREGATE, "Aggregated Service Data")
@@ -154,6 +163,8 @@ optional<uint16_t> attr_read(
 
         READ_VALUE(FAN_POWER, g_fan_power)
         READ_VALUE(FAN_POWER_OVERRIDE, g_fan_power_override)
+        READ_VALUE(FAN_POWER_AUTOMATIC, g_fan_power_automatic)
+        READ_VALUE(FAN_POWER_COEFFICIENT, g_fan_power_coefficient)
         READ_VALUE(TACHOMETER, FanPowerTachoAggregate{}.tachometer)
         READ_VALUE(FAN_POWER_TACHO_AGGREGATE, FanPowerTachoAggregate{})
         READ_VALUE(FAN_AGGREGATE, Aggregate{});  // default init populate from global state
@@ -184,6 +195,22 @@ optional<int> attr_write(hci_con_handle_t conn, uint16_t att_handle, uint16_t of
 
     case HANDLE_ATTR(FAN_POWER_OVERRIDE, VALUE): {
         fan_power_override((BLE::Percentage8)consume);
+        return 0;
+    }
+
+    case HANDLE_ATTR(FAN_POWER_AUTOMATIC, VALUE): {
+        BLE::Percentage8 value = consume;
+        if (value == BLE::NOT_KNOWN) throw AttrWriteException(ATT_ERROR_VALUE_NOT_ALLOWED);
+
+        g_fan_power_automatic = value;
+        return 0;
+    }
+
+    case HANDLE_ATTR(FAN_POWER_COEFFICIENT, VALUE): {
+        BLE::Percentage8 value = consume;
+        if (value == BLE::NOT_KNOWN) throw AttrWriteException(ATT_ERROR_VALUE_NOT_ALLOWED);
+
+        g_fan_power_coefficient = value;
         return 0;
     }
 

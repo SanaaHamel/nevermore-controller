@@ -357,6 +357,19 @@ connection_initial_timeout: 10
 led_colour_order: GBR
 led_chain_count: 16
 
+# Optional - Fan Options
+# Various settings for the fan.
+# Values given here are also the defaults.
+
+# float \in [0, 1] - Fan power used when the automatic fan policy is active.
+fan_power_automatic: 1
+
+# float \in [0, 1] - Coefficient applied to the fan power.
+# i.e. Limits the maximum speed of the fan. Useful for things like managing noise.
+# e.g. At 0.75, requesting 100% power will run the fan at 75% power.
+fan_power_coefficient: 1
+
+
 # Optional - Fan Policy
 # Controls how/when the fan turns on automatically.
 # Values given here are also the defaults.
@@ -534,6 +547,8 @@ SET_FAN_SPEED FAN=nevermore_fan
 ```
 
 WARNING: Setting the fan speed to 0 in Mainsail/Fluidd UI does **not** clear the control override. It just sets it to zero. (i.e. disables the fan)
+
+If you would like to limit the maximum speed of the fan, e.g. to reduce noise, xref:klipper-config-full[set `fan_power_coefficient` to a value < 1].
 
 == Credits
 
