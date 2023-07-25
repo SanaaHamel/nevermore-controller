@@ -874,6 +874,7 @@ class Nevermore:
         self._interface.send_command(self._configuration)
         self._interface.send_command(self._fan_policy)
         self._interface.send_command(CmdWs2812Length(len(self.led_colour_idxs)))
+        self._interface.send_command(CmdWs2812MarkDirty())
 
     def _handle_request_restart(self, print_time: Optional[float]):
         self._handle_shutdown()
