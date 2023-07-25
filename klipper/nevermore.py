@@ -871,6 +871,9 @@ class Nevermore:
             raise self.printer.config_error("nevermore failed to connect - timed out")
 
     def handle_controller_connect(self) -> None:
+        if self._interface is None:
+            return  # defensive: potential race between shutdown notice and connection
+
         self._interface.send_command(self._configuration)
         self._interface.send_command(self._fan_policy)
         self._interface.send_command(CmdWs2812Length(len(self.led_colour_idxs)))
