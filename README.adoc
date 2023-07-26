@@ -100,7 +100,12 @@ cd nevermore-controller
 ./install-klipper-module.bash
 ```
 
-. Add nevermore your printer config. Here's a xref:klipper-config-minimal[trivial configuration example], and xref:klipper-config-full[see here for complete documentation].
+. If you're using Mainsail OS then the install script will ask if you wish to enable BlueTooth.
+Do so, and then restart your Klipper host. (e.g. `sudo reboot`)
+
+. Add nevermore your printer config. xref:klipper-config-minimal[Here's a trivial configuration example you can use.]
++
+xref:klipper-config-full[See here for complete documentation.]
 
 . Update your printer macros.
 
@@ -184,7 +189,7 @@ If `bluetoothctl` works fine and the scan lists the Nevermore controller then so
 [#faq-mainsail-os]
 * I'm using MainsailOS and...
 +
-This distro disables BlueTooth by default. footnote:[Mainsail OS disabled BlueTooth to enable hardware UART on Raspberry Pi SBCs.] Please follow https://docs-os.mainsail.xyz/faq/enable-bluetooth-on-rpi[this guide] to enable BlueTooth.
+This distro disables BlueTooth by default. footnote:[Mainsail OS disabled BlueTooth to enable hardware UART on Raspberry Pi SBCs.] Please follow https://docs-os.mainsail.xyz/faq/enable-bluetooth-on-rpi[this guide] to enable BlueTooth. Alternatively, the install script will attempt to apply the changes for you.
 +
 Alternatively, you can flash Klipper to the Pico and use it like any other Klipper MCU.
 +
@@ -262,8 +267,6 @@ WARNING: The default assignments are tentative and will probably change after we
 
 [#klipper-requirements]
 === Requirements
-
-NOTE: xref:faq-mainsail-os[MainsailOS deliberately disables BlueTooth.]
 
 * xref:faq-is-the-bluetooth-on[Working BlueTooth on your Klipper host.]
 * Klipper using Python 3.7+

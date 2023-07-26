@@ -79,6 +79,46 @@ check_folders()
     echo "Moonraker configuration found at $MOONRAKER_CONFIG_DIR"
 }
 
+fix_mainsail_os_bluetooth()
+{
+    BOOT_CONFIG="/boot/config.txt"
+
+    if [ -f "$BOOT_CONFIG" ] && grep -q "^\s*dtoverlay=disable-bt\s*\(#.*\)\?$" "$BOOT_CONFIG"; then
+        echo "It looks like you're using Mainsail OS and the BlueTooth is currently disabled."
+        echo "Do you wish to enable it now?"
+        echo "WARNING:  Do not do this if you're using the UART to communicate with your board."
+        echo "          This will disable the UART on Raspberry Pis."
+        echo "Details:  https://docs-os.mainsail.xyz/faq/enable-bluetooth-on-rpi"
+
+        while true; do
+            read -r -p "Enable BlueTooth? [yn]" ANSWER
+            case $ANSWER in
+                [Yy])
+                    echo "Enabling hciuart service... "
+                    sudo systemctl enable hciuart.service
+                    echo "[OK]"
+                    echo "Enabling bluetooth service... "
+                    sudo systemctl enable bluetooth.service
+                    echo "[OK]"
+                    echo "Editing \`$BOOT_CONFIG\`... "
+                    sudo sed -i -E "s/^(\s*enable_uart=1\s*(#.*)?)$/#\1/g" "$BOOT_CONFIG"
+                    sudo sed -i -E "s/^(\s*dtoverlay=disable-bt\s*(#.*)?)$/#\1/g" "$BOOT_CONFIG"
+                    echo "[OK]"
+                    echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
+                    echo "!!!! REBOOT REQUIRED TO TAKE EFFECT !!!!"
+                    echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
+                    break;;
+                [Nn])
+                    echo "BlueTooth is required for this module. Exiting."
+                    exit -1;;
+                *) echo "Enable BlueTooth? [yn]";;
+            esac
+        done
+    else
+        echo "[OK] No \`dtoverlay=disable-bt\` found in \`$BOOT_CONFIG\`"
+    fi
+}
+
 # Link extension to Klipper
 link_extension()
 {
@@ -155,6 +195,7 @@ check_klipper
 check_folders
 stop_klipper
 if [[ "$UNINSTALL" != 1 ]]; then
+    fix_mainsail_os_bluetooth
     link_extension
     add_updater
 else
