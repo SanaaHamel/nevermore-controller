@@ -48,7 +48,7 @@ void hci_handler(uint8_t packet_type, [[maybe_unused]] uint16_t channel, uint8_t
 
         bd_addr_t local_addr;
         gap_local_bd_addr(local_addr);
-        printf("BTstack up and running on %s.\n", bd_addr_to_str(local_addr));
+        printf("BLE GATT - ready; address is %s.\n", bd_addr_to_str(local_addr));
 
         // setup advertisements
         static_assert(sizeof(ADVERT) <= 31, "too large for non-extended advertisement");
