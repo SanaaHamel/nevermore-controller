@@ -44,8 +44,8 @@ constexpr auto SENSOR_UPDATE_PERIOD = 1s;
 static_assert(0.5s <= SENSOR_UPDATE_PERIOD,
         "SENSOR_UPDATE_PERIOD too low, SGP40 needs at least 0.5s between measures.");
 
-constexpr auto ADVERTISE_INTERVAL_MIN = 1000ms;
-constexpr auto ADVERTISE_INTERVAL_MAX = 1000ms;
+constexpr auto ADVERTISE_INTERVAL_MIN = 300ms;
+constexpr auto ADVERTISE_INTERVAL_MAX = 500ms;
 
 // Set to desired baud rate. Most sensors support 400 kbit/s.
 // Compile time error checks will trigger if set too high for included sensors.

@@ -16,8 +16,9 @@ namespace nevermore {
 
 static_assert(PIN_MAX == 30, "Told you not to alter this!");
 
-static_assert(ADVERTISE_INTERVAL_MIN <= ADVERTISE_INTERVAL_MAX,
-        "`config.hpp`'s `ADVERTISE_INTERVAL_MIN` must be <= `ADVERTISE_INTERVAL_MAX`");
+// Spec recommends you give the BT controller some slack in picking an advert interval.
+static_assert(ADVERTISE_INTERVAL_MIN < ADVERTISE_INTERVAL_MAX,
+        "`config.hpp`'s `ADVERTISE_INTERVAL_MIN` must be < `ADVERTISE_INTERVAL_MAX`");
 static_assert(BT_ADVERTISEMENT_INTERVAL_MIN <= ADVERTISE_INTERVAL_MIN,
         "`config.hpp`'s `ADVERTISE_INTERVAL_MIN` is set too low. Minimum is 100ms.");
 
