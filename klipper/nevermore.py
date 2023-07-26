@@ -904,6 +904,7 @@ class Nevermore:
             self.connection_initial_timeout != 0
             and not self._interface.wait_for_connection(self.connection_initial_timeout)
         ):
+            self._interface.disconnect()  # the deadline was blown, it doesn't need to keep trying.
             raise self.printer.config_error("nevermore failed to connect - timed out")
 
     def handle_controller_connect(self) -> None:
