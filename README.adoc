@@ -329,19 +329,23 @@ layers:
 
 WARNING: Don't copy-paste this into your config/ It won't give you a working setup. xref:guide-setup[Follow the setup guide if you have any doubts.]
 
-This section lists all options and defaults. Some minor examples are also provided
+This section lists all options and defaults. Some minor examples are also provided.
+
+NOTE: The values shown here are either the default for that option or a placeholder.
 
 ```ini
 # DON'T JUST COPY PASTE THIS INTO YOUR CONFIG.
 # READ THE SETUP GUIDE.
 
 [nevermore]
-# Optional - Can omit if you have only one nevermore in range.
+# Can omit if you have only one nevermore in range.
 # See <<Finding The BT Address>> for more info.
+# NOTE: Providing an address will make startup slightly faster.
+#       (If no address is provided then the system must spend extra time
+#        verifying that there's only one nearby Nevermore.)
 # example - `bt_address: 43:43:A2:12:1F:AC`
-bt_address: XX:XX:XX:XX:XX:XX
+bt_address: <optional, omitted by default>
 
-# Optional
 # seconds, how long to wait before reporting that the Nevermore is missing.
 # If set to 0, this will disable the startup check and instead of an error,
 # it'll keep trying to connect in the background.
@@ -350,16 +354,15 @@ bt_address: XX:XX:XX:XX:XX:XX
 # NOTE:     The module always quietly keeps trying to reconnect if connection is lost after startup.
 connection_initial_timeout: 10
 
-# Optional - LED
+# LED
 # For the optional LED ring feature.
 # Members generally behaves like the WS2812 klipper module.
 # (e.g. supports heterogenous pixel chains)
 led_colour_order: GBR
-led_chain_count: 16
+led_chain_count: 0
 
-# Optional - Fan Options
+# Fan Options
 # Various settings for the fan.
-# Values given here are also the defaults.
 
 # float \in [0, 1] - Fan power used when the automatic fan policy is active.
 fan_power_automatic: 1
@@ -370,9 +373,8 @@ fan_power_automatic: 1
 fan_power_coefficient: 1
 
 
-# Optional - Fan Policy
+# Fan Policy
 # Controls how/when the fan turns on automatically.
-# Values given here are also the defaults.
 
 # seconds, how long to keep filtering after the policy would otherwise stop
 fan_policy_cooldown: 900
@@ -381,7 +383,7 @@ fan_policy_voc_passive_max: 125
 # voc index, 0 to disable, filter if the intake exceeds exhaust by at least this much
 fan_policy_voc_improve_min: 5
 
-# Optional - Misc. Sensor Options
+# Misc. Sensor Options
 
 # If temperature, humidity, etc, is unavailable on one side of the filter then
 # report the value from the other side (if available).
@@ -395,20 +397,20 @@ sensors_fallback_exhaust_mcu: false
 
 
 [temperature_sensor nevermore_sensor]
-sensor_type: NevermoreSensor
+sensor_type: NevermoreSensor # fixed, must be `NevermoreSensor`
 
-# required - valid values: `intake`, `exhaust`
-sensor_kind: intake
+# valid values: `intake`, `exhaust`
+sensor_kind: <required, no defaults>
 
-# optional
 # If you do not wish to edit your mainsail installation to add `NevermoreSensor`,
-# to its list of known sensors, you can use an already recognised classname (e.g. `bme280`)
-class_name_override: bme280
+# to its list of known sensors, you can use an already recognised classname.
+# Using `bme280` is strongly suggested, at least until the relevant PRs are merged.
+class_name_override: <optional, not set by default>
 
-# optional - default: false
 # Pretends the VOC index is a temperature, allowing it to be plotted in Mainsail/Fluidd.
-# Setting this to true will suppress the all other readings for this sensor object. (e.g. temperature, pressure, etc)
-plot_voc: true
+# Setting this to `true` will suppress the all other readings for this sensor object.
+# (e.g. temperature, pressure, etc)
+plot_voc: false
 
 ```
 
