@@ -363,7 +363,7 @@ connection_initial_timeout: <default varies based on whether `bt_address` is set
 # For the optional LED ring feature.
 # Members generally behaves like the WS2812 klipper module.
 # (e.g. supports heterogenous pixel chains)
-led_colour_order: GBR
+led_colour_order: GRB
 led_chain_count: 0
 
 # Fan Options
