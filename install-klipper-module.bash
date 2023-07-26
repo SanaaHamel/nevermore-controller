@@ -17,11 +17,12 @@ fi
 
 UNINSTALL=0
 KLIPPER_PATH="${HOME}/klipper"
+KLIPPER_ENV_PATH="${HOME}/klippy-env"
 MOONRAKER_CONFIG_DIR="${HOME}/printer_data/config"
 
 # Fall back to old directory for configuration as default
 if [ ! -d "${MOONRAKER_CONFIG_DIR}" ]; then
-    echo "\"$MOONRAKER_CONFIG_DIR\" does not exist. Falling back to ""${HOME}"/klipper_config" as default."
+    echo "\`$MOONRAKER_CONFIG_DIR\` does not exist. Falling back to \`${HOME}/klipper_config\` as default."
     MOONRAKER_CONFIG_DIR="${HOME}/klipper_config"
 fi
 
@@ -50,16 +51,10 @@ check_klipper()
         exit -1
     fi
 
-    if [ ! -f "${HOME}/klippy-env/bin/pip" ]; then
-        echo "[ERROR] '${HOME}/klippy-env/bin/pip' is not a file"
+    if [ ! -f "$KLIPPER_ENV_PATH/bin/pip" ]; then
+        echo "[ERROR] '$KLIPPER_ENV_PATH/bin/pip' is not a file"
         echo "[ERROR] This can happen if you didn't install Klipper via Kiauh."
         echo "[ERROR] This is not a supported scenario at this time, pardon."
-        exit -1
-    fi
-
-    if ! "${HOME}/klippy-env/bin/pip" --version | grep "(python 3\(\.[0-9]\+\)*)" >> /dev/null; then
-        echo "[ERROR] Klipper doesn't seem to be using Python 3."
-        echo "[ERROR] NOTE: You can reinstall Klipper w/ Python 3 using Kliauh. (Backup your config!)"
         exit -1
     fi
 }
@@ -83,7 +78,9 @@ fix_mainsail_os_bluetooth()
 {
     BOOT_CONFIG="/boot/config.txt"
 
+    echo -n "Checking for Mainsail OS & BlueTooth issue... "
     if [ -f "$BOOT_CONFIG" ] && grep -q "^\s*dtoverlay=disable-bt\s*\(#.*\)\?$" "$BOOT_CONFIG"; then
+        echo "[FAILED]"
         echo "It looks like you're using Mainsail OS and the BlueTooth is currently disabled."
         echo "Do you wish to enable it now?"
         echo "WARNING:  Do not do this if you're using the UART to communicate with your board."
@@ -94,13 +91,13 @@ fix_mainsail_os_bluetooth()
             read -r -p "Enable BlueTooth? [yn]" ANSWER
             case $ANSWER in
                 [Yy])
-                    echo "Enabling hciuart service... "
+                    echo -n "Enabling hciuart service... "
                     sudo systemctl enable hciuart.service
                     echo "[OK]"
-                    echo "Enabling bluetooth service... "
+                    echo -n "Enabling bluetooth service... "
                     sudo systemctl enable bluetooth.service
                     echo "[OK]"
-                    echo "Editing \`$BOOT_CONFIG\`... "
+                    echo -n "Editing \`$BOOT_CONFIG\`... "
                     sudo sed -i -E "s/^(\s*enable_uart=1\s*(#.*)?)$/#\1/g" "$BOOT_CONFIG"
                     sudo sed -i -E "s/^(\s*dtoverlay=disable-bt\s*(#.*)?)$/#\1/g" "$BOOT_CONFIG"
                     echo "[OK]"
@@ -115,7 +112,58 @@ fix_mainsail_os_bluetooth()
             esac
         done
     else
-        echo "[OK] No \`dtoverlay=disable-bt\` found in \`$BOOT_CONFIG\`"
+        echo "[OK]"
+    fi
+}
+
+fix_python2()
+{
+    KLIPPER_ENV_BACKUP_PATH="$KLIPPER_ENV_PATH-backup-python2"
+
+    echo -n "Checking for Python 3... "
+    if ! "$KLIPPER_ENV_PATH/bin/pip" --version | grep "(python 3\(\.[0-9]\+\)*)" >> /dev/null; then
+        echo "[FAILED]"
+        echo "Klipper appears to be using python 2. This module requires Python 3.7+."
+        echo "Do you wish to try to upgrade to Python 3?"
+        echo ""
+        echo "WARNING:  This will uninstall any dependencies that aren't required by Klipper."
+        echo "          You may need to re-run install scripts for other Klipper extensions."
+
+        while true; do
+            read -r -p "Upgrade installation to Python 3? [yn]" ANSWER
+            case $ANSWER in
+                [Yy])
+                    echo -n "Installing Python 3... "
+                    sudo apt-get install python3-dev python3-matplotlib
+                    echo "[OK]"
+
+                    echo -n "Backing up existing \`$KLIPPER_ENV_PATH\` to \`$KLIPPER_ENV_BACKUP_PATH\`... "
+                    mv "$KLIPPER_ENV_PATH" "$KLIPPER_ENV_BACKUP_PATH"
+                    echo "[OK]"
+
+                    echo -n "Setting up python3 env... "
+                    if ! virtualenv -p python3 "$KLIPPER_ENV_PATH" &&
+                         "$KLIPPER_ENV_PATH/bin/pip" install -r "$KLIPPER_PATH/scripts/klippy-requirements.txt"; then
+                        echo "[ERROR]"
+                        echo -n "Reverting env change... "
+                        rm -r "$KLIPPER_ENV_PATH" || true
+                        mv "$KLIPPER_ENV_BACKUP_PATH" "$KLIPPER_ENV_PATH"
+                        echo "[OK]"
+                        exit -1
+                    fi
+
+                    echo "[OK]"
+                    break;;
+
+                [Nn])
+                    echo "Python 3.7+ is required for this module. Exiting."
+                    exit -1;;
+
+                *) echo "Upgrade installation to Python 3? [yn]";;
+            esac
+        done
+    else
+        echo "[OK]"
     fi
 }
 
@@ -126,7 +174,7 @@ link_extension()
     ln -sf "${ROOT_DIR}/klipper/nevermore.py" "${KLIPPER_PATH}/klippy/extras/nevermore.py"
     echo "[OK]"
     echo "Installing python dependencies... "
-    "${HOME}/klippy-env/bin/pip" install bleak janus typing_extensions
+    "$KLIPPER_ENV_PATH/bin/pip" install bleak janus typing_extensions
 }
 
 # Restart moonraker
@@ -196,6 +244,7 @@ check_folders
 stop_klipper
 if [[ "$UNINSTALL" != 1 ]]; then
     fix_mainsail_os_bluetooth
+    fix_python2
     link_extension
     add_updater
 else
