@@ -65,7 +65,7 @@ void hci_handler(uint8_t packet_type, uint16_t channel, uint8_t* packet, uint16_
         environmental::disconnected(conn);
         fan::disconnected(conn);
         ws2812::disconnected(conn);
-    };
+    } break;
     }
 }
 
