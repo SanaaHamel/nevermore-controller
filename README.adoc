@@ -184,9 +184,7 @@ If `bluetoothctl` works fine and the scan lists the Nevermore controller then so
 [#faq-mainsail-os]
 * I'm using MainsailOS and...
 +
-This distro disables BlueTooth by default. footnote:[Mainsail OS disabled BlueTooth to enable hardware UART on Raspberry Pi SBCs.] Unless you're very familiar with Linux, it'll likely be easier to install a new OS. I suggest using a recent Debian and https://github.com/th33xitus/kiauh[KIAUH].
-+
-WARNING: Make sure you back up the `~/printer_data` directory!
+This distro disables BlueTooth by default. footnote:[Mainsail OS disabled BlueTooth to enable hardware UART on Raspberry Pi SBCs.] Please follow https://docs-os.mainsail.xyz/faq/enable-bluetooth-on-rpi[this guide] to enable BlueTooth.
 +
 Alternatively, you can flash Klipper to the Pico and use it like any other Klipper MCU.
 +
