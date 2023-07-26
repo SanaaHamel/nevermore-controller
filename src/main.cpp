@@ -107,7 +107,7 @@ int main() {
     printf("SPI bus %d running at %u baud/s (requested %u baud/s)\n", spi_gpio_bus_num(PINS_DISPLAY_SPI[0]),
             spi_init(spi, SPI_BAUD_RATE_DISPLAY), unsigned(SPI_BAUD_RATE_DISPLAY));
 
-    mk_task("main", Priority::Idle, 1024)([]() {
+    mk_task("startup", Priority::Startup, 1024)([]() {
         if (auto err = cyw43_arch_init()) {
             panic("ERR - cyw43_arch_init failed = 0x%08x\n", err);
         }
@@ -124,7 +124,9 @@ int main() {
             cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, led_on);
         });
 
-        btstack_run_loop_execute();  // !! NO-RETURN
+        mk_task("bluetooth", Priority::Communication, 1024)(btstack_run_loop_execute).release();
+
+        vTaskDelete(nullptr);  // we're done, delete ourselves
     }).release();
 
     vTaskStartScheduler();  // !! NO-RETURN

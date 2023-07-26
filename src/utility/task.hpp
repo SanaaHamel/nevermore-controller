@@ -10,11 +10,10 @@ namespace nevermore {
 
 enum class Priority : UBaseType_t {
     Idle = 0,
-    Low,
     Display,
     Sensors,
     Communication,
-    Max,
+    Startup,
 };
 
 struct Task {
