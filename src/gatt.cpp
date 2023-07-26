@@ -57,8 +57,15 @@ void hci_handler(uint8_t packet_type, [[maybe_unused]] uint16_t channel, uint8_t
         gap_advertisements_enable(1);
     } break;
 
+    case ATT_EVENT_CONNECTED: {
+        auto const conn = att_event_connected_get_handle(packet);
+        printf("BLE GATT - connected conn=%d\n", conn);
+    } break;
+
     case ATT_EVENT_DISCONNECTED: {
-        auto conn = att_event_disconnected_get_handle(packet);
+        auto const conn = att_event_disconnected_get_handle(packet);
+        printf("BLE GATT - disconnected conn=%d\n", conn);
+
         configuration::disconnected(conn);
         display::disconnected(conn);
         environmental::disconnected(conn);
@@ -137,8 +144,7 @@ bool init() {
     hci_add_event_handler(&g_hci_handler);
 
     att_server_init(profile_data, attr_read, attr_write);
-    // not interested in attribute events for now, we have no indicator/notify attributes
-    // att_server_register_packet_handler(att_handler);
+    att_server_register_packet_handler(hci_handler);
 
     gap_set_max_number_peripheral_connections(MAX_NR_HCI_CONNECTIONS);
 
