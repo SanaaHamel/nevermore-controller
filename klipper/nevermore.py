@@ -614,9 +614,9 @@ class NevermoreBackgroundWorker:
                     # remember the discovered device's address, just in case another
                     # controller wanders into range and we need to reconnect to this one
                     if device_address is None:
-                        worker_log.info(f"discovered controller {devices[0].address}")
                         device_address = devices[0].address
 
+                    worker_log.info(f"discovered controller {devices[0].address}")
                     async with BleakClient(devices[0]) as client:
                         await self._worker_using(worker_log, client)
                 except TimeoutError:
