@@ -101,7 +101,8 @@ int attr_write(hci_con_handle_t conn, uint16_t attr, uint16_t transaction_mode, 
 
     // We don't support any kind of transaction modes.
     if (transaction_mode != ATT_TRANSACTION_MODE_NONE) {
-        printf("WARN - BLE GATT - attr_write unhandled transaction mode 0x%04x\n", int(transaction_mode));
+        printf("WARN - BLE GATT - attr_write unhandled transaction mode 0x%04x w/ attr=%d (conn=%d)\n",
+                transaction_mode, attr, conn);
         return 0;
     }
 
