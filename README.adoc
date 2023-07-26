@@ -346,13 +346,18 @@ NOTE: The values shown here are either the default for that option or a placehol
 # example - `bt_address: 43:43:A2:12:1F:AC`
 bt_address: <optional, omitted by default>
 
-# seconds, how long to wait before reporting that the Nevermore is missing.
-# If set to 0, this will disable the startup check and instead of an error,
-# it'll keep trying to connect in the background.
-# WARNING:  Don't use 0 unless you've already tested that it can connect to the Nevermore.
-# WARNING:  If you set this < 5 you will likely have trouble connecting to the Nevermore.
-# NOTE:     The module always quietly keeps trying to reconnect if connection is lost after startup.
-connection_initial_timeout: 10
+# seconds, 0 to disable, how long to wait before reporting that the Nevermore is missing.
+# If disabled (set to 0) the module will keep trying to connect in the background.
+# Disabling this requires that `bt_address` is set.
+#
+# WARNING:  Do not disable unless you've already tested that it can connect to the Nevermore.
+# WARNING:  If you set this < 10 you will likely have trouble connecting to the Nevermore.
+# NOTE:     The module quietly keeps trying to reconnect if connection is lost after startup.
+# NOTE:     It takes some amount of time to reliably scan & connect to Nevermore.
+#           This varies on a few factors outside of your control, so the system
+#           will reject unfeasibly small timeout values to keep you from screwing
+#           yourself over.
+connection_initial_timeout: <default varies based on whether `bt_address` is set>
 
 # LED
 # For the optional LED ring feature.

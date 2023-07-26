@@ -47,6 +47,17 @@ __all__ = [
     "load_config",
 ]
 
+# Non-configurable constants
+CONTROLLER_ADVERTISEMENT_PERIOD = 0.5  # seconds, upper bound on adverts
+CONTROLLER_CONNECTION_DELAY = 5  # seconds, expected upper bound based on tests
+
+# Derived constants
+# must cover at least 2-3 advert periods
+BT_SCAN_KNOWN_ADDRESS_TIMEOUT = CONTROLLER_ADVERTISEMENT_PERIOD * 2
+# If we're just trying to connect to any Nevermore, make extra sure there's only one.
+BT_SCAN_GATHER_ALL_TIMEOUT = BT_SCAN_KNOWN_ADDRESS_TIMEOUT * 4
+
+
 _A = TypeVar("_A")
 _Float = TypeVar("_Float", bound=float)
 
@@ -310,7 +321,7 @@ def require_char(
 
 
 async def discover_controllers(
-    address: Optional[str] = None, timeout: float = 10
+    address: Optional[str] = None, timeout: float = BT_SCAN_GATHER_ALL_TIMEOUT
 ) -> List[BLEDevice]:
     NAME_SHORTENED = "Nevermore"
     NAME_COMPLETE = "Nevermore Controller"
@@ -575,16 +586,7 @@ class NevermoreBackgroundWorker:
 
         self._thread.name = nevermore.name
         device_address = nevermore.bt_address
-        timeout = nevermore.connection_initial_timeout
         nevermore = None  # release reference otherwise call frame keeps it alive
-
-        # if it's 0 (i.e. no-initial-timeout), then it doesn't matter how long we try
-        if timeout == 0:
-            timeout = 10
-        else:
-            # * 0.75 b/c scan must finish before main thread times out waiting
-            # for initial connection check
-            timeout *= 0.75
 
         worker_log = LogPrefixed(LOG, lambda x: f"{self._thread.name} - {x}")
 
@@ -592,7 +594,12 @@ class NevermoreBackgroundWorker:
             # Attempt (re)connection. Might have to do this multiple times if we lose connection.
             while True:
                 try:
-                    devices = await discover_controllers(device_address, timeout)
+                    scan_timeout = (
+                        BT_SCAN_GATHER_ALL_TIMEOUT
+                        if device_address is None
+                        else BT_SCAN_KNOWN_ADDRESS_TIMEOUT
+                    )
+                    devices = await discover_controllers(device_address, scan_timeout)
                     if not devices:
                         continue  # no devices found, try again
 
@@ -834,9 +841,29 @@ class Nevermore:
                     f"invalid bluetooth address for `bt_address`, given `{self.bt_address}`"
                 )
 
-        self.connection_initial_timeout: float = config.getfloat(
-            "connection_initial_timeout", 10, minval=0
+        bt_scan_timeout = (
+            BT_SCAN_GATHER_ALL_TIMEOUT
+            if self.bt_address is None
+            else BT_SCAN_KNOWN_ADDRESS_TIMEOUT
         )
+        # never gonna reliable find the controller if we don't scan long enough
+        connection_initial_min = CONTROLLER_CONNECTION_DELAY + bt_scan_timeout
+        self.connection_initial_timeout: float = config.getfloat(
+            "connection_initial_timeout",
+            CONTROLLER_CONNECTION_DELAY + bt_scan_timeout * 2,
+            minval=0,
+        )
+        if (
+            self.connection_initial_timeout != 0
+            and self.connection_initial_timeout < connection_initial_min
+        ):
+            raise config.error(
+                f"`connection_initial_timeout` must either be 0 or >= {connection_initial_min}."
+            )
+        if self.connection_initial_timeout == 0 and self.bt_address is None:
+            raise config.error(
+                f"`connection_initial_timeout` cannot be 0 if `bt_address` is not specified."
+            )
 
         # LED-specific code.
         # Ripped from `extras/neopixel.py` because the processing code is entangled with MCU transmission.
