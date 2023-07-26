@@ -87,6 +87,10 @@ uint16_t attr_read(
 
 int attr_write(hci_con_handle_t conn, uint16_t attr, uint16_t transaction_mode, uint16_t offset,
         uint8_t* buffer, uint16_t buffer_size) {
+    // `attr == 0` is an invalid handle, but the combination of `attr == 0` and a cancel transaction means
+    // 'drop everything pending, the other side has disconnected'.
+    // For us, this means a no-op; we don't support transactions so there's nothing to cancel.
+    if (attr == 0 && transaction_mode == ATT_TRANSACTION_MODE_CANCEL) return 0;
     if (buffer_size < offset) return ATT_ERROR_INVALID_OFFSET;
 
     // We don't support any kind of transaction modes.
