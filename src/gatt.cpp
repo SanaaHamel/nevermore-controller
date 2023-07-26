@@ -37,9 +37,8 @@ constexpr tuple ADVERT{
         services<ORG_BLUETOOTH_SERVICE_ENVIRONMENTAL_SENSING>(),
 };
 
-void hci_handler(uint8_t packet_type, uint16_t channel, uint8_t* packet, uint16_t size) {
-    UNUSED(size);
-    UNUSED(channel);
+void hci_handler(uint8_t packet_type, [[maybe_unused]] uint16_t channel, uint8_t* packet,
+        [[maybe_unused]] uint16_t size) {
     if (packet_type != HCI_EVENT_PACKET) return;
 
     auto const event_type = hci_event_packet_get_type(packet);
