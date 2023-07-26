@@ -631,6 +631,21 @@ class NevermoreBackgroundWorker:
                     )
                     if not transient:
                         raise
+                except BleakError as e:
+                    if e.args[0] == "Not connected":
+                        # don't be noisy about it, it happens
+                        worker_log.info("connection lost. attempting reconnection...")
+                    else:
+                        # be noisy about it, something unexpected happened.
+                        # try to recovery by resetting the connection.
+                        # This sucks, but there's huge variety of errors that
+                        # can happen due to a lost connection, and I can't think
+                        # of a good way to recognise them with this API.
+                        # TODO: Log this in the console area. Ostensibly you can
+                        #       do this with `GCode::response_info`, but I don't
+                        #       know if there are rules/invariants about this.
+                        #       (e.g. only the active GCode/command may write)
+                        worker_log.exception("BT error - attempting reconnection...")
 
         async def go():
             # set this up ASAP once we're in an asyncio loop
@@ -779,14 +794,6 @@ class NevermoreBackgroundWorker:
             await notify(aggregate_env, notify_env)
             await notify(aggregate_fan, notify_fan)
             await tasks
-        except BleakError as e:
-            # consider non-fatal. don't to abort due to potentially transient error
-            # special case: lost connection -> wait and attempt reconnect
-            if e.args[0] == "Not connected":
-                log.info("connection lost. attempting reconnection...")
-                return
-
-            raise  # any other kind of uncaught failure -> re-raise
         except EOFError:  # consider non-fatal, potentially transient
             return
         finally:
