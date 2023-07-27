@@ -27,7 +27,7 @@ constexpr I2C_Pin i2c_gpio_kind(uint8_t pin) {
 extern SemaphoreHandle_t g_i2c_locks[NUM_I2CS];
 
 inline auto i2c_guard(i2c_inst_t& i2c) {
-    auto& lock = g_i2c_locks[&i2c == i2c0 ? 0 : 1];  // NOLINT
+    auto& lock = g_i2c_locks[i2c_hw_index(&i2c)];  // NOLINT
     return ScopeGuard{[&] { xSemaphoreGive(lock); }};
 }
 
@@ -64,7 +64,9 @@ std::optional<PackedTuple<A...>> i2c_read_blocking_crc(i2c_inst_t& i2c, uint8_t 
     if (sizeof(response) != ret) return {};
 
     if (!response.verify()) {
-        printf("CRC failed\n");  // really should show up in a log if they've noise in their wiring
+        // really should show up in a log if they've noise in their wiring
+        printf("ERR - I2C%d - read failed CRC; device=0x%02x crc-computed=0x%02x crc-expected=0x%02x\n",
+                i2c_hw_index(&i2c), addr, response.data_crc(), response.crc);
         return {};
     }
 

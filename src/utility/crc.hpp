@@ -36,8 +36,12 @@ struct [[gnu::packed]] ResponseCRC {
     A data;
     CRC8_t crc;
 
+    [[nodiscard]] CRC8_t data_crc() const {
+        return crc8(data, CRC_INIT);
+    }
+
     [[nodiscard]] bool verify() const {
-        return crc == crc8(data, CRC_INIT);
+        return crc == data_crc();
     };
 };
 
