@@ -80,6 +80,7 @@ set(SRC_FILES ${SRC_H} ${SRC_C} ${SRC_HPP} ${SRC_CPP})
 add_compile_options(-Wall -Wno-psabi -Wno-trigraphs)
 add_compile_definitions(PARAM_ASSERTIONS_ENABLE_ALL=1)
 add_compile_definitions(WANT_HCI_DUMP=1)
+add_compile_definitions(PICO_USE_MALLOC_MUTEX=1)
 add_compile_definitions(CYW43_LWIP=0)
 
 # UGLY: Also defines the value of `nevermore::Priority::Communication`.
