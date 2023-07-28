@@ -109,19 +109,23 @@ target_include_directories(nevermore-controller PRIVATE
 
 target_link_libraries(nevermore-controller
   PRIVATE
-  lvgl::lvgl
-  lvgl::drivers
-  pico_stdlib
-  pico_cyw43_arch_sys_freertos
-  pico_btstack_ble
-  pico_btstack_cyw43
+
+  # Pico SDK
   hardware_adc
   hardware_i2c
   hardware_pio
   hardware_pwm
   hardware_spi
+  pico_btstack_ble
+  pico_btstack_cyw43
+  pico_cyw43_arch_sys_freertos
+  pico_stdlib
+
+  # Others
   FreeRTOS-Kernel
   FreeRTOS-Kernel-Heap4
+  lvgl::drivers
+  lvgl::lvgl
 )
 
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")
