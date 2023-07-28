@@ -9,7 +9,6 @@
 #include "sdk/spi.hpp"
 #include "sdk/timer.hpp"
 #include "ui.hpp"
-#include "utility/task.hpp"
 #include <algorithm>
 #include <cassert>
 #include <cstdint>
