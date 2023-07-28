@@ -133,6 +133,7 @@ if(CMAKE_BUILD_TYPE STREQUAL "Debug")
   # Specify source files explicitly b/c some SDK sources trigger warnings.
   # target_compile_options(nevermore-controller PRIVATE -Werror)
   set_source_files_properties(${SRC_FILES} PROPERTIES COMPILE_FLAGS -Werror)
+  add_compile_definitions(PICO_DEBUG_MALLOC=1)
 endif()
 
 pico_enable_stdio_usb(nevermore-controller 1)
