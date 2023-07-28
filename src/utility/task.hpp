@@ -12,7 +12,7 @@ enum class Priority : UBaseType_t {
     Idle = 0,
     Display,
     Sensors,
-    Communication,
+    Communication = CYW43_TASK_PRIORITY,  // higher priority
     Startup,
 };
 

@@ -82,6 +82,10 @@ add_compile_definitions(PARAM_ASSERTIONS_ENABLE_ALL=1)
 add_compile_definitions(WANT_HCI_DUMP=1)
 add_compile_definitions(CYW43_LWIP=0)
 
+# UGLY: Also defines the value of `nevermore::Priority::Communication`.
+# We want a priority above almost anything else.
+add_compile_definitions(CYW43_TASK_PRIORITY=100)
+
 # default is 4.
 # Current users: tinyusb w/ DCD (1), stdio w/ USB (1), CYW43 driver (1), WS2812 (1), CST816S (1), GC9A01 (1)
 add_compile_definitions(PICO_MAX_SHARED_IRQ_HANDLERS=6)
