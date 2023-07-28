@@ -9,7 +9,7 @@ namespace nevermore::sensors {
 
 namespace {
 
-constexpr uint32_t SENSOR_STACK_DEPTH = 1024;
+constexpr uint32_t SENSOR_STACK_DEPTH = 256;
 
 }
 

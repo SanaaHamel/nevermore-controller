@@ -75,9 +75,10 @@ lv_point_t top_left(lv_area_t const& coord) {
 template <typename A, typename Ratio>
 auto pretty_print_time(std::chrono::duration<A, Ratio> const& dur, char const* spec = "%.f") {
     auto format = [&](char const* unit, double value) -> std::string {
-        char buffer[256];  // b/c we apparently don't have `<format>` yet in GCC 12.2.1
-        auto n = sprintf(buffer, spec, double(value));
+        auto n = snprintf(nullptr, 0, spec, double(value));
         assert(0 <= n);
+        char buffer[n + strlen(unit) + 1];  // b/c we apparently don't have `<format>` yet in GCC 12.2.1
+        sprintf(buffer, spec, double(value));
         strcpy(buffer + n, unit);  // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
         return buffer;
     };
@@ -96,8 +97,9 @@ auto label_set(lv_obj_t* obj, char const* unk, char const* fmt, A&& value, doubl
         return;
     }
 
-    char buffer[256];  // b/c we apparently don't have `<format>` yet in GCC 12.2.1
-    sprintf(buffer, fmt, double(value) / scale);
+    // b/c we apparently don't have `<format>` yet in GCC 12.2.1
+    char buffer[32];  // labels should be short, minimise stack usage
+    snprintf(buffer, size(buffer), fmt, double(value) / scale);
     lv_label_set_text(obj, buffer);
 };
 
