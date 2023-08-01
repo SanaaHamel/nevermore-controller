@@ -12,6 +12,7 @@
 #include "sdk/spi.hpp"
 #include "sensors.hpp"
 #include "task.h"  // IWYU pragma: keep
+#include "utility/numeric_suffixes.hpp"
 #include "utility/task.hpp"
 #include "utility/timer.hpp"
 #include "ws2812.hpp"
@@ -102,6 +103,11 @@ int main() {
             unsigned(I2C_BAUD_RATE));
     printf("I2C bus 1 running at %u baud/s (requested %u baud/s)\n", i2c_init(i2c1, I2C_BAUD_RATE),
             unsigned(I2C_BAUD_RATE));
+
+    // I2C devices aren't required to understand/respond to general-call (addr 0) reset (0x06).
+    // But for those that do, hey, might as well tell them to reset in case we just rebooted.
+    i2c_write_blocking(*i2c0, 0x00, 0x06_u8);
+    i2c_write_blocking(*i2c1, 0x00, 0x06_u8);
 
     auto* spi = spi_gpio_bus(PINS_DISPLAY_SPI[0]);
     printf("SPI bus %d running at %u baud/s (requested %u baud/s)\n", spi_gpio_bus_num(PINS_DISPLAY_SPI[0]),
