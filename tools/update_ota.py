@@ -244,12 +244,10 @@ async def _main(args: CmdLnArgs):
 
     if await reboot_into_ota_mode(args.bt_address):
         print("waiting for OTA access point...")
-        async with asyncio.Timeout(CONNECT_TO_AP_TIMEOUT):
-            await _connect_to_ota_ap()
+        await asyncio.wait_for(_connect_to_ota_ap(), CONNECT_TO_AP_TIMEOUT)
     else:
         print("attempting to connect to OTA access point anyways")
-        async with asyncio.Timeout(CONNECT_TO_AP_TIMEOUT / 4):
-            await _connect_to_ota_ap()
+        await asyncio.wait_for(_connect_to_ota_ap(), CONNECT_TO_AP_TIMEOUT / 4)
 
     try:
         tcp_args = TcpArgs(
