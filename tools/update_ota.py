@@ -20,7 +20,6 @@ exit $?
 __doc__ = """Script for updating Nevermore controllers."""
 
 import asyncio
-import datetime
 import json
 import logging
 import subprocess
@@ -93,7 +92,6 @@ def _bt_address_validate(addr: str):
 @dataclass
 class ReleaseInfo:
     tag: str
-    published: datetime.datetime
     assets: List[str]
 
 
@@ -127,7 +125,6 @@ async def fetch_latest_release() -> Optional[ReleaseInfo]:
             content = json.loads(content)[0]
             return ReleaseInfo(
                 tag=content["tag_name"],
-                published=datetime.datetime.fromisoformat(content["published_at"]),
                 assets=[x["browser_download_url"] for x in content["assets"]],
             )
 
