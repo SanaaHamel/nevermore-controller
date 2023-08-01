@@ -1,9 +1,13 @@
-#!/bin/sh
+#!/bin/bash
 "true" '''\'
-echo "$(dirname "$(readlink -f "$0")")"/venv/bin/python "$0" "$@"
+set -eu
+set -o pipefail
 FILE="$(readlink -f "$0")"
 ROOT_DIR="$(dirname "$FILE")"
-"$ROOT_DIR/setup-tool-env.bash" && "$ROOT_DIR/.venv/bin/python" "$FILE" "$@"
+if [ ! -d "$ROOT_DIR/.venv" ]; then
+    "$ROOT_DIR/setup-tool-env.bash"
+fi
+"$ROOT_DIR/.venv/bin/python" "$FILE" "$@"
 exit $?
 '''
 
