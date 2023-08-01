@@ -26,24 +26,27 @@ if [ ! -d "${MOONRAKER_CONFIG_DIR}" ]; then
     MOONRAKER_CONFIG_DIR="${HOME}/klipper_config"
 fi
 
-usage(){ echo "Usage: $0 [-k <klipper path>] [-c <configuration path>]" 1>&2; exit 1; }
+usage() {
+    echo "Usage: $0 [-k <klipper path>] [-c <configuration path>]" 1>&2
+    exit 1
+}
+
 # Parse command line arguments
 while getopts "k:c:uh" arg; do
     case $arg in
-        k) KLIPPER_PATH=$OPTARG;;
-        c) MOONRAKER_CONFIG_DIR=$OPTARG;;
-        u) UNINSTALL=1;;
-        h) usage;;
-        *) usage;;
+    k) KLIPPER_PATH=$OPTARG ;;
+    c) MOONRAKER_CONFIG_DIR=$OPTARG ;;
+    u) UNINSTALL=1 ;;
+    h) usage ;;
+    *) usage ;;
     esac
 done
 
 # Find ROOT_DIR from the pathname of this script
-ROOT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # Verify Klipper has been installed, is kiauh-like, and is using Python 3
-check_klipper()
-{
+check_klipper() {
     if [ "$(sudo systemctl list-units --full -all -t service --no-legend | grep -F "klipper.service")" ]; then
         echo "Klipper service found."
     else
@@ -59,8 +62,7 @@ check_klipper()
     fi
 }
 
-check_folders()
-{
+check_folders() {
     if [ ! -d "$KLIPPER_PATH/klippy/extras/" ]; then
         echo "[ERROR] Klipper installation not found in directory \"$KLIPPER_PATH\". Exiting"
         exit 1
@@ -74,8 +76,7 @@ check_folders()
     echo "Moonraker configuration found at $MOONRAKER_CONFIG_DIR"
 }
 
-fix_mainsail_os_bluetooth()
-{
+fix_mainsail_os_bluetooth() {
     BOOT_CONFIG="/boot/config.txt"
 
     echo -n "Checking for Mainsail OS & BlueTooth issue... "
@@ -90,25 +91,27 @@ fix_mainsail_os_bluetooth()
         while true; do
             read -r -p "Enable BlueTooth? [yn]" ANSWER
             case $ANSWER in
-                [Yy])
-                    echo -n "Enabling hciuart service... "
-                    sudo systemctl enable hciuart.service
-                    echo "[OK]"
-                    echo -n "Enabling bluetooth service... "
-                    sudo systemctl enable bluetooth.service
-                    echo "[OK]"
-                    echo -n "Editing \`$BOOT_CONFIG\`... "
-                    sudo sed -i -E "s/^(\s*enable_uart=1\s*(#.*)?)$/#\1/g" "$BOOT_CONFIG"
-                    sudo sed -i -E "s/^(\s*dtoverlay=disable-bt\s*(#.*)?)$/#\1/g" "$BOOT_CONFIG"
-                    echo "[OK]"
-                    echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
-                    echo "!!!! REBOOT REQUIRED TO TAKE EFFECT !!!!"
-                    echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
-                    break;;
-                [Nn])
-                    echo "BlueTooth is required for this module. Exiting."
-                    exit 1;;
-                *) echo "Enable BlueTooth? [yn]";;
+            [Yy])
+                echo -n "Enabling hciuart service... "
+                sudo systemctl enable hciuart.service
+                echo "[OK]"
+                echo -n "Enabling bluetooth service... "
+                sudo systemctl enable bluetooth.service
+                echo "[OK]"
+                echo -n "Editing \`$BOOT_CONFIG\`... "
+                sudo sed -i -E "s/^(\s*enable_uart=1\s*(#.*)?)$/#\1/g" "$BOOT_CONFIG"
+                sudo sed -i -E "s/^(\s*dtoverlay=disable-bt\s*(#.*)?)$/#\1/g" "$BOOT_CONFIG"
+                echo "[OK]"
+                echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
+                echo "!!!! REBOOT REQUIRED TO TAKE EFFECT !!!!"
+                echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
+                break
+                ;;
+            [Nn])
+                echo "BlueTooth is required for this module. Exiting."
+                exit 1
+                ;;
+            *) echo "Enable BlueTooth? [yn]" ;;
             esac
         done
     else
@@ -116,12 +119,11 @@ fix_mainsail_os_bluetooth()
     fi
 }
 
-fix_python2()
-{
+fix_python2() {
     KLIPPER_ENV_BACKUP_PATH="$KLIPPER_ENV_PATH-backup-python2"
 
     echo -n "Checking for Python 3... "
-    if ! "$KLIPPER_ENV_PATH/bin/pip" --version | grep "(python 3\(\.[0-9]\+\)*)" >> /dev/null; then
+    if ! "$KLIPPER_ENV_PATH/bin/pip" --version | grep "(python 3\(\.[0-9]\+\)*)" >>/dev/null; then
         echo "[FAILED]"
         echo "Klipper appears to be using python 2. This module requires Python 3.7+."
         echo "Do you wish to try to upgrade to Python 3?"
@@ -132,34 +134,36 @@ fix_python2()
         while true; do
             read -r -p "Upgrade installation to Python 3? [yn]" ANSWER
             case $ANSWER in
-                [Yy])
-                    echo -n "Installing Python 3... "
-                    sudo apt-get install python3-dev python3-matplotlib
+            [Yy])
+                echo -n "Installing Python 3... "
+                sudo apt-get install python3-dev python3-matplotlib
+                echo "[OK]"
+
+                echo -n "Backing up existing \`$KLIPPER_ENV_PATH\` to \`$KLIPPER_ENV_BACKUP_PATH\`... "
+                mv "$KLIPPER_ENV_PATH" "$KLIPPER_ENV_BACKUP_PATH"
+                echo "[OK]"
+
+                echo -n "Setting up python3 env... "
+                if ! virtualenv -p python3 "$KLIPPER_ENV_PATH" &&
+                    "$KLIPPER_ENV_PATH/bin/pip" install -r "$KLIPPER_PATH/scripts/klippy-requirements.txt"; then
+                    echo "[ERROR]"
+                    echo -n "Reverting env change... "
+                    rm -r "$KLIPPER_ENV_PATH" || true
+                    mv "$KLIPPER_ENV_BACKUP_PATH" "$KLIPPER_ENV_PATH"
                     echo "[OK]"
+                    exit 1
+                fi
 
-                    echo -n "Backing up existing \`$KLIPPER_ENV_PATH\` to \`$KLIPPER_ENV_BACKUP_PATH\`... "
-                    mv "$KLIPPER_ENV_PATH" "$KLIPPER_ENV_BACKUP_PATH"
-                    echo "[OK]"
+                echo "[OK]"
+                break
+                ;;
 
-                    echo -n "Setting up python3 env... "
-                    if ! virtualenv -p python3 "$KLIPPER_ENV_PATH" &&
-                         "$KLIPPER_ENV_PATH/bin/pip" install -r "$KLIPPER_PATH/scripts/klippy-requirements.txt"; then
-                        echo "[ERROR]"
-                        echo -n "Reverting env change... "
-                        rm -r "$KLIPPER_ENV_PATH" || true
-                        mv "$KLIPPER_ENV_BACKUP_PATH" "$KLIPPER_ENV_PATH"
-                        echo "[OK]"
-                        exit 1
-                    fi
+            [Nn])
+                echo "Python 3.7+ is required for this module. Exiting."
+                exit 1
+                ;;
 
-                    echo "[OK]"
-                    break;;
-
-                [Nn])
-                    echo "Python 3.7+ is required for this module. Exiting."
-                    exit 1;;
-
-                *) echo "Upgrade installation to Python 3? [yn]";;
+            *) echo "Upgrade installation to Python 3? [yn]" ;;
             esac
         done
     else
@@ -168,8 +172,7 @@ fix_python2()
 }
 
 # Link extension to Klipper
-link_extension()
-{
+link_extension() {
     echo -n "Linking extension to Klipper... "
     ln -sf "${ROOT_DIR}/klipper/nevermore.py" "${KLIPPER_PATH}/klippy/extras/nevermore.py"
     echo "[OK]"
@@ -178,55 +181,49 @@ link_extension()
 }
 
 # Restart moonraker
-restart_moonraker()
-{
+restart_moonraker() {
     echo -n "Restarting Moonraker... "
     sudo systemctl restart moonraker
     echo "[OK]"
 }
 
 # Add updater to moonraker.conf
-add_updater()
-{
+add_updater() {
     echo -e -n "Adding update manager to moonraker.conf... "
 
     update_section=$(grep -c '\[update_manager nevermore\]' "${MOONRAKER_CONFIG_DIR}"/moonraker.conf || true)
     if [ "${update_section}" -eq 0 ]; then
-        echo -e "\n" >> "${MOONRAKER_CONFIG_DIR}/moonraker.conf"
+        echo -e "\n" >>"${MOONRAKER_CONFIG_DIR}/moonraker.conf"
         while read -r line; do
-            echo -e "${line}" >> "${MOONRAKER_CONFIG_DIR}/moonraker.conf"
-        done < "$ROOT_DIR/klipper/moonraker_update.txt"
-        echo -e "\n" >> "${MOONRAKER_CONFIG_DIR}/moonraker.conf"
+            echo -e "${line}" >>"${MOONRAKER_CONFIG_DIR}/moonraker.conf"
+        done <"$ROOT_DIR/klipper/moonraker_update.txt"
+        echo -e "\n" >>"${MOONRAKER_CONFIG_DIR}/moonraker.conf"
         echo "[OK]"
         restart_moonraker
-        else
+    else
         echo -e "[update_manager nevermore] already exists in moonraker.conf [SKIPPED]"
     fi
 }
 
-restart_klipper()
-{
+restart_klipper() {
     echo -n "Restarting Klipper... "
     sudo systemctl restart klipper
     echo "[OK]"
 }
 
-start_klipper()
-{
+start_klipper() {
     echo -n "Starting Klipper... "
     sudo systemctl start klipper
     echo "[OK]"
 }
 
-stop_klipper()
-{
+stop_klipper() {
     echo -n "Stopping Klipper... "
     sudo systemctl start klipper
     echo "[OK]"
 }
 
-uninstall()
-{
+uninstall() {
     if [ -f "${KLIPPER_PATH}/klippy/extras/nevermore.py" ]; then
         echo -n "Uninstalling... "
         rm -f "${KLIPPER_PATH}/klippy/extras/nevermore.py"
