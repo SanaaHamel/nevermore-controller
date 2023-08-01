@@ -10,6 +10,7 @@ import datetime
 import enum
 import logging
 import threading
+import typing
 import weakref
 from abc import abstractmethod
 from dataclasses import dataclass
@@ -20,6 +21,7 @@ from typing import (
     Callable,
     Coroutine,
     Dict,
+    Generator,
     List,
     MutableMapping,
     Optional,
@@ -32,16 +34,22 @@ from typing import (
 from uuid import UUID
 
 import janus
-from bleak import BleakClient, BleakError, BleakScanner
+from bleak import BleakClient, BleakScanner
+from bleak.backends.characteristic import BleakGATTCharacteristic
 from bleak.backends.device import BLEDevice
-from bleak.backends.service import BleakGATTCharacteristic, BleakGATTService
-from bleak.exc import BleakDBusError, BleakDeviceNotFoundError
+from bleak.backends.service import BleakGATTService
+from bleak.exc import BleakDBusError, BleakDeviceNotFoundError, BleakError
 from configfile import ConfigWrapper
 from extras.led import LEDHelper
 from gcode import GCodeCommand, GCodeDispatch
 from klippy import Printer
 from reactor import SelectReactor
-from typing_extensions import override
+from typing_extensions import Buffer, override
+
+if typing.TYPE_CHECKING:
+    _LoggerAdapter = logging.LoggerAdapter[logging.Logger]
+else:
+    _LoggerAdapter = logging.LoggerAdapter
 
 __all__ = [
     "load_config",
@@ -78,13 +86,13 @@ class CharacteristicProperty(enum.Enum):
     WRITE_NO_RESPONSE = "write-without-response"
 
 
-class LogPrefixed(logging.LoggerAdapter):
+class LogPrefixed(_LoggerAdapter):
     def __init__(
         self,
-        logger: Union[logging.Logger, logging.LoggerAdapter],
+        logger: Union[logging.Logger, _LoggerAdapter],
         format: Callable[[str], str],
     ):
-        super().__init__(logger, None)
+        super().__init__(logger, None)  # type: ignore
         self.format = format
 
     def process(self, msg: Any, kwargs: MutableMapping[str, Any]):
@@ -263,7 +271,7 @@ class BleAttrReader:
 def parse_agg_env(reader: BleAttrReader) -> Tuple[SensorState, SensorState]:
     t_in = reader.temperature()
     t_out = reader.temperature()
-    t_mcu = reader.temperature()  # unused/ignored
+    _t_mcu = reader.temperature()  # unused/ignored
     h_in = reader.humidity()
     h_out = reader.humidity()
     p_in = reader.pressure()
@@ -334,7 +342,7 @@ async def discover_controllers(
         x
         for x in await BleakScanner.discover(timeout=timeout)
         if x.name in {NAME_SHORTENED, NAME_COMPLETE}
-    ]
+    ]  # type: ignore mistake in overload resolution
 
 
 @dataclass
@@ -402,7 +410,7 @@ class PseudoCommand:
 # Commands which are directly forwarded to the controller.
 class Command:
     @abstractmethod
-    def params(self) -> bytearray:
+    def params(self) -> Buffer:
         raise NotImplemented
 
 
@@ -679,7 +687,7 @@ class NevermoreBackgroundWorker:
             worker_log.exception("worker failed")
 
     async def _worker_using(
-        self, log: Union[logging.Logger, logging.LoggerAdapter], client: BleakClient
+        self, log: Union[logging.Logger, _LoggerAdapter], client: BleakClient
     ):
         log.info(f"connected to controller {client.address}")
 
@@ -749,7 +757,7 @@ class NevermoreBackgroundWorker:
         def notify_fan(nevermore: "Nevermore", params: BleAttrReader):
             # HACK: Abuse GIL to keep this thread-safe
             # show the current fan power even if it isn't overridden
-            nevermore.state.fan_power = params.percentage8() / 100.0  # need it in [0,1]
+            nevermore.state.fan_power = (params.percentage8() or 0) / 100.0
             nevermore.state.fan_tacho = params.tachometer()
 
         async def handle_commands():
@@ -806,7 +814,7 @@ class NevermoreBackgroundWorker:
         finally:
             tasks.cancel()  # kill off all active tasks if any fail
 
-    def _worker_led_diffs(self):
+    def _worker_led_diffs(self) -> Generator[Tuple[int, bytearray], Any, None]:
         nm = self._nevermore()
         if nm is None:
             return  # frontend is dead -> nothing to do
@@ -976,17 +984,11 @@ class NevermoreFan:
             desc=self.cmd_SET_FAN_SPEED_help,
         )
 
-        self.printer.register_event_handler("klippy:connect", self._handle_connect)
-
     def get_status(self, eventtime: float) -> Dict[str, float]:
         return {
-            "speed": 0 if self.nevermore is None else self.nevermore.state.fan_power,
-            "rpm": 0 if self.nevermore is None else self.nevermore.state.fan_tacho,
+            "speed": self.nevermore.state.fan_power,
+            "rpm": self.nevermore.state.fan_tacho,
         }
-
-    def _handle_connect(self) -> None:
-        self.nevermore = self.printer.lookup_object("nevermore")
-        assert isinstance(self.nevermore, Nevermore)
 
     def cmd_SET_FAN_SPEED(self, gcmd: GCodeCommand) -> None:
         # `None` to allow explicitly clearing override by not specifying a `SPEED` arg

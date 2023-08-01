@@ -49,4 +49,5 @@
     "mypy-type-checker.args": [
         "--follow-imports=silent"
     ],
+    "python.analysis.typeCheckingMode": "strict",
 }

@@ -1,0 +1,6 @@
+// a lot of these have to do with Klippy not being typed.
+{
+  "reportUnknownArgumentType": false,
+  "reportUnknownMemberType": false,
+  "reportUnknownVariableType": false
+}
