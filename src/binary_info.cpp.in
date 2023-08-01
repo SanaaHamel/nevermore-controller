@@ -1,6 +1,7 @@
-#include "pico/binary_info.h"  // IWYU pragma: keep
 #include "config.hpp"
+#include "pico/binary_info.h"  // IWYU pragma: keep
 #include "sdk/i2c.hpp"
+#include "sdk/spi.hpp"
 
 namespace nevermore {
 
@@ -12,6 +13,14 @@ constexpr GPIO_Pin first_i2c_pin(uint8_t bus, I2C_Pin kind) {
         if (i2c_gpio_kind(pin) != kind) continue;
         return pin;
     }
+
+    return PIN_MAX;
+}
+
+template <typename A>
+constexpr GPIO_Pin first_spi_pin(A const& xs, SPI_Pin kind) {
+    for (GPIO_Pin pin : xs)
+        if (spi_gpio_kind(pin) == kind) return pin;
 
     return PIN_MAX;
 }
@@ -29,6 +38,10 @@ bi_decl(bi_program_version_string("@GIT_DESCRIPTION@"));
 bi_decl(bi_program_build_date_string("@BUILD_TIMESTAMP@"));
 
 // clang-format off
+bi_decl(bi_2pins_with_names(
+    0, "UART - TX",
+    1, "UART - RX"));
+
 bi_decl(bi_4pins_with_names(
     first_i2c_pin(0, I2C_Pin::SDA), "Intake I2C SDA",
     first_i2c_pin(0, I2C_Pin::SCL), "Intake I2C SCL",
@@ -41,6 +54,20 @@ bi_decl(bi_2pins_with_names(
 
 bi_decl(bi_1pin_with_name(
     PIN_NEOPIXEL_DATA_IN, "NeoPixel Data In"));
+
+bi_decl(bi_3pins_with_names(
+    first_spi_pin(PINS_DISPLAY_SPI, SPI_Pin::CLOCK), "Display - SPI CLOCK",
+    first_spi_pin(PINS_DISPLAY_SPI, SPI_Pin::SEND ), "Display - SPI SEND",
+    first_spi_pin(PINS_DISPLAY_SPI, SPI_Pin::RECV ), "Display - SPI RECV"));
+
+bi_decl(bi_3pins_with_names(
+    PIN_DISPLAY_COMMAND     , "Display - Command",
+    PIN_DISPLAY_RESET       , "Display - Reset",
+    PIN_DISPLAY_BRIGHTNESS  , "Display - Brightness"));
+
+bi_decl(bi_2pins_with_names(
+    PIN_TOUCH_INTERRUPT , "Touch Interrupt",
+    PIN_TOUCH_RESET     , "Touch Reset"));
 // clang-format on
 
 }  // namespace nevermore
