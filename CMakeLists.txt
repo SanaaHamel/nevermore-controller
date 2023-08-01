@@ -1,7 +1,6 @@
-cmake_minimum_required(VERSION 3.13)
+cmake_minimum_required(VERSION 3.20)
 
 include(FetchContent)
-include(cmake/GetGitRevisionDescription.cmake)
 include(cmake/pico_sdk_import.cmake)
 
 FetchContent_Declare(freertos_kernel
@@ -63,16 +62,22 @@ set_target_properties(lvgl_demos lvgl_examples
   EXCLUDE_FROM_ALL TRUE
 )
 
+# Touch outputs of config files so the rest of config knows there'll be associated outputs
+file(GLOB_RECURSE SRC_IN ${SRC_DIR}/*.in)
+
+foreach(IN_FILE ${SRC_IN})
+  cmake_path(REMOVE_EXTENSION IN_FILE LAST_ONLY)
+
+  if(NOT EXISTS ${IN_FILE})
+    file(TOUCH "${IN_FILE}")
+  endif()
+endforeach()
+
 # target_include_directories(FreeRTOS-Kernel PRIVATE ${SRC_CONFIG_DIR})
 file(GLOB_RECURSE SRC_H ${SRC_DIR}/*.h)
 file(GLOB_RECURSE SRC_C ${SRC_DIR}/*.c)
 file(GLOB_RECURSE SRC_HPP ${SRC_DIR}/*.hpp)
 file(GLOB_RECURSE SRC_CPP ${SRC_DIR}/*.cpp)
-
-string(TIMESTAMP BUILD_TIMESTAMP "%Y-%m-%d %H:%M:%S UTC" UTC)
-git_describe_working_tree(GIT_DESCRIPTION --always)
-configure_file("${SRC_DIR}/binary_info.cpp.in" "${SRC_DIR}/binary_info.cpp" @ONLY)
-list(APPEND SRC_CPP "${SRC_DIR}/binary_info.cpp")
 
 set(SRC_FILES ${SRC_H} ${SRC_C} ${SRC_HPP} ${SRC_CPP})
 
@@ -128,6 +133,19 @@ target_link_libraries(nevermore-controller
   lvgl::drivers
   lvgl::lvgl
 )
+
+list(TRANSFORM SRC_IN REPLACE "(.*)\.in$" "\\1" OUTPUT_VARIABLE SRC_IN_BYPRODUCTS)
+add_custom_target(nevermore-controller-generate-build-info
+  COMMAND ${CMAKE_COMMAND}
+  -D EXTRA_MODULES_DIR=${CMAKE_CURRENT_SOURCE_DIR}/cmake
+  -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/configure_files.cmake
+  --
+  ${SRC_IN}
+  BYPRODUCTS
+  ${SRC_IN_BYPRODUCTS}
+)
+
+add_dependencies(nevermore-controller nevermore-controller-generate-build-info)
 
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")
   # Specify source files explicitly b/c some SDK sources trigger warnings.
