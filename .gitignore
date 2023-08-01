@@ -8,3 +8,4 @@
 /.vscode/.cortex-debug.registers.state.json
 # derived from cfg file
 /src/binary_info.cpp
+/src/nevermore.gatt
