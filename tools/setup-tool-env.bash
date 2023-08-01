@@ -18,7 +18,8 @@ VENV_DIR="$ROOT_DIR/.venv"
 
 if [ ! -d "$VENV_DIR" ]; then
   echo "Setting up \`${VENV_DIR}\`..."
-  echo "This may take a bit..."
+  echo "Be patient. This may take a *quite* a bit..."
+  echo ""
 fi
 
 if [ ! -d "$VENV_DIR" ] && ! virtualenv -p python3 "$VENV_DIR"; then

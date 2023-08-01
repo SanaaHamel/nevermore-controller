@@ -16,42 +16,30 @@ exit $?
 __doc__ = """Script for updating Nevermore controllers."""
 
 import asyncio
-import binascii
 import datetime
 import json
 import logging
 import subprocess
+import time
 from dataclasses import dataclass
 from pathlib import Path
 from tempfile import NamedTemporaryFile
 from typing import List, Optional
 from uuid import UUID
 
-import sdbus
 import serial_flash
 import typed_argparse as tap
 from aiohttp import ClientSession
 from bleak import BleakClient, BleakScanner
 from bleak.backends.device import BLEDevice
-from passlib.utils.pbkdf2 import pbkdf2
-from sdbus_async.networkmanager import ConnectionType
-from sdbus_async.networkmanager import NetworkManagerSettings as SettingsManager
-from sdbus_async.networkmanager.exceptions import NmSettingsInvalidConnectionError
-from sdbus_async.networkmanager.settings import (
-    ConnectionProfile,
-    ConnectionSettings,
-    Ipv4Settings,
-    Ipv6Settings,
-    WirelessSecuritySettings,
-    WirelessSettings,
-)
 from serial_flash.transport.tcp import TcpArgs
 
 NEVERMORE_OTA_WIFI_SSID = 'nevermore-update-ota'
 NEVERMORE_OTA_WIFI_KEY = 'raccoons-love-floor-onions'
 
 BT_SCAN_GATHER_ALL_TIMEOUT = 10  # seconds
-CONNECT_TO_AP_TIMEOUT = 10  # seconds
+CONNECT_TO_AP_TIMEOUT = 20  # seconds
+CONNECT_TO_AP_DELAY = 2  # seconds
 
 OTA_UPDATE_FILENAME = "nevermore-controller-ota.elf"
 
@@ -96,44 +84,6 @@ def _bt_address_validate(addr: str):
         return False
 
     return True
-
-
-async def create_connection_profile():
-    """Add a temporary (not yet saved) network connection profile
-    :param Namespace args: autoconnect, conn_id, psk, save, ssid, uuid
-    :return: dbus connection path of the created connection profile
-    """
-
-    # If we add many connections passing the same id, things get messy. Check:
-    CONN_ID = f"{NEVERMORE_OTA_WIFI_SSID}-DEFAULT-CONNECTION"
-
-    s = SettingsManager()
-    try:
-        await s.delete_connection_by_uuid(str(UUID_NEVERMORE_OTA_WIFI))
-    except NmSettingsInvalidConnectionError:
-        pass
-
-    pw = pbkdf2(
-        NEVERMORE_OTA_WIFI_KEY.encode(), NEVERMORE_OTA_WIFI_SSID.encode(), 4096, 32
-    )
-    pw = binascii.hexlify(pw).decode("utf-8")
-
-    profile = ConnectionProfile(
-        connection=ConnectionSettings(
-            connection_id=CONN_ID,
-            uuid=str(UUID_NEVERMORE_OTA_WIFI),
-            connection_type=ConnectionType.WIFI.value,
-            autoconnect=False,
-        ),
-        ipv4=Ipv4Settings(method="auto"),
-        ipv6=Ipv6Settings(method="auto"),
-        wireless=WirelessSettings(ssid=NEVERMORE_OTA_WIFI_SSID.encode("utf-8")),
-        wireless_security=WirelessSecuritySettings(
-            key_mgmt="wpa-psk", auth_alg="open", psk=pw
-        ),
-    )
-
-    await s.add_connection(profile.to_dbus())
 
 
 @dataclass
@@ -241,15 +191,29 @@ async def reboot_into_ota_mode(bt_address: Optional[str]):
 
 
 async def _connect_to_ota_ap():
+    subprocess.check_call(["nmcli", "device", "wifi", "rescan"])
+
     while True:
         try:
             subprocess.check_call(
-                ["nmcli", "connection", "up", str(UUID_NEVERMORE_OTA_WIFI)]
+                [
+                    "nmcli",
+                    "device",
+                    "wifi",
+                    "connect",
+                    NEVERMORE_OTA_WIFI_SSID,
+                    "password",
+                    NEVERMORE_OTA_WIFI_KEY,
+                    "name",
+                    NEVERMORE_OTA_WIFI_SSID,
+                ]
             )
             break
         except subprocess.CalledProcessError as e:
-            if e.returncode != 4:
+            if e.returncode != 10:
                 raise
+
+        time.sleep(CONNECT_TO_AP_DELAY)
 
 
 class CmdLnArgs(tap.TypedArgs):
@@ -264,7 +228,7 @@ async def _main(args: CmdLnArgs):
     print("   e.g. `nohup ./update_ota.py ...`")
     print("-------------------------------------------------------------------------")
     print()
-    await create_connection_profile()
+    # await create_connection_profile()
 
     if args.bt_address is not None and not _bt_address_validate(args.bt_address):
         logging.error("invalid address for `--bt-address`")
@@ -293,9 +257,7 @@ async def _main(args: CmdLnArgs):
         )
         serial_flash.run(tcp_args)
     finally:
-        subprocess.check_call(
-            ["nmcli", "connection", "down", str(UUID_NEVERMORE_OTA_WIFI)]
-        )
+        subprocess.check_call(["nmcli", "connection", "down", NEVERMORE_OTA_WIFI_SSID])
 
 
 def main():
@@ -306,5 +268,4 @@ def main():
 
 
 if __name__ == "__main__":
-    sdbus.set_default_bus(sdbus.sd_bus_open_system())
     main()
