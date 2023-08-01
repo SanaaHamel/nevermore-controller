@@ -1,25 +1,40 @@
 #include "configuration.hpp"
 #include "handler_helpers.hpp"
 #include "nevermore.h"
+#include "picowota/reboot.h"
 #include "sdk/btstack.hpp"
 #include "sensors.hpp"
+#include "utility/timer.hpp"
 #include <array>
 #include <cstdint>
+#include <cstdio>
 
 using namespace std;
 
-#define WS2812_UPDATE_SPAN_UUID 5d91b6ce_7db1_4e06_b8cb_d75e7dd49aae
-
+#define CONFIG_REBOOT_01 f48a18bb_e03c_4583_8006_5b54422e2045_01
 #define CONFIG_FLAGS_01 d4b66bf4_3d8f_4746_b6a2_8a59d2eac3ce_01
 
 namespace nevermore::gatt::configuration {
 
 namespace {
 
+constexpr auto REBOOT_DELAY = 200ms;
+
 constexpr array FLAGS{
         &sensors::g_config.fallback,
         &sensors::g_config.fallback_exhaust_mcu,
 };
+
+void reboot_delayed(bool to_bootloader) {
+    // if they want to race these, who cares, we're rebooting anyways
+    printf("!! GATT - Reboot Requested; OTA=%d\n", int(to_bootloader));
+
+    auto go = mk_timer("gatt-configuration-reboot", REBOOT_DELAY);
+    if (to_bootloader)
+        go([](auto* p) { picowota_reboot(true); });
+    else
+        go([](auto* p) { picowota_reboot(false); });
+}
 
 }  // namespace
 
@@ -32,6 +47,7 @@ void disconnected(hci_con_handle_t) {}
 optional<uint16_t> attr_read(
         hci_con_handle_t, uint16_t att_handle, uint16_t offset, uint8_t* buffer, uint16_t buffer_size) {
     switch (att_handle) {
+        USER_DESCRIBE(CONFIG_REBOOT_01, "Reboot")
         USER_DESCRIBE(CONFIG_FLAGS_01, "Configuration Flags (bitset)")
 
         READ_VALUE(CONFIG_FLAGS_01, ([]() -> uint16_t {
@@ -51,6 +67,13 @@ optional<int> attr_write(
     WriteConsumer consume{offset, buffer, buffer_size};
 
     switch (att_handle) {
+    case HANDLE_ATTR(CONFIG_REBOOT_01, VALUE): {
+        switch (uint8_t(consume)) {
+        case 0: reboot_delayed(false); return 0;
+        case 1: reboot_delayed(true); return 0;
+        default: return ATT_ERROR_VALUE_NOT_ALLOWED;
+        }
+    }
     case HANDLE_ATTR(CONFIG_FLAGS_01, VALUE): {
         uint64_t const flags = consume;
         for (size_t i = 0; i < FLAGS.size(); ++i)

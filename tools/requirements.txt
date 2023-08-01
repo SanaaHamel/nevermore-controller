@@ -1,0 +1,4 @@
+aiohttp>=3.8
+passlib>=1.7<2
+sdbus-networkmanager>=2.0.0<3
+typed-argparse>=0.2.11<1

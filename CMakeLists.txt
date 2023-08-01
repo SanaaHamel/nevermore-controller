@@ -47,6 +47,11 @@ set(PICO_BOARD pico_w)
 set(PICO_CXX_ENABLE_EXCEPTIONS 1)
 pico_sdk_init()
 
+set(PICOWOTA_WIFI_SSID "nevermore-update-ota")
+set(PICOWOTA_WIFI_PASS "raccoons-love-floor-onions")
+set(PICOWOTA_WIFI_AP true)
+add_subdirectory(picowota)
+
 set(SRC_DIR ${CMAKE_SOURCE_DIR}/src)
 set(SRC_CONFIG_DIR ${SRC_DIR}/config) # HACK: libs often include a config header (e.g. lvgl, btstack, etc)
 
@@ -87,6 +92,7 @@ add_compile_definitions(PARAM_ASSERTIONS_ENABLE_ALL=1)
 add_compile_definitions(WANT_HCI_DUMP=1)
 add_compile_definitions(PICO_USE_MALLOC_MUTEX=1)
 add_compile_definitions(CYW43_LWIP=0)
+add_compile_definitions(CYW43_HOST_NAME="Nevermore")
 
 # UGLY: Also defines the value of `nevermore::Priority::Communication`.
 # We want a priority above almost anything else.
@@ -104,17 +110,17 @@ if(BLUETOOTH_LOW_LEVEL_DEBUG)
   add_compile_definitions(CMAKE_BLUETOOTH_LOW_LEVEL_DEBUG=1)
 endif()
 
-add_executable(nevermore-controller
+add_library(nevermore-controller
   ${SRC_FILES}
 )
 
-target_include_directories(nevermore-controller PRIVATE
+target_include_directories(nevermore-controller PUBLIC
   ${SRC_DIR}
   ${SRC_CONFIG_DIR}
 )
 
 target_link_libraries(nevermore-controller
-  PRIVATE
+  PUBLIC
 
   # Pico SDK
   hardware_adc
@@ -132,6 +138,7 @@ target_link_libraries(nevermore-controller
   FreeRTOS-Kernel-Heap4
   lvgl::drivers
   lvgl::lvgl
+  picowota_reboot
 )
 
 list(TRANSFORM SRC_IN REPLACE "(.*)\.in$" "\\1" OUTPUT_VARIABLE SRC_IN_BYPRODUCTS)
@@ -156,7 +163,16 @@ endif()
 
 pico_enable_stdio_usb(nevermore-controller 1)
 pico_enable_stdio_uart(nevermore-controller 1)
-pico_add_extra_outputs(nevermore-controller)
 pico_btstack_make_gatt_header(nevermore-controller PRIVATE ${SRC_DIR}/nevermore.gatt)
-
 pico_generate_pio_header(nevermore-controller ${SRC_DIR}/ws2812.pio)
+
+add_executable(nevermore-controller-no-bootloader)
+target_link_libraries(nevermore-controller-no-bootloader PRIVATE nevermore-controller)
+pico_add_extra_outputs(nevermore-controller-no-bootloader)
+
+add_executable(nevermore-controller-ota)
+target_link_libraries(nevermore-controller-ota PRIVATE nevermore-controller)
+pico_add_extra_outputs(nevermore-controller-ota)
+
+picowota_build_standalone(nevermore-controller-ota)
+picowota_build_combined(nevermore-controller-ota)
