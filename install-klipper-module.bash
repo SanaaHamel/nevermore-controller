@@ -12,7 +12,7 @@ set -o pipefail
 
 if [ "$EUID" -eq 0 ]; then
     echo "[ERROR] This script must not run as root. Exiting."
-    exit -1
+    exit 1
 fi
 
 UNINSTALL=0
@@ -48,14 +48,14 @@ check_klipper()
         echo "Klipper service found."
     else
         echo "[ERROR] Klipper service not found, please install Klipper first"
-        exit -1
+        exit 1
     fi
 
     if [ ! -f "$KLIPPER_ENV_PATH/bin/pip" ]; then
         echo "[ERROR] '$KLIPPER_ENV_PATH/bin/pip' is not a file"
         echo "[ERROR] This can happen if you didn't install Klipper via Kiauh."
         echo "[ERROR] This is not a supported scenario at this time, pardon."
-        exit -1
+        exit 1
     fi
 }
 
@@ -63,13 +63,13 @@ check_folders()
 {
     if [ ! -d "$KLIPPER_PATH/klippy/extras/" ]; then
         echo "[ERROR] Klipper installation not found in directory \"$KLIPPER_PATH\". Exiting"
-        exit -1
+        exit 1
     fi
     echo "Klipper installation found at $KLIPPER_PATH"
 
     if [ ! -f "${MOONRAKER_CONFIG_DIR}/moonraker.conf" ]; then
         echo "[ERROR] Moonraker configuration not found in directory \"$MOONRAKER_CONFIG_DIR\". Exiting"
-        exit -1
+        exit 1
     fi
     echo "Moonraker configuration found at $MOONRAKER_CONFIG_DIR"
 }
@@ -107,7 +107,7 @@ fix_mainsail_os_bluetooth()
                     break;;
                 [Nn])
                     echo "BlueTooth is required for this module. Exiting."
-                    exit -1;;
+                    exit 1;;
                 *) echo "Enable BlueTooth? [yn]";;
             esac
         done
@@ -149,7 +149,7 @@ fix_python2()
                         rm -r "$KLIPPER_ENV_PATH" || true
                         mv "$KLIPPER_ENV_BACKUP_PATH" "$KLIPPER_ENV_PATH"
                         echo "[OK]"
-                        exit -1
+                        exit 1
                     fi
 
                     echo "[OK]"
@@ -157,7 +157,7 @@ fix_python2()
 
                 [Nn])
                     echo "Python 3.7+ is required for this module. Exiting."
-                    exit -1;;
+                    exit 1;;
 
                 *) echo "Upgrade installation to Python 3? [yn]";;
             esac
