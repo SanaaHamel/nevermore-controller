@@ -174,7 +174,7 @@ link_extension()
     ln -sf "${ROOT_DIR}/klipper/nevermore.py" "${KLIPPER_PATH}/klippy/extras/nevermore.py"
     echo "[OK]"
     echo "Installing python dependencies... "
-    "$KLIPPER_ENV_PATH/bin/pip" install bleak janus typing_extensions
+    "$KLIPPER_ENV_PATH/bin/pip" install -r "${ROOT_DIR}/klipper/requirements.txt"
 }
 
 # Restart moonraker
