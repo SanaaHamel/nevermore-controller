@@ -116,13 +116,10 @@ struct HTU2xDSensor final : SensorPeriodic {
         return "HTU2xD";
     }
 
-    // TODO: This is a multi-query sensor: we can't batch read issues and then batch read-backs
-    //       Ideally we'd like to be able to chain issue/read pairs.
-    //       For now, just bite the bullet, we're spending ~66ms blocked.
     void read() override {
         auto htu2xd_fetch = [&](auto kind, auto delay) {
             htu2xd_issue(bus, kind);
-            busy_wait(delay);  // must busy wait, can't sleep inside an interrupt handler
+            task_delay(delay);
 
             // the sensor could return either data. take what we can get.
             auto response = htu2xd_read_compensated(

@@ -7,7 +7,7 @@
 #include "lvgl.h"  // IWYU pragma: keep
 #include "sdk/pwm.hpp"
 #include "sdk/spi.hpp"
-#include "sdk/timer.hpp"
+#include "sdk/task.hpp"
 #include "ui.hpp"
 #include <algorithm>
 #include <cassert>
@@ -104,5 +104,5 @@ void LV_DRV_DISP_SPI_WR_BYTE(uint8_t x) {
 }
 
 void LV_DRV_DELAY_MS(uint32_t ms) {
-    busy_wait(chrono::milliseconds(ms));
+    task_delay(chrono::milliseconds(ms));
 }

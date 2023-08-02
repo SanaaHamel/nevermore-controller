@@ -2,7 +2,6 @@
 #include "hardware/adc.h"
 #include "hardware/i2c.h"
 #include "sdk/ble_data_types.hpp"
-#include "sdk/timer.hpp"
 #include "sensors/async_sensor.hpp"
 #include "sensors/bme280.hpp"
 #include "sensors/bme68x.hpp"
@@ -111,7 +110,7 @@ bool init() {
     g_mcu_temperature_sensor.start();
 
     printf("Waiting %u ms for sensor init\n", unsigned(SENSOR_POWER_ON_DELAY / 1ms));
-    busy_wait(SENSOR_POWER_ON_DELAY);
+    task_delay(SENSOR_POWER_ON_DELAY);
 
     printf("I2C0 - initializing sensors...\n");
     g_sensors_intake = sensors_init_bus(*i2c0, {EnvironmentalFilter::Kind::Intake});
@@ -120,7 +119,7 @@ bool init() {
     g_sensors_exhaust = sensors_init_bus(*i2c1, {EnvironmentalFilter::Kind::Exhaust});
 
     // wait again b/c probing might be implemented by sending a reset command to the sensor
-    busy_wait(SENSOR_POWER_ON_DELAY);
+    task_delay(SENSOR_POWER_ON_DELAY);
 
     return true;
 }
