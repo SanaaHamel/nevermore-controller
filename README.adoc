@@ -187,7 +187,7 @@ Discovery started
 If `bluetoothctl` works fine and the scan lists the Nevermore controller then something probably went wrong with the Klipper module. Go find me on the Nevermore Discord for help.
 
 [#faq-mainsail-os]
-* I'm using MainsailOS and...
+* I'm using MainsailOS and I'm having trouble with BlueTooth.
 +
 This distro disables BlueTooth by default. footnote:[Mainsail OS disabled BlueTooth to enable hardware UART on Raspberry Pi SBCs.] Please follow https://docs-os.mainsail.xyz/faq/enable-bluetooth-on-rpi[this guide] to enable BlueTooth. Alternatively, the install script will attempt to apply the changes for you.
 +
