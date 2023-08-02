@@ -563,4 +563,5 @@ If you would like to limit the maximum speed of the fan, e.g. to reduce noise, x
 * https://github.com/julianschill/klipper-led_effect[Julian Schill] - installation script (derived)
 * https://github.com/boschsensortec/BME280_driver[Bosch Sensors] - BME280, BME68x library (included)
 * https://github.com/Sensirion/gas-index-algorithm[Sensirion] - SGP40 gas index library (included)
+* https://github.com/apache/nuttx[Apache Nuttx] - I2C software reset (derived)
 * https://github.com/0ndsk4[0ndsk4] - Donated hardware for testing

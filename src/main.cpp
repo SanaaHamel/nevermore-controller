@@ -6,23 +6,27 @@
 #include "hardware/adc.h"
 #include "hardware/gpio.h"
 #include "hardware/i2c.h"
+#include "hardware/platform_defs.h"
 #include "pico/cyw43_arch.h"
 #include "pico/stdio.h"
 #include "sdk/i2c.hpp"
 #include "sdk/spi.hpp"
 #include "sensors.hpp"
 #include "task.h"  // IWYU pragma: keep
+#include "utility/i2c.hpp"
 #include "utility/numeric_suffixes.hpp"
 #include "utility/task.hpp"
 #include "utility/timer.hpp"
 #include "ws2812.hpp"
 #include <cstdint>
 #include <cstdio>
+#include <utility>
 
 #ifndef NDEBUG
 #include "utility/square_wave.hpp"
 #endif
 
+using namespace std;
 using namespace nevermore;
 
 extern "C" {
@@ -39,16 +43,18 @@ void vApplicationMallocFailedHook() {
 
 namespace {
 
-// so far PIN config can be statically checked, so no risk of runtime error
-void pins_setup() {
-    // Leave pins {0, 1} set to UART TX/RX.
-    // Clear everything else.
+// Leave pins {0, 1} set to UART TX/RX.
+// Clear everything else.
+void pins_clear_except_uart() {
     for (GPIO_Pin pin = 2; pin < PIN_MAX; ++pin) {
         gpio_set_function(pin, GPIO_FUNC_NULL);
         gpio_set_dir(pin, false);
         gpio_pull_down(pin);
     }
+}
 
+// so far PIN config can be statically checked, so no risk of runtime error
+void pins_setup() {
     for (auto pin : PINS_I2C) {
         gpio_set_function(pin, GPIO_FUNC_I2C);
         gpio_pull_up(pin);
@@ -84,6 +90,21 @@ void pins_setup() {
 #endif
 }
 
+void pins_i2c_reset() {
+    auto get = [](uint8_t bus, I2C_Pin kind) {
+        for (auto pin : PINS_I2C)
+            if (i2c_gpio_bus_num(pin) == bus && i2c_gpio_kind(pin) == kind) return pin;
+
+        unreachable();
+    };
+
+    static_assert(size(PINS_I2C) == 4, "too many pins - not impl");
+    for (uint8_t i = 0; i < NUM_I2CS; ++i) {
+        if (!i2c_bitbang_reset(get(i, I2C_Pin::SDA), get(i, I2C_Pin::SCL)))
+            printf("WARN - I2C%d - failed to reset bus\n", i);
+    }
+}
+
 }  // namespace
 
 int main() {
@@ -92,7 +113,11 @@ int main() {
 
     stdio_init_all();
     adc_init();
-    pins_setup();
+
+    pins_clear_except_uart();
+    pins_i2c_reset();          // bit-bang out a reset for the I2C buses
+    pins_clear_except_uart();  // clear pins again, `pins_i2c_reset` leaves things dirty
+    pins_setup();              // setup everything (except UART, which should be set to default 0/1)
 
     // GCC 12.2.1 bug: -Werror=format reports that `I2C_BAUD_RATE` is a `long unsigned int`.
     // This is technically true on this platform, see static-assert below, but it is benign since
