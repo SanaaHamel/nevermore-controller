@@ -27,7 +27,7 @@ PRIMARY_SERVICE, GATT_SERVICE
 CHARACTERISTIC, GATT_DATABASE_HASH, READ,
 
 PRIMARY_SERVICE, ORG_BLUETOOTH_SERVICE_DEVICE_INFORMATION
-# HACK: prefix with `commit: ` to force `compile_gatt.py` to interpret it as a string
+// HACK: prefix with `commit: ` to force `compile_gatt.py` to interpret it as a string
 CHARACTERISTIC, ORG_BLUETOOTH_CHARACTERISTIC_SOFTWARE_REVISION_STRING, READ, "commit: @GIT_DESCRIPTION@"
 
 /////////////////////////////
