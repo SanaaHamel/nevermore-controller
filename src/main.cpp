@@ -14,7 +14,6 @@
 #include "sensors.hpp"
 #include "task.h"  // IWYU pragma: keep
 #include "utility/i2c.hpp"
-#include "utility/numeric_suffixes.hpp"
 #include "utility/task.hpp"
 #include "utility/timer.hpp"
 #include "ws2812.hpp"
