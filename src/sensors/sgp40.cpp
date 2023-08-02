@@ -71,7 +71,14 @@ bool sgp40_measure_issue(i2c_inst_t& bus, double temperature, double humidity) {
     auto humidity_tick = to_tick(humidity, 0, 100);
     PackedTuple cmd{Cmd::SGP40_MEASURE, temperature_tick, crc8(temperature_tick, 0xFF), humidity_tick,
             crc8(humidity_tick, 0xFF)};
-    return sizeof(cmd) == i2c_write_blocking(bus, SGP40_ADDRESS, cmd);
+
+    auto r = i2c_write_blocking(bus, SGP40_ADDRESS, cmd);
+    if (r != sizeof(cmd)) {
+        printf("ERR - SGP40 - failed read request: %d\n", r);
+        return false;
+    }
+
+    return true;
 }
 
 bool sgp40_measure_issue(i2c_inst_t& bus, Temperature const& temperature, Humidity const& humidity) {
@@ -125,10 +132,7 @@ struct SGP40 final : SensorPeriodic {
     }
 
     void read() override {
-        if (!issue()) {
-            printf("ERR - SGP40 - failed read request\n");
-            return;
-        }
+        if (!issue()) return;
 
         task_delay(320ms);
 
