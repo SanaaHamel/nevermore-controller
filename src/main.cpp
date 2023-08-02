@@ -45,7 +45,8 @@ void pins_setup() {
     // Clear everything else.
     for (GPIO_Pin pin = 2; pin < PIN_MAX; ++pin) {
         gpio_set_function(pin, GPIO_FUNC_NULL);
-        gpio_set_pulls(pin, false, false);
+        gpio_set_dir(pin, false);
+        gpio_pull_down(pin);
     }
 
     for (auto pin : PINS_I2C) {
