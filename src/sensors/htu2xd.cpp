@@ -74,7 +74,7 @@ bool htu2xd_issue(i2c_inst_t& bus, HTU2xD_Measure kind) {
     }
 
     if (auto r = i2c_write_blocking(bus, HTU2xD_I2C_ADDRESS, cmd); r < 0) {
-        printf("ERR - HTU2xD - failed to issue read: %d\n", r);
+        printf("ERR - HTU2xD - failed read request: %d\n", r);
         return false;
     }
 
