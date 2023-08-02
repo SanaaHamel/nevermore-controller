@@ -963,6 +963,18 @@ class Nevermore:
             self._interface.disconnect()
             self._interface = None
 
+    # having this method is sufficient to be visible to klipper/moonraker
+    def get_status(self, eventtime: float) -> Dict[str, float]:
+        data = {
+            "speed": self.state.fan_power,
+            "rpm": self.state.fan_tacho,
+        }
+        data.update((f"intake_{k}", v) for k, v in self.state.intake.as_dict().items())
+        data.update(
+            (f"exhaust_{k}", v) for k, v in self.state.exhaust.as_dict().items()
+        )
+        return data
+
 
 # basically ripped from `extras/fan_generic.py`
 class NevermoreFan:
