@@ -65,8 +65,8 @@ std::optional<PackedTuple<A...>> i2c_read_blocking_crc(i2c_inst_t& i2c, uint8_t 
 
     if (!response.verify()) {
         // really should show up in a log if they've noise in their wiring
-        printf("ERR - I2C%d - read failed CRC; device=0x%02x crc-computed=0x%02x crc-expected=0x%02x\n",
-                i2c_hw_index(&i2c), addr, response.data_crc(), response.crc);
+        printf("ERR - I2C%d - read failed CRC; device=0x%02x crc-reported=0x%02x crc-computed=0x%02x\n",
+                i2c_hw_index(&i2c), addr, response.crc, response.data_crc());
         return {};
     }
 
