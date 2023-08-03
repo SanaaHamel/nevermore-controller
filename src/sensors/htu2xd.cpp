@@ -117,7 +117,7 @@ struct HTU2xDSensor final : SensorPeriodic {
 
     void read() override {
         auto htu2xd_fetch = [&](auto kind, auto delay) {
-            htu2xd_issue(bus, kind);
+            if (!htu2xd_issue(bus, kind)) return;
             task_delay(delay);
 
             // the sensor could return either data. take what we can get.
