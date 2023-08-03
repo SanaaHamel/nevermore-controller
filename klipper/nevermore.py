@@ -109,6 +109,17 @@ LOG = LogPrefixed(
 SensorCallback = Callable[[float, float], None]
 
 
+def _apply2_optional(fn: Callable[[_A, _A], _A]):
+    def go(x: Optional[_A], y: Optional[_A]):
+        if x is None:
+            return y
+        if y is None:
+            return x
+        return fn(x, y)
+
+    return go
+
+
 class SensorKind(Enum):
     INTAKE = 1
     EXHAUST = 2
@@ -130,6 +141,20 @@ class SensorState:
             if getattr(self, f.name) is not None
         }
 
+    def merge(
+        self,
+        rhs: "SensorState",
+        # TFW you need rank-2 polymorphism but python typing doesn't support it
+        fn: Callable[[Optional[float], Optional[float]], Optional[float]],
+    ) -> "SensorState":
+        x = fn(self.gas, rhs.gas)
+        return SensorState(
+            temperature=fn(self.temperature, rhs.temperature),
+            humidity=fn(self.humidity, rhs.humidity),
+            pressure=fn(self.pressure, rhs.pressure),
+            gas=None if x is None else int(x),  # rank-2 poly support pls :(
+        )
+
 
 @dataclass
 class ControllerState:
@@ -137,6 +162,24 @@ class ControllerState:
     exhaust: SensorState = SensorState()
     fan_power: float = 0
     fan_tacho: float = 0
+
+    def min(self, rhs: "ControllerState") -> "ControllerState":
+        return self.merge(rhs, _apply2_optional(min))  # type: ignore needs better bounds
+
+    def max(self, rhs: "ControllerState") -> "ControllerState":
+        return self.merge(rhs, _apply2_optional(max))  # type: ignore needs better bounds
+
+    def merge(
+        self,
+        rhs: "ControllerState",
+        fn: Callable[[Optional[float], Optional[float]], Optional[float]],
+    ) -> "ControllerState":
+        return ControllerState(
+            intake=self.intake.merge(rhs.intake, fn),
+            exhaust=self.exhaust.merge(rhs.exhaust, fn),
+            fan_power=fn(self.fan_power, rhs.fan_power) or 0,
+            fan_tacho=fn(self.fan_tacho, rhs.fan_tacho) or 0,
+        )
 
 
 def short_uuid(x: int):
@@ -774,12 +817,14 @@ class NevermoreBackgroundWorker:
             # HACK: Abuse GIL to keep this thread-safe
             nevermore.state.intake = intake
             nevermore.state.exhaust = exhaust
+            nevermore.state_stats_update()
 
         def notify_fan(nevermore: "Nevermore", params: BleAttrReader):
             # HACK: Abuse GIL to keep this thread-safe
             # show the current fan power even if it isn't overridden
             nevermore.state.fan_power = (params.percentage8() or 0) / 100.0
             nevermore.state.fan_tacho = params.tachometer()
+            nevermore.state_stats_update()
 
         async def handle_commands():
             cmd = await self._command_queue.async_q.get()
@@ -860,6 +905,8 @@ class Nevermore:
         self.printer: Printer = config.get_printer()
         self.reactor: SelectReactor = self.printer.get_reactor()
         self.state = ControllerState()
+        self._state_min = ControllerState()
+        self._state_max = ControllerState()
         self.fan = NevermoreFan(self)
 
         self.bt_address: Optional[str] = config.get("bt_address", None)
@@ -939,6 +986,10 @@ class Nevermore:
         if self._interface is not None:
             self._interface.send_command(CmdFanPowerOverride(percent))
 
+    def state_stats_update(self):
+        self._state_min = self._state_min.min(self.state)
+        self._state_max = self._state_max.max(self.state)
+
     def _led_update(self, led_state: List[RGBW], print_time: Optional[float]) -> None:
         for i, (led, clr) in enumerate(self.led_colour_idxs):
             self.led_colour_data[i] = int(led_state[led][clr] * 255.0 + 0.5)
@@ -986,14 +1037,23 @@ class Nevermore:
 
     # having this method is sufficient to be visible to klipper/moonraker
     def get_status(self, eventtime: float) -> Dict[str, float]:
-        data = {
-            "speed": self.state.fan_power,
-            "rpm": self.state.fan_tacho,
-        }
-        data.update((f"intake_{k}", v) for k, v in self.state.intake.as_dict().items())
-        data.update(
-            (f"exhaust_{k}", v) for k, v in self.state.exhaust.as_dict().items()
-        )
+        data: Dict[str, float] = {}
+
+        def add(fmt: str, k: str, v: Optional[float]):
+            if v is not None:
+                data[fmt.format(k)] = v
+
+        def add_data(fmt: str, s: ControllerState):
+            add(fmt, "speed", s.fan_power)
+            add(fmt, "rpm", s.fan_tacho)
+            for k, v in s.intake.as_dict().items():
+                add(f"intake_{fmt}", k, v)
+            for k, v in s.exhaust.as_dict().items():
+                add(f"exhaust_{fmt}", k, v)
+
+        add_data("{0}", self.state)
+        add_data("{0}_min", self._state_min)
+        add_data("{0}_max", self._state_max)
         return data
 
 
