@@ -2,7 +2,6 @@
 #include "config.hpp"
 #include "sdk/ble_data_types.hpp"
 #include "sdk/i2c.hpp"
-#include "sdk/timer.hpp"
 #include <bit>
 #include <cassert>
 #include <cstdint>
