@@ -601,7 +601,28 @@ class NevermoreBackgroundWorker:
 
         async def handle_connection(device_address: Optional[str]) -> None:
             # Attempt (re)connection. Might have to do this multiple times if we lose connection.
-            while True:
+            #
+            # HACK: FIXME: Very rarely (race?) it happens that the cancel exception fires, but that
+            # the exception isn't properly propagated? I'm not sure what the hell is going on, but
+            # the log showed:
+            # ```
+            # Timeout with MCU 'mcu' (eventtime=252271.768243)
+            # Transition to shutdown state: Lost communication with MCU 'mcu'
+            # ...
+            # _GatheringFuture exception was never retrieved
+            # future: <_GatheringFuture finished exception=CancelledError()>
+            # cmd = await self._command_queue.async_q.get()
+            # ...
+            # [09:37:00:001317] nevermore - discovered controller 28:CD:C1:09:64:8F
+            # [09:37:01:811708] nevermore - connected to controller 28:CD:C1:09:64:8F
+            # ```
+            # So a cancel was raised, `_worker_using` exited, but the `main`
+            # task never was cancelled?
+            #
+            # As a hack/workaround, check that the exit isn't set.
+            # This should never be true, since the canceller task should cancel
+            # us when it fires, but apparently I've a bug in here.
+            while not self._loop_exit.is_set():
                 try:
                     scan_timeout = (
                         BT_SCAN_GATHER_ALL_TIMEOUT
