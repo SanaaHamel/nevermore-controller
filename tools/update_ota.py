@@ -192,9 +192,9 @@ async def reboot_into_ota_mode(bt_address: Optional[str]):
 
 
 async def _connect_to_ota_ap():
-    subprocess.check_call(["nmcli", "device", "wifi", "rescan"])
-
     while True:
+        subprocess.check_call(["nmcli", "device", "wifi", "rescan"])
+
         try:
             subprocess.check_call(
                 [
