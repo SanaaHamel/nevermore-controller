@@ -704,7 +704,6 @@ class NevermoreBackgroundWorker:
             self._loop.run_until_complete(go())
         except asyncio.CancelledError:
             worker_log.info("disconnecting")
-            raise
         except:
             worker_log.exception("worker failed")
 
