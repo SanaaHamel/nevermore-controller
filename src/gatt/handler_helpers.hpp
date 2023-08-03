@@ -126,9 +126,10 @@ struct NotifyState {
     }
 
     bool unregister(hci_con_handle_t const conn) {
+        // btstack only releases HCI connection info after registered event handlers
+        // finish *and* no one triggered a reconnect
         auto* hci_connection = hci_connection_for_handle(conn);
-        assert(hci_connection && "should still have HCI info?");
-        if (!hci_connection) return false;  // malformed handle?
+        assert(hci_connection && "should still have HCI info until event handler completes");
 
         for (auto& cb : callbacks) {
             if (conn != uintptr_t(cb.context)) continue;
