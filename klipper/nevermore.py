@@ -641,7 +641,7 @@ class NevermoreBackgroundWorker:
                     pass  # ignore, keep trying to (re)connect
                 except BleakDBusError as e:
                     # potentially caused by noisy environments or poor timing
-                    transient = (
+                    transient = (e.dbus_error == "org.bluez.Error.NotConnected") or (
                         e.dbus_error == "org.bluez.Error.Failed"
                         and e.dbus_error_details == "Software caused connection abort"
                     )
