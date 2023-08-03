@@ -136,7 +136,7 @@ struct NotifyState {
             // remove any pending notification requests
             btstack_linked_list_remove(&hci_connection->att_server.notification_requests,
                     reinterpret_cast<btstack_linked_item_t*>(&cb));
-            cb.context = nullptr;  // unassign slot
+            cb.context = reinterpret_cast<void*>(HCI_CON_HANDLE_INVALID);  // unassign slot
             return true;
         }
 
