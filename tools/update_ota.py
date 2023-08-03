@@ -211,7 +211,7 @@ async def _connect_to_ota_ap():
             )
             break
         except subprocess.CalledProcessError as e:
-            if e.returncode != 10:
+            if e.returncode not in {4, 10}:
                 raise
 
         time.sleep(CONNECT_TO_AP_DELAY)
