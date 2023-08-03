@@ -562,6 +562,7 @@ class NevermoreBackgroundWorker:
         return self._thread.is_alive() and self._connected.wait(timeout)
 
     def disconnect(self):
+        assert self._loop_exit is not None, "pre-condition violated"
         self._loop_exit.set_threadsafe(self._loop)
 
     # PRECONDITION: `self._connected` is set
