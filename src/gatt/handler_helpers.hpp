@@ -10,6 +10,7 @@
 #include <array>
 #include <cassert>
 #include <cstdint>
+#include <cstdio>
 #include <span>
 #include <type_traits>
 
@@ -122,6 +123,7 @@ struct NotifyState {
             return true;
         }
 
+        printf("ERR - BLE GATT - notify register failed for conn=%d\n", conn);
         return false;
     }
 
@@ -158,9 +160,10 @@ struct NotifyState {
         uint16_t state = consume;
         if (consume.remaining() != 0) return ATT_ERROR_INVALID_ATTRIBUTE_VALUE_LENGTH;
 
-        if (state & GATT_CLIENT_CFG_NOTIFY_FLAG)
-            register_(conn);
-        else
+        if (state & GATT_CLIENT_CFG_NOTIFY_FLAG) {
+            // something went wrong, might as well let the other side know about it
+            if (!registered(conn) && !register_(conn)) return ATT_ERROR_WRITE_REQUEST_REJECTED;
+        } else
             unregister(conn);
 
         return 0;
