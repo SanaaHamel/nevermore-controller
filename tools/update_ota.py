@@ -256,7 +256,13 @@ async def _main(args: CmdLnArgs):
         )
         serial_flash.run(tcp_args)
     finally:
-        subprocess.check_call(["nmcli", "connection", "down", NEVERMORE_OTA_WIFI_SSID])
+        try:
+            subprocess.check_call(
+                ["nmcli", "connection", "down", NEVERMORE_OTA_WIFI_SSID]
+            )
+        except subprocess.CalledProcessError as e:
+            if e.returncode not in {10}:  # 10 -> no active connection provided
+                raise
 
 
 def main():
