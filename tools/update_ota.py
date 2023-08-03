@@ -89,6 +89,14 @@ def _bt_address_validate(addr: str):
     return True
 
 
+def _bssid_from_bt_address(bt_address: str):
+    # The BSSID of a Pico is by default 1 less than that of its BT address.
+    assert _bt_address_validate(bt_address)
+    bssid = bt_address.split(':')
+    bssid[-1] = f"{(int(bssid[-1], 16) - 1) & 0xFF:02x}"
+    return ":".join(bssid)
+
+
 @dataclass
 class ReleaseInfo:
     tag: str
@@ -163,7 +171,7 @@ async def reboot_into_ota_mode(bt_address: Optional[str]):
     xs = await discover_controllers(bt_address)
     if not xs:
         logging.error("no Nevermore controllers found")
-        return False
+        return None
 
     if 1 < len(xs):
         logging.error(
@@ -173,7 +181,7 @@ async def reboot_into_ota_mode(bt_address: Optional[str]):
         xs.sort(key=lambda x: x.address)
         for x in xs:
             logging.error(x)
-        return False
+        return None
 
     print(f"connecting to {xs[0].address}")
     async with BleakClient(xs[0]) as client:
@@ -182,16 +190,37 @@ async def reboot_into_ota_mode(bt_address: Optional[str]):
             logging.error(
                 "Nevermore is too old to update with OTA. Manually flash the latest UF2 to it."
             )
-            return False
+            return None
 
         print(f"sending reboot-to-OTA command...")
         # b"\1" to reboot to OTA, "0" to restart
         await client.write_gatt_char(char_reboot, b"\1")
+        return client.address
 
-    return True
+
+def _ota_ap_visible(bt_address: str) -> bool:  # type: ignore unused
+    try:
+        subprocess.run(
+            [
+                "nmcli",
+                "device",
+                "wifi",
+                "list",
+                "bssid",
+                _bssid_from_bt_address(bt_address),
+                "--rescan",
+                "yes",
+            ],
+            text=True,
+            check=True,
+            stdout=open("/dev/null"),
+        )
+        return True
+    except subprocess.CalledProcessError:
+        return False
 
 
-async def _connect_to_ota_ap():
+async def _ota_ap_connect(bssid: Optional[str]):
     while True:
         subprocess.check_call(["nmcli", "device", "wifi", "rescan"])
 
@@ -202,7 +231,7 @@ async def _connect_to_ota_ap():
                     "device",
                     "wifi",
                     "connect",
-                    NEVERMORE_OTA_WIFI_SSID,
+                    NEVERMORE_OTA_WIFI_SSID if bssid is None else bssid,
                     "password",
                     NEVERMORE_OTA_WIFI_KEY,
                     "name",
@@ -243,12 +272,15 @@ async def _main(args: CmdLnArgs):
 
         args.file = Path(temp_file.name)
 
-    if await reboot_into_ota_mode(args.bt_address):
+    args.bt_address = await reboot_into_ota_mode(args.bt_address)
+    bssid = None if args.bt_address is None else _bssid_from_bt_address(args.bt_address)
+
+    if args.bt_address is not None:
         print("waiting for OTA access point...")
-        await asyncio.wait_for(_connect_to_ota_ap(), CONNECT_TO_AP_TIMEOUT)
+        await asyncio.wait_for(_ota_ap_connect(bssid), CONNECT_TO_AP_TIMEOUT)
     else:
         print("attempting to connect to OTA access point anyways")
-        await asyncio.wait_for(_connect_to_ota_ap(), CONNECT_TO_AP_TIMEOUT / 4)
+        await asyncio.wait_for(_ota_ap_connect(bssid), CONNECT_TO_AP_TIMEOUT / 4)
 
     try:
         tcp_args = TcpArgs(
