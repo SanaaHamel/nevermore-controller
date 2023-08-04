@@ -71,7 +71,7 @@ BT_SCAN_GATHER_ALL_TIMEOUT = 10  # seconds
 CONNECT_TO_AP_TIMEOUT = 20  # seconds
 CONNECT_TO_AP_DELAY = 2  # seconds
 
-OTA_UPDATE_FILENAME = "nevermore-controller-ota.elf"
+OTA_UPDATE_FILENAME = "picowota_nevermore-controller-ota.uf2"
 
 URL_RELEASES_FETCH = (
     "https://api.github.com/repos/sanaahamel/nevermore-controller/releases?per_page=1"
