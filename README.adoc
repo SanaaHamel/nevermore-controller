@@ -166,8 +166,6 @@ Configured MCU 'mcu' (283 moves)
 [#guide-updating]
 == Updating Guide For Dummies
 
-WARNING: The OTA bootloader itself cannot be updated over wireless at this time. If a future update changes the bootloader, you will have to xref:guide-setup[flash the update's UF2 file] instead of using this guide.
-
 WARNING: Your host will temporarily disconnect from the current wifi as part of update process. If you're SSH'd in you will notice the shell briefly stops responding during this time.
 
 If you've flashed a OTA-capable UF2 to your controller (v0.3+) you can update it wirelessly. The process is simple:
