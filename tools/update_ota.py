@@ -6,8 +6,35 @@ set -o pipefail
 FILE="$(readlink -f "$0")"
 ROOT_DIR="$(dirname "$FILE")"
 
-"$ROOT_DIR/setup-tool-env.bash"
-"$ROOT_DIR/.venv/bin/python" "$FILE" "$@"
+NO_TMUX=0
+for ARG; do
+  shift
+  if [ "$ARG" = "--no-tmux" ]; then
+    NO_TMUX=1
+    continue
+  fi
+  set -- "$@" "$ARG"
+done
+
+if [[ "$NO_TMUX" = 1 ]]; then
+  "$ROOT_DIR/setup-tool-env.bash"
+  "$ROOT_DIR/.venv/bin/python" "$FILE" "$@"
+  exit 0
+fi
+
+if ! which tmux &>/dev/null; then
+  echo "installing 'tmux'..."
+  sudo apt-get install tmux -y
+fi
+
+escape() {
+  printf "%q " "$@"
+}
+
+tmux new-session -A -s "nevermore-update" \
+  "$(escape bash -c "$(escape "$FILE" --no-tmux "$@"); \
+                     $(escape read -r -p "Press enter to continue")")"
+
 exit 0 # required to stop shell execution here
 '''
 
@@ -249,16 +276,15 @@ async def _ota_ap_connect(bssid: Optional[str]):
 class CmdLnArgs(tap.TypedArgs):
     bt_address: Optional[str] = tap.arg(help="device's BT adddress")
     file: Optional[Path] = tap.arg(help="filepath for image")
+    # `--no-tmux` is used/handled by the shell wrapper script. list it here for `--help`
+    no_tmux: bool = tap.arg(help="don't run in a tmux session")
 
 
 async def _main(args: CmdLnArgs):
     print("This program will attempt to update a Nevermore controller.")
     print("The host will disconnect from the current WiFi, and then later reconnect.")
-    print("!! IF YOU'RE SSH-ING YOU **MUST** RUN THIS SCRIPT USING `nohup` !!")
-    print("   e.g. `nohup ./update_ota.py ...`")
     print("-------------------------------------------------------------------------")
     print()
-    # await create_connection_profile()
 
     if args.bt_address is not None and not _bt_address_validate(args.bt_address):
         logging.error("invalid address for `--bt-address`")
