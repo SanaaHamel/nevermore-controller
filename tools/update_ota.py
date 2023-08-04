@@ -2,13 +2,13 @@
 "true" '''\'
 set -eu
 set -o pipefail
+
 FILE="$(readlink -f "$0")"
 ROOT_DIR="$(dirname "$FILE")"
-if [ ! -d "$ROOT_DIR/.venv" ]; then
-    "$ROOT_DIR/setup-tool-env.bash"
-fi
+
+"$ROOT_DIR/setup-tool-env.bash"
 "$ROOT_DIR/.venv/bin/python" "$FILE" "$@"
-exit $?
+exit 0 # required to stop shell execution here
 '''
 
 # Script for updating a Nevermore controller.
