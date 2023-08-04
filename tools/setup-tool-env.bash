@@ -142,11 +142,11 @@ if [ ! -d "$VENV_DIR" ] && ! virtualenv -p python3 "$VENV_DIR"; then
   exit 1
 fi
 
-for REQ in $PYTHON_REQUIREMENTS; do
+for REQ in "${PYTHON_REQUIREMENTS[@]}"; do
   "$VENV_DIR/bin/pip" install -r "$REQ"
 done
 
-for REPO in $PYTHON_GITHUB_REPOS; do
+for REPO in "${PYTHON_GITHUB_REPOS[@]}"; do
   "$VENV_DIR/bin/pip" install --force-reinstall "git+https://github.com/$REPO@main"
 done
 
