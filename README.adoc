@@ -254,13 +254,15 @@ https://github.com/mainsail-crew/mainsail/pull/1437[There's a PR for Mainsail wh
 
 * Mainsail doesn't show sensor values other than temperature and, yes, I applied the `class_name_override` hack.
 +
-Refresh the webpage. Mainsail assumes that the first time it sees a multi-value sensor (usually when the page loads) that it will always have the same fields. This isn't true for Nevermore controller sensors.
+Update your Mainsail. Older versions had a bug where it would assume that multi-value sensors always had the same fields once they were seen for the first time. This isn't true for Nevermore controller sensors.
 +
 NOTE: This is very common with the VOC sensors during controller startup. They take a few seconds to initialise.
 
 * Fluidd doesn't show sensor values other than temperature, even with the `class_name_override` hack.
 +
 Can't fix due to how Fluidd interprets Klipper state data. https://github.com/fluidd-core/fluidd/pull/1114[There's a PR fixing the issue, but it hasn't received much support.]
++
+Fluidd is more or less unsupported with regards to sensor display and visualisation. I recommend Mainsail instead.
 
 == Touch Display Support
 
