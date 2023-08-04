@@ -32,23 +32,22 @@ bme68x_conf BME68x_SETTINGS{
         .odr = BME68X_ODR_250_MS,
 };
 
-BME68X_INTF_RET_TYPE i2c_read(uint8_t reg_addr, uint8_t* reg_data, uint32_t len, void* intf_ptr) {
+BME68X_INTF_RET_TYPE i2c_read_(uint8_t reg_addr, uint8_t* reg_data, uint32_t len, void* intf_ptr) {
     auto* bus = reinterpret_cast<i2c_inst_t*>(intf_ptr);
-    if (1 != i2c_write_blocking(*bus, BME68x_ADDRESS, reg_addr)) return BME68X_E_COM_FAIL;
-    if (int(len) != i2c_read_blocking(bus, BME68x_ADDRESS, reg_data, len, false)) return BME68X_E_COM_FAIL;
+    if (!i2c_write("BME68x", *bus, BME68x_ADDRESS, reg_addr)) return BME68X_E_COM_FAIL;
+    if (!i2c_read("BME68x", *bus, BME68x_ADDRESS, reg_data, len)) return BME68X_E_COM_FAIL;
 
     return BME68X_OK;
 }
 
-BME68X_INTF_RET_TYPE i2c_write(uint8_t reg_addr, const uint8_t* reg_data, uint32_t len, void* intf_ptr) {
+BME68X_INTF_RET_TYPE i2c_write_(uint8_t reg_addr, const uint8_t* reg_data, uint32_t len, void* intf_ptr) {
     assert(len < 256);  // keep things reasonable
     auto* bus = reinterpret_cast<i2c_inst_t*>(intf_ptr);
 
     uint8_t buf[len + 1];
     buf[0] = reg_addr;
     memcpy(buf + 1, reg_data, len);  // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
-    if (int(sizeof(buf)) != i2c_write_blocking(bus, BME68x_ADDRESS, buf, sizeof(buf), false))
-        return BME68X_E_COM_FAIL;
+    if (!i2c_write("BME68x", *bus, BME68x_ADDRESS, buf, len + 1)) return BME68X_E_COM_FAIL;
 
     return BME68X_OK;
 }
@@ -57,8 +56,8 @@ optional<bme68x_dev> init(i2c_inst_t& bus) {
     bme68x_dev dev{
             .intf_ptr = &bus,
             .intf = BME68X_I2C_INTF,
-            .read = i2c_read,
-            .write = i2c_write,
+            .read = i2c_read_,
+            .write = i2c_write_,
             .delay_us = [](uint32_t delay_us, void*) { busy_wait_us_32(delay_us); },
     };
 

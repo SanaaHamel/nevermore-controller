@@ -40,16 +40,16 @@ enum class Cmd : uint16_t {
 };
 
 bool sgp4x_heater_off(i2c_inst_t& bus) {
-    return 2 == i2c_write_blocking(bus, SGP40_ADDRESS, Cmd::SGP4x_HEATER_OFF);
+    return i2c_write("SGP40", bus, SGP40_ADDRESS, Cmd::SGP4x_HEATER_OFF);
 }
 
 // returns true IIF self-test passed. any error (I2C or self-test) -> false
 bool sgp40_self_test(i2c_inst_t& bus) {
-    if (2 != i2c_write_blocking(bus, SGP40_ADDRESS, Cmd::SGP40_SELF_TEST)) return false;
+    if (!i2c_write("SGP40", bus, SGP40_ADDRESS, Cmd::SGP40_SELF_TEST)) return false;
 
     task_delay(320ms);  // spec says max delay of 320ms
 
-    auto response = i2c_read_blocking_crc<0xFF, uint8_t, uint8_t>(bus, SGP40_ADDRESS);
+    auto response = i2c_read_blocking_crc<0xFF, uint8_t, uint8_t>("SGP40", bus, SGP40_ADDRESS);
     if (!response) return false;
 
     auto&& [code, _] = *response;
@@ -71,14 +71,7 @@ bool sgp40_measure_issue(i2c_inst_t& bus, double temperature, double humidity) {
     auto humidity_tick = to_tick(humidity, 0, 100);
     PackedTuple cmd{Cmd::SGP40_MEASURE, temperature_tick, crc8(temperature_tick, 0xFF), humidity_tick,
             crc8(humidity_tick, 0xFF)};
-
-    auto r = i2c_write_blocking(bus, SGP40_ADDRESS, cmd);
-    if (r != sizeof(cmd)) {
-        printf("ERR - SGP40 - failed read request: %d\n", r);
-        return false;
-    }
-
-    return true;
+    return i2c_write("SGP40", bus, SGP40_ADDRESS, cmd);
 }
 
 bool sgp40_measure_issue(i2c_inst_t& bus, Temperature const& temperature, Humidity const& humidity) {
@@ -86,7 +79,7 @@ bool sgp40_measure_issue(i2c_inst_t& bus, Temperature const& temperature, Humidi
 }
 
 optional<uint16_t> sgp40_measure_read(i2c_inst_t& bus) {
-    auto response = i2c_read_blocking_crc<0xFF, uint16_t>(bus, SGP40_ADDRESS);
+    auto response = i2c_read_blocking_crc<0xFF, uint16_t>("SGP40", bus, SGP40_ADDRESS);
     if (!response) return false;
 
     auto&& [voc_raw] = *response;
@@ -137,10 +130,7 @@ struct SGP40 final : SensorPeriodic {
         task_delay(320ms);
 
         auto voc_raw = sgp40_measure_read(bus);
-        if (!voc_raw) {
-            printf("ERR - SGP40 - failed read\n");
-            return;
-        }
+        if (!voc_raw) return;
 
 #if DBG_SGP40_TEMP_HUMIDITY_BREAKDOWN
         state = (state + 1) % 4;

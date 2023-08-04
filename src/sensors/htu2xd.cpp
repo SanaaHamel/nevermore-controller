@@ -59,7 +59,7 @@ double htu2xd_humidity_compensated(double humidity_uncompensated, double tempera
 }
 
 bool htu2xd_reset(i2c_inst_t& bus) {
-    return 1 == i2c_write_blocking(bus, HTU2xD_I2C_ADDRESS, Cmd::SOFT_RESET, false);
+    return i2c_write("HTU2xD", bus, HTU2xD_I2C_ADDRESS, Cmd::SOFT_RESET);
 }
 
 // Once a measure is enqueued, call await to retrieve the value.
@@ -72,18 +72,13 @@ bool htu2xd_issue(i2c_inst_t& bus, HTU2xD_Measure kind) {
     case HTU2xD_Measure::Humidity: cmd = Cmd::MEASURE_HUMIDITY_NON_BLOCKING; break;
     }
 
-    if (auto r = i2c_write_blocking(bus, HTU2xD_I2C_ADDRESS, cmd); r < 0) {
-        printf("ERR - HTU2xD - failed read request: %d\n", r);
-        return false;
-    }
-
-    return true;
+    return i2c_write("HTU2xD", bus, HTU2xD_I2C_ADDRESS, cmd);
 }
 
 optional<tuple<HTU2xD_Measure, double>> htu2xd_read_compensated(
         i2c_inst_t& bus, double temperature = HTU2xD_HUMIDITY_COMPENSATION_ZERO_POINT) {
     // in either case we're waiting for the same kind of payload
-    auto response = i2c_read_blocking_crc<0, uint16_t>(bus, HTU2xD_I2C_ADDRESS);
+    auto response = i2c_read_blocking_crc<0, uint16_t>("HTU2xD", bus, HTU2xD_I2C_ADDRESS);
     if (!response) return {};
     auto const data = byteswap(get<0>(*response));
 

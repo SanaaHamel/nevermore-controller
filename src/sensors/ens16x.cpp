@@ -99,7 +99,7 @@ private:
 };
 
 struct ENS16xSensor final : SensorPeriodic {
-    I2CDevice<Reg> i2c;
+    I2CDevice<Reg, "ENS16x"> i2c;
     EnvironmentalFilter side;
     Kind kind = Kind::ENS160;  // assume we're the simpler one until we test
     MISR misr;

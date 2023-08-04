@@ -93,17 +93,13 @@ enum class Cmd : uint8_t {
 
 template <typename A = uint8_t>
 optional<A> reg_read(i2c_inst_t& bus, Cmd const cmd, bool nostop = false) {
-    if (1 != i2c_write_blocking(bus, ADDRESS, cmd)) return {};
-
-    A result{};
-    if (sizeof(A) != i2c_read_blocking(bus, ADDRESS, result)) return {};
-
-    return result;
+    if (!i2c_write("CST816S", bus, ADDRESS, cmd)) return {};
+    return i2c_read<A>("CST816S", bus, ADDRESS);
 }
 
 bool reg_write(i2c_inst_t& bus, Cmd const cmd, uint8_t value) {
     uint8_t data[]{uint8_t(cmd), value};
-    return sizeof(data) == i2c_write_blocking(bus, ADDRESS, data);
+    return i2c_write("CST816S", bus, ADDRESS, data);
 }
 
 optional<uint8_t> reg_write(i2c_inst_t& bus, Cmd const cmd, uint8_t value, uint8_t mask) {

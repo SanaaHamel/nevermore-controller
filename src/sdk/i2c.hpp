@@ -14,6 +14,8 @@
 
 namespace nevermore {
 
+constexpr uint32_t I2C_TIMEOUT_US = 1000000;
+
 enum class I2C_Pin : uint8_t { SDA = 0, SCL = 1 };
 
 constexpr uint8_t i2c_gpio_bus_num(uint8_t pin) {
@@ -39,34 +41,67 @@ constexpr bool i2c_address_reserved(uint8_t addr) {
     return masked == 0 || masked == MASK;
 }
 
-template <typename A>
-int i2c_write_blocking(i2c_inst_t& i2c, uint8_t addr, A const& blob, bool nostop = false)
+inline bool i2c_write(char const* name, i2c_inst_t& i2c, uint8_t addr, uint8_t const* value, size_t len,
+        bool nostop = false) {
+    auto _ = i2c_guard(i2c);
+    int r = i2c_write_timeout_us(&i2c, addr, value, len, nostop, I2C_TIMEOUT_US);
+    if (r < 0 || size_t(r) != len) {
+        printf("ERR - I2C%d - %s write failed; device=0x%02x len=%d result=%d\n", i2c_hw_index(&i2c), name,
+                addr, len, r);
+        return false;
+    }
+
+    return true;
+}
+
+inline bool i2c_read(char const* name, i2c_inst_t& i2c, uint8_t addr, uint8_t* dest, size_t len,
+        bool nostop = false, char const* extra = "") {
+    auto _ = i2c_guard(i2c);
+    int r = i2c_read_timeout_us(&i2c, addr, dest, len, nostop, I2C_TIMEOUT_US);
+    if (r < 0 || size_t(r) != len) {
+        printf("ERR - I2C%d - %s read failed; device=0x%02x len=%d result=%d\n", i2c_hw_index(&i2c), extra,
+                addr, len, r);
+        return false;
+    }
+
+    return true;
+}
+
+template <typename A, bool report_error = true>
+bool i2c_write(char const* name, i2c_inst_t& i2c, uint8_t addr, A const& blob, bool nostop = false)
     requires(!std::is_pointer_v<A>)
 {
-    auto _ = i2c_guard(i2c);
-    return i2c_write_blocking(&i2c, addr, reinterpret_cast<uint8_t const*>(&blob), sizeof(A), nostop);
+    return i2c_write(name, i2c, addr, reinterpret_cast<uint8_t const*>(&blob), sizeof(A), nostop);
 }
 
 template <typename A>
-int i2c_read_blocking(i2c_inst_t& i2c, uint8_t addr, A& blob, bool nostop = false)
+bool i2c_read(char const* name, i2c_inst_t& i2c, uint8_t addr, A& blob, bool nostop = false)
     requires(!std::is_pointer_v<A>)
 {
-    auto _ = i2c_guard(i2c);
-    return i2c_read_blocking(&i2c, addr, reinterpret_cast<uint8_t*>(&blob), sizeof(A), nostop);
+    return i2c_read(name, i2c, addr, reinterpret_cast<uint8_t*>(&blob), sizeof(A), nostop);
+}
+
+template <typename A>
+std::optional<A> i2c_read(char const* name, i2c_inst_t& i2c, uint8_t addr, bool nostop = false)
+    requires(!std::is_pointer_v<A>)
+{
+    A result;
+    if (!i2c_read(name, i2c, addr, result, nostop)) return {};
+    return {std::move(result)};
 }
 
 template <CRC8_t CRC_INIT, typename... A>
-std::optional<PackedTuple<A...>> i2c_read_blocking_crc(i2c_inst_t& i2c, uint8_t addr, bool nostop = false) {
+std::optional<PackedTuple<A...>> i2c_read_blocking_crc(
+        char const* name, i2c_inst_t& i2c, uint8_t addr, bool nostop = false) {
     static_assert(sizeof(PackedTuple<A...>) == (sizeof(A) + ...));  // sancheck packing
 
     ResponseCRC<PackedTuple<A...>, CRC_INIT> response;
-    auto ret = i2c_read_blocking(i2c, addr, response, nostop);
-    if (sizeof(response) != ret) return {};
+    if (!i2c_read(name, i2c, addr, response, nostop)) return {};
 
     if (!response.verify()) {
         // really should show up in a log if they've noise in their wiring
-        printf("ERR - I2C%d - read failed CRC; device=0x%02x crc-reported=0x%02x crc-computed=0x%02x\n",
-                i2c_hw_index(&i2c), addr, response.crc, response.data_crc());
+        printf("ERR - I2C%d - %s read failed CRC; device=0x%02x crc-reported=0x%02x crc-computed=0x%02x\n",
+                i2c_hw_index(&i2c), name, addr, response.crc, response.data_crc());
         return {};
     }
 

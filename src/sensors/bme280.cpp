@@ -29,23 +29,22 @@ constexpr bme280_settings BME280_SETTINGS{
         .standby_time = BME280_STANDBY_TIME_250_MS,
 };
 
-BME280_INTF_RET_TYPE i2c_read(uint8_t reg_addr, uint8_t* reg_data, uint32_t len, void* intf_ptr) {
+BME280_INTF_RET_TYPE i2c_read_(uint8_t reg_addr, uint8_t* reg_data, uint32_t len, void* intf_ptr) {
     auto* bus = reinterpret_cast<i2c_inst_t*>(intf_ptr);
-    if (1 != i2c_write_blocking(*bus, BME280_ADDRESS, reg_addr)) return BME280_E_COMM_FAIL;
-    if (int(len) != i2c_read_blocking(bus, BME280_ADDRESS, reg_data, len, false)) return BME280_E_COMM_FAIL;
+    if (!i2c_write("BME280", *bus, BME280_ADDRESS, reg_addr)) return BME280_E_COMM_FAIL;
+    if (!i2c_read("BME280", *bus, BME280_ADDRESS, reg_data, len)) return BME280_E_COMM_FAIL;
 
     return BME280_OK;
 }
 
-BME280_INTF_RET_TYPE i2c_write(uint8_t reg_addr, const uint8_t* reg_data, uint32_t len, void* intf_ptr) {
+BME280_INTF_RET_TYPE i2c_write_(uint8_t reg_addr, const uint8_t* reg_data, uint32_t len, void* intf_ptr) {
     assert(len < 256);  // keep things reasonable
     auto* bus = reinterpret_cast<i2c_inst_t*>(intf_ptr);
 
     uint8_t buf[len + 1];
     buf[0] = reg_addr;
     memcpy(buf + 1, reg_data, len);  // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
-    if (int(sizeof(buf)) != i2c_write_blocking(bus, BME280_ADDRESS, buf, sizeof(buf), false))
-        return BME280_E_COMM_FAIL;
+    if (!i2c_write("BME280", *bus, BME280_ADDRESS, buf, len)) return BME280_E_COMM_FAIL;
 
     return BME280_OK;
 }
@@ -54,8 +53,8 @@ optional<bme280_dev> init(i2c_inst_t& bus) {
     bme280_dev dev{
             .intf = BME280_I2C_INTF,
             .intf_ptr = &bus,
-            .read = i2c_read,
-            .write = i2c_write,
+            .read = i2c_read_,
+            .write = i2c_write_,
             .delay_us = [](uint32_t delay_us, void*) { busy_wait_us_32(delay_us); },
     };
 
