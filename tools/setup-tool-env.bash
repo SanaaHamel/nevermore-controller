@@ -115,6 +115,7 @@ error-handler() {
 }
 
 trap error-handler ERR
+install-prerequisites
 
 # fetch before install.
 # if we race we fail safe by getting the old commit, but installing the latest.
@@ -128,8 +129,6 @@ if up-to-date "$COMMIT_SERIAL_FLASH_PY"; then
   echo "Tool environment seems up to date."
   exit 0
 fi
-
-install-prerequisites
 
 echo "Updating tool environment..."
 echo "Be patient. This may take a long time..."
