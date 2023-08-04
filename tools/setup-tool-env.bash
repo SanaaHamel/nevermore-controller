@@ -148,7 +148,7 @@ for REQ in $PYTHON_REQUIREMENTS; do
 done
 
 for REPO in $PYTHON_GITHUB_REPOS; do
-  "$VENV_DIR/bin/pip" install "git+https://github.com/$REPO"
+  "$VENV_DIR/bin/pip" install --force-reinstall "git+https://github.com/$REPO@main"
 done
 
 echo "$COMMIT_SERIAL_FLASH_PY" >"$VENV_COMMITS_RECORD"
