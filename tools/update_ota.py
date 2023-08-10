@@ -6,17 +6,20 @@ set -o pipefail
 FILE="$(readlink -f "$0")"
 ROOT_DIR="$(dirname "$FILE")"
 
+TCP=0
 NO_TMUX=0
 for ARG; do
   shift
   if [ "$ARG" = "--no-tmux" ]; then
     NO_TMUX=1
-    continue
+  elif [ "$ARG" = "--tcp" ]; then
+    TCP=1
   fi
   set -- "$@" "$ARG"
 done
 
-if [[ "$NO_TMUX" = 1 ]]; then
+# only run in `tmux` if we'd switch wifi (i.e. using `tcp`)
+if [[ "$TCP" = 0 || "$NO_TMUX" = 1 ]]; then
   "$ROOT_DIR/setup-tool-env.bash"
   "$ROOT_DIR/.venv/bin/python" "$FILE" "$@"
   exit 0
@@ -50,11 +53,11 @@ import asyncio
 import json
 import logging
 import subprocess
-import time
+from abc import abstractmethod
 from dataclasses import dataclass
 from pathlib import Path
 from tempfile import NamedTemporaryFile
-from typing import List, Optional
+from typing import Any, Callable, List, Optional
 from uuid import UUID
 
 import serial_flash
@@ -62,7 +65,12 @@ import typed_argparse as tap
 from aiohttp import ClientSession
 from bleak import BleakClient, BleakScanner
 from bleak.backends.device import BLEDevice
+from serial_flash.transport.bluetooth.spp import SppArgs
 from serial_flash.transport.tcp import TcpArgs
+from typing_extensions import override
+
+
+NEVERMORE_CONTROLLER_NAMES = {"Nevermore", "Nevermore Controller"}
 
 NEVERMORE_OTA_WIFI_SSID = 'nevermore-update-ota'
 NEVERMORE_OTA_WIFI_KEY = 'raccoons-love-floor-onions'
@@ -99,8 +107,6 @@ UUID_SERVICE_ENVIRONMENTAL_SENSING = short_uuid(0x181A)
 UUID_CHAR_SOFTWARE_REVISION = short_uuid(0x2B04)
 UUID_CHAR_CONFIG_REBOOT = UUID("f48a18bb-e03c-4583-8006-5b54422e2045")
 
-UUID_NEVERMORE_OTA_WIFI = UUID("f234a256-b826-4392-b79e-5106bd1e19dd")
-
 
 # must be of the form `xx:xx:xx:xx:xx:xx`, where `x` is a hex digit (uppercase)
 # FUTURE WORK: Won't work on MacOS. It uses UUIDs to abstract/hide the BT address.
@@ -130,21 +136,16 @@ class ReleaseInfo:
     assets: List[str]
 
 
-async def discover_controllers(
-    address: Optional[str] = None, timeout: float = BT_SCAN_GATHER_ALL_TIMEOUT
+async def discover_bluetooth_devices(
+    filter: Callable[[BLEDevice], bool],
+    address: Optional[str] = None,
+    timeout: float = BT_SCAN_GATHER_ALL_TIMEOUT,
 ) -> List[BLEDevice]:
-    NAME_SHORTENED = "Nevermore"
-    NAME_COMPLETE = "Nevermore Controller"
-
     if address is not None:
         device = await BleakScanner.find_device_by_address(address, timeout=timeout)
         return [device] if device is not None else []
 
-    return [
-        x
-        for x in await BleakScanner.discover(timeout=timeout)
-        if x.name in {NAME_SHORTENED, NAME_COMPLETE}
-    ]
+    return [x for x in await BleakScanner.discover(timeout=timeout) if filter(x)]
 
 
 async def fetch_latest_release() -> Optional[ReleaseInfo]:
@@ -193,25 +194,31 @@ async def download_update():
     return await fetch_asset(assert_candidates[0])
 
 
-async def reboot_into_ota_mode(bt_address: Optional[str]):
-    print("discovering Nevermores...")
-    xs = await discover_controllers(bt_address)
+async def discover_device_address(
+    display_name: str, filter: Callable[[BLEDevice], bool], bt_address: Optional[str]
+):
+    print(f"discovering {display_name}...")
+    xs = await discover_bluetooth_devices(filter, bt_address)
     if not xs:
-        logging.error("no Nevermore controllers found")
+        logging.warning(f"no {display_name} found")
         return None
 
     if 1 < len(xs):
         logging.error(
-            "multiple Nevermore controllers found. use `--bt-address` to disambiguate"
+            f"multiple {display_name} found. use `--bt-address` to disambiguate"
         )
-        logging.error("Nevermore controllers found:")
+        logging.error(f"{display_name} found:")
         xs.sort(key=lambda x: x.address)
         for x in xs:
             logging.error(x)
         return None
 
-    print(f"connecting to {xs[0].address}")
-    async with BleakClient(xs[0]) as client:
+    return bt_address
+
+
+async def reboot_into_ota_mode(bt_address: str):
+    print(f"connecting to {bt_address}")
+    async with BleakClient(bt_address) as client:
         char_reboot = client.services.get_characteristic(UUID_CHAR_CONFIG_REBOOT)
         if char_reboot is None:
             logging.error(
@@ -247,8 +254,51 @@ def _ota_ap_visible(bt_address: str) -> bool:  # type: ignore unused
         return False
 
 
-async def _ota_ap_connect(bssid: Optional[str]):
-    while True:
+class ConnectToWifiAccessPoint:
+    def __init__(
+        self,
+        bssid: Optional[str] = None,
+        *,
+        timeout: float = CONNECT_TO_AP_TIMEOUT,
+        retry_delay: float = CONNECT_TO_AP_DELAY,
+    ):
+        assert 0 <= timeout
+        assert 0 < retry_delay
+        self._bssid = bssid
+        self._timeout = timeout
+        self._retry_delay = retry_delay
+        self._closed = False
+
+    async def __aenter__(self):
+        print("waiting for OTA access point...")
+        if self._timeout == 0:
+            await asyncio.wait_for(self._connect_forever(), self._timeout)
+        else:
+            await self._connect_forever()
+
+        return self
+
+    async def __aexit__(self, *_args: Any):
+        if not self._closed:
+            self._closed = True
+            await self._disconnect()
+
+    async def _connect_forever(self):
+        while not self._connect_attempt():
+            await asyncio.sleep(self._retry_delay)
+
+    @abstractmethod
+    async def _connect_attempt(self) -> bool:
+        raise NotImplementedError()
+
+    @abstractmethod
+    async def _disconnect(self) -> None:
+        raise NotImplementedError()
+
+
+class ConnectToWifiAccessPointNetworkManager(ConnectToWifiAccessPoint):
+    @override
+    async def _connect_attempt(self):
         subprocess.check_call(["nmcli", "device", "wifi", "rescan"])
 
         try:
@@ -258,19 +308,29 @@ async def _ota_ap_connect(bssid: Optional[str]):
                     "device",
                     "wifi",
                     "connect",
-                    NEVERMORE_OTA_WIFI_SSID if bssid is None else bssid,
+                    NEVERMORE_OTA_WIFI_SSID if self._bssid is None else self._bssid,
                     "password",
                     NEVERMORE_OTA_WIFI_KEY,
                     "name",
                     NEVERMORE_OTA_WIFI_SSID,
                 ]
             )
-            break
+            return True
         except subprocess.CalledProcessError as e:
             if e.returncode not in {4, 10}:
                 raise
 
-        time.sleep(CONNECT_TO_AP_DELAY)
+        return False
+
+    @override
+    async def _disconnect(self):
+        try:
+            subprocess.check_call(
+                ["nmcli", "connection", "down", NEVERMORE_OTA_WIFI_SSID]
+            )
+        except subprocess.CalledProcessError as e:
+            if e.returncode not in {10}:  # 10 -> no active connection provided
+                raise
 
 
 class CmdLnArgs(tap.TypedArgs):
@@ -278,14 +338,54 @@ class CmdLnArgs(tap.TypedArgs):
     file: Optional[Path] = tap.arg(help="filepath for image")
     # `--no-tmux` is used/handled by the shell wrapper script. list it here for `--help`
     no_tmux: bool = tap.arg(help="don't run in a tmux session")
+    tcp: bool = tap.arg(help="connect via TCP instead of BT SPP")
+    ip: str = tap.arg(
+        default="192.168.4.1", help="if non-empty, connect via TCP to given IP"
+    )
+    port: int = tap.arg(
+        default=4242, help="port use when connecting via TCP, see `--ip`"
+    )
+
+
+async def _update_via_tcp(args: CmdLnArgs, bssid: Optional[str]):
+    if args.file is None:
+        logging.error("no image to upload specified")
+        return
+
+    if bssid is None:
+        logging.warning("no BSSID specified, attempting to connect by SSID...")
+    else:
+        print("waiting for OTA access point...")
+
+    async with ConnectToWifiAccessPointNetworkManager(bssid):
+        serial_flash.run(
+            TcpArgs(
+                filename=str(args.file.absolute()),
+                ip=args.ip or "192.168.4.1",
+                port=args.port,
+            )
+        )
+
+
+async def _update_via_bt_spp(args: CmdLnArgs):
+    if args.file is None:
+        logging.error("no image to upload specified")
+        return
+
+    if args.bt_address is None:
+        logging.error("no BT address specified")
+        return
+
+    serial_flash.run(
+        SppArgs(
+            filename=str(args.file.absolute()),
+            addr=args.bt_address,
+            channel=1,
+        )
+    )
 
 
 async def _main(args: CmdLnArgs):
-    print("This program will attempt to update a Nevermore controller.")
-    print("The host will disconnect from the current WiFi, and then later reconnect.")
-    print("-------------------------------------------------------------------------")
-    print()
-
     if args.bt_address is not None and not _bt_address_validate(args.bt_address):
         logging.error("invalid address for `--bt-address`")
         return
@@ -298,29 +398,34 @@ async def _main(args: CmdLnArgs):
 
         args.file = Path(temp_file.name)
 
-    args.bt_address = await reboot_into_ota_mode(args.bt_address)
-    bssid = None if args.bt_address is None else _bssid_from_bt_address(args.bt_address)
+    address_found = await discover_device_address(
+        "Nevermore controllers",
+        lambda x: x.name is not None and x.name in NEVERMORE_CONTROLLER_NAMES,
+        args.bt_address,
+    )
+    if args.bt_address is None:
+        args.bt_address = address_found
 
-    if args.bt_address is not None:
-        print("waiting for OTA access point...")
-        await asyncio.wait_for(_ota_ap_connect(bssid), CONNECT_TO_AP_TIMEOUT)
+    if address_found is None:
+        print("attempting to connect to bootloader anyways...")
     else:
-        print("attempting to connect to OTA access point anyways")
-        await asyncio.wait_for(_ota_ap_connect(bssid), CONNECT_TO_AP_TIMEOUT / 4)
+        await reboot_into_ota_mode(address_found)
 
-    try:
-        tcp_args = TcpArgs(
-            filename=str(args.file.absolute()), ip="192.168.4.1", port=4242
+    if args.tcp:
+        bssid = (
+            None if args.bt_address is None else _bssid_from_bt_address(args.bt_address)
         )
-        serial_flash.run(tcp_args)
-    finally:
-        try:
-            subprocess.check_call(
-                ["nmcli", "connection", "down", NEVERMORE_OTA_WIFI_SSID]
-            )
-        except subprocess.CalledProcessError as e:
-            if e.returncode not in {10}:  # 10 -> no active connection provided
-                raise
+        await _update_via_tcp(args, bssid)
+    else:
+        # FIXME: Can't scan for bootloaders w/ this API b/c they're BT devices, not BLE devices.
+        # address_found = await discover_device_address(
+        #     "bootloaders",
+        #     lambda x: x.name is not None and x.name.startswith("picowota"),
+        #     args.bt_address,
+        # )
+        # if args.bt_address is None:
+        #     args.bt_address = address_found
+        await _update_via_bt_spp(args)
 
 
 def main():

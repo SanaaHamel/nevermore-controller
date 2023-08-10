@@ -47,9 +47,8 @@ set(PICO_BOARD pico_w)
 set(PICO_CXX_ENABLE_EXCEPTIONS 1)
 pico_sdk_init()
 
-set(PICOWOTA_WIFI_SSID "nevermore-update-ota")
-set(PICOWOTA_WIFI_PASS "raccoons-love-floor-onions")
-set(PICOWOTA_WIFI_AP true)
+set(PICOWOTA_TCP 0)
+set(PICOWOTA_BT_SPP 1)
 add_subdirectory(picowota)
 
 set(SRC_DIR ${CMAKE_SOURCE_DIR}/src)
@@ -174,5 +173,5 @@ add_executable(nevermore-controller-ota)
 target_link_libraries(nevermore-controller-ota PRIVATE nevermore-controller)
 pico_add_extra_outputs(nevermore-controller-ota)
 
-picowota_build_standalone(nevermore-controller-ota)
+picowota_share_cyw43_firmware(nevermore-controller)
 picowota_build_combined(nevermore-controller-ota)
