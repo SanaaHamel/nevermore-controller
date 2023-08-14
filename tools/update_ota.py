@@ -59,6 +59,7 @@ from pathlib import Path
 from tempfile import NamedTemporaryFile
 from typing import Any, Callable, List, Optional
 from uuid import UUID
+import bleak
 
 import serial_flash
 import typed_argparse as tap
@@ -78,6 +79,7 @@ NEVERMORE_OTA_WIFI_KEY = 'raccoons-love-floor-onions'
 BT_SCAN_GATHER_ALL_TIMEOUT = 10  # seconds
 CONNECT_TO_AP_TIMEOUT = 20  # seconds
 CONNECT_TO_AP_DELAY = 2  # seconds
+REBOOT_DELAY = 1  # seconds
 
 OTA_UPDATE_FILENAME = "picowota_nevermore-controller-ota.uf2"
 
@@ -104,7 +106,7 @@ def short_uuid(x: int):
 UUID_SERVICE_GAP = short_uuid(0x1801)
 UUID_SERVICE_ENVIRONMENTAL_SENSING = short_uuid(0x181A)
 
-UUID_CHAR_SOFTWARE_REVISION = short_uuid(0x2B04)
+UUID_CHAR_SOFTWARE_REVISION = short_uuid(0x2A28)
 UUID_CHAR_CONFIG_REBOOT = UUID("f48a18bb-e03c-4583-8006-5b54422e2045")
 
 
@@ -216,20 +218,45 @@ async def discover_device_address(
     return bt_address
 
 
-async def reboot_into_ota_mode(bt_address: str):
-    print(f"connecting to {bt_address}")
-    async with BleakClient(bt_address) as client:
-        char_reboot = client.services.get_characteristic(UUID_CHAR_CONFIG_REBOOT)
-        if char_reboot is None:
-            logging.error(
-                "Nevermore is too old to update with OTA. Manually flash the latest UF2 to it."
-            )
-            return None
+async def software_revision(client: BleakClient):
+    char_revision = client.services.get_characteristic(UUID_CHAR_SOFTWARE_REVISION)
+    if char_revision is None:
+        logging.warning("device does not have a software revision characteristic")
+        return "<unknown>"
 
-        print(f"sending reboot-to-OTA command...")
-        # b"\1" to reboot to OTA, "0" to restart
-        await client.write_gatt_char(char_reboot, b"\1")
-        return client.address
+    HEADER = "commit: "
+    DIRTY = "-dirty"
+
+    revision = str(await client.read_gatt_char(char_revision), "UTF-8")
+    commit = revision
+    if commit.startswith(HEADER):
+        commit = commit[len(HEADER) :]
+    dirty = commit.endswith(DIRTY)
+    if dirty:
+        commit = commit[: -len(DIRTY)]
+
+    try:
+        described = subprocess.check_output(
+            ["git", "describe", "--long", "--tags", commit]
+        ).strip()
+        return str(described, "UTF-8") + (DIRTY if dirty else "")
+    except subprocess.CalledProcessError:
+        logging.exception("failed to describe revision")
+        return revision
+
+
+async def reboot_into_ota_mode(client: BleakClient):
+    char_reboot = client.services.get_characteristic(UUID_CHAR_CONFIG_REBOOT)
+    if char_reboot is None:
+        logging.error(
+            "Nevermore is too old to update with OTA. Manually flash the latest UF2 to it."
+        )
+        return None
+
+    print(f"sending reboot-to-OTA command...")
+    # b"\1" to reboot to OTA, "0" to restart
+    await client.write_gatt_char(char_reboot, b"\1")
+    return client.address
 
 
 def _ota_ap_visible(bt_address: str) -> bool:  # type: ignore unused
@@ -406,10 +433,15 @@ async def _main(args: CmdLnArgs):
     if args.bt_address is None:
         args.bt_address = address_found
 
-    if address_found is None:
-        print("attempting to connect to bootloader anyways...")
+    if address_found is not None:
+        print(f"connecting to {address_found}")
+        async with BleakClient(address_found) as client:
+            prev_version = await software_revision(client)
+            print(f"current revision: {prev_version}")
+            await reboot_into_ota_mode(client)
     else:
-        await reboot_into_ota_mode(address_found)
+        prev_version = "<unknown>"
+        print("attempting to connect to bootloader anyways...")
 
     if args.tcp:
         bssid = (
@@ -426,6 +458,32 @@ async def _main(args: CmdLnArgs):
         # if args.bt_address is None:
         #     args.bt_address = address_found
         await _update_via_bt_spp(args)
+
+    print(f"waiting for device to reboot ({REBOOT_DELAY} seconds)...")
+    await asyncio.sleep(REBOOT_DELAY)  # block b/c we need to wait for it to reboot
+
+    if args.bt_address is not None:
+        print(f"connecting to {args.bt_address} to get installed version")
+        print("(this may take longer than usual)")
+        print(
+            "NOTE: Ignore logged exceptions about `A message handler raised an exception: 'org.bluez.Device1'.`"
+        )
+        print(
+            "      This is caused by a bug in `bleak` but should be benign for this application."
+        )
+
+        while True:
+            try:
+                async with BleakClient(args.bt_address) as client:
+                    curr_version = await software_revision(client)
+                    print(f"previous version: {prev_version}")
+                    print(f" current version: {curr_version}")
+                    break
+            except TimeoutError:
+                pass
+            except bleak.exc.BleakError as e:
+                if "not connected" not in str(e).lower():
+                    raise
 
 
 def main():
