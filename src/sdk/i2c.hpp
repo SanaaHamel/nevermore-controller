@@ -55,12 +55,12 @@ inline bool i2c_write(char const* name, i2c_inst_t& i2c, uint8_t addr, uint8_t c
     return true;
 }
 
-inline bool i2c_read(char const* name, i2c_inst_t& i2c, uint8_t addr, uint8_t* dest, size_t len,
-        bool nostop = false, char const* extra = "") {
+inline bool i2c_read(
+        char const* name, i2c_inst_t& i2c, uint8_t addr, uint8_t* dest, size_t len, bool nostop = false) {
     auto _ = i2c_guard(i2c);
     int r = i2c_read_timeout_us(&i2c, addr, dest, len, nostop, I2C_TIMEOUT_US);
     if (r < 0 || size_t(r) != len) {
-        printf("ERR - I2C%d - %s read failed; device=0x%02x len=%d result=%d\n", i2c_hw_index(&i2c), extra,
+        printf("ERR - I2C%d - %s read failed; device=0x%02x len=%d result=%d\n", i2c_hw_index(&i2c), name,
                 addr, len, r);
         return false;
     }
