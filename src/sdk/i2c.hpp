@@ -30,6 +30,7 @@ extern SemaphoreHandle_t g_i2c_locks[NUM_I2CS];
 
 inline auto i2c_guard(i2c_inst_t& i2c) {
     auto& lock = g_i2c_locks[i2c_hw_index(&i2c)];  // NOLINT
+    xSemaphoreTake(lock, portMAX_DELAY);
     return ScopeGuard{[&] { xSemaphoreGive(lock); }};
 }
 
