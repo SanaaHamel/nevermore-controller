@@ -45,7 +45,7 @@ BME280_INTF_RET_TYPE i2c_write_(uint8_t reg_addr, const uint8_t* reg_data, uint3
     uint8_t buf[len + 1];
     buf[0] = reg_addr;
     memcpy(buf + 1, reg_data, len);  // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
-    if (!i2c_write("BME280", *bus, BME280_ADDRESS, buf, len)) return BME280_E_COMM_FAIL;
+    if (!i2c_write("BME280", *bus, BME280_ADDRESS, buf, sizeof(buf))) return BME280_E_COMM_FAIL;
 
     return BME280_OK;
 }

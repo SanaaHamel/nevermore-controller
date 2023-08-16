@@ -48,7 +48,7 @@ BME68X_INTF_RET_TYPE i2c_write_(uint8_t reg_addr, const uint8_t* reg_data, uint3
     uint8_t buf[len + 1];
     buf[0] = reg_addr;
     memcpy(buf + 1, reg_data, len);  // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
-    if (!i2c_write("BME68x", *bus, BME68x_ADDRESS, buf, len + 1)) return BME68X_E_COM_FAIL;
+    if (!i2c_write("BME68x", *bus, BME68x_ADDRESS, buf, sizeof(buf))) return BME68X_E_COM_FAIL;
 
     return BME68X_OK;
 }
