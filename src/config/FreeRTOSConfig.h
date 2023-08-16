@@ -109,7 +109,7 @@
 */
 
 /* SMP port only */
-#define configNUM_CORES 2  // TODO: bump to 2 after initial test
+#define configNUM_CORES 2
 #define configTICK_CORE 0
 #define configRUN_MULTIPLE_PRIORITIES 1
 #define configUSE_CORE_AFFINITY 1
