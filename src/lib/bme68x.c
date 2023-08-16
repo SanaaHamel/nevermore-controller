@@ -147,14 +147,16 @@ int8_t bme68x_init(struct bme68x_dev *dev)
 {
     int8_t rslt;
 
-    (void) bme68x_soft_reset(dev);
-
     rslt = bme68x_get_regs(BME68X_REG_CHIP_ID, &dev->chip_id, 1, dev);
 
     if (rslt == BME68X_OK)
     {
         if (dev->chip_id == BME68X_CHIP_ID)
         {
+            /* Don't be an ass and reset this device until we know it's a BME68x. */
+            /* It could be a BME280 and they're using a different driver/library. */
+            (void) bme68x_soft_reset(dev);
+
             /* Read Variant ID */
             rslt = read_variant_id(dev);
 
