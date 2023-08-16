@@ -38,7 +38,8 @@ BME280_INTF_RET_TYPE i2c_read_(uint8_t reg_addr, uint8_t* reg_data, uint32_t len
 }
 
 BME280_INTF_RET_TYPE i2c_write_(uint8_t reg_addr, const uint8_t* reg_data, uint32_t len, void* intf_ptr) {
-    assert(len < 256);  // keep things reasonable
+    static_assert(BME280_MAX_LEN * 2 <= 32);
+    assert(len <= BME280_MAX_LEN * 2);  // keep things reasonable
     auto* bus = reinterpret_cast<i2c_inst_t*>(intf_ptr);
 
     uint8_t buf[len + 1];
