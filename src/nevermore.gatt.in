@@ -7,6 +7,7 @@
 // 216aa791-97d0-46ac-8752-60bbc00611e1 VOC Indexed
 // 75134bec-dd06-49b1-bac2-c15e05fd7199 Service Data Aggregation
 // 79cd747f-91af-49a6-95b2-5b597c683129 Fan Power & Tachometer Aggregation
+// 45d2e7d7-40c4-46a6-a160-43eb02d01e27 Fan Thermal Limit Settings
 // 03f61fe0-9fe7-4516-98e6-056de551687f Tachometer
 // 3886216a-d971-4c71-afc4-19f8fba8fb92 WS2812 Config
 // 5d91b6ce-7db1-4e06-b8cb-d75e7dd49aae WS2812 Update Span
@@ -125,6 +126,19 @@ CHARACTERISTIC_USER_DESCRIPTION, READ | DYNAMIC
 // Fan Policy - VOC Improvement Min
 CHARACTERISTIC, 216aa791-97d0-46ac-8752-60bbc00611e1, READ | WRITE | DYNAMIC
 CHARACTERISTIC_USER_DESCRIPTION, READ | DYNAMIC
+// Fan Policy - Thermal Limiting Cut-Off
+CHARACTERISTIC, 45d2e7d7-40c4-46a6-a160-43eb02d01e27, READ | WRITE | DYNAMIC
+CHARACTERISTIC_USER_DESCRIPTION, READ | DYNAMIC
+// `compiler_gatt.py` is dumb as a brick: you cannot specify signed integers for exponent
+// despite it being a `sint8` field in the spec. Lovely.
+// I'm not patching this stupid compiler again, so we got to hand-convert this crap ourselves.
+// , , 0x0E sint16, -2 10^exponent, 0x272F Celsius, 0x1 BT SIG namespace, 0x0105 lower
+CHARACTERISTIC_FORMAT, org-bluetooth-temperature-lower, 0E, FE, 272F, 1, 0105
+// , , 0x0E sint16, -2 10^exponent, 0x272F Celsius, 0x1 BT SIG namespace, 0x0104 upper
+CHARACTERISTIC_FORMAT, org-bluetooth-temperature-upper, 0E, FE, 272F, 1, 0104
+// , , 0x06 uint16, -2 10^exponent, 0x27AD Percentage, 0x1 BT SIG namespace, 0 unknown desc
+CHARACTERISTIC_FORMAT, percentage16_10, 06, FE, 27AD, 1, 0000
+CHARACTERISTIC_AGGREGATE_FORMAT, org-bluetooth-temperature-lower, org-bluetooth-temperature-upper, percentage16_10
 
 /////////////////////////////
 // NeoPixel Control Service

@@ -200,6 +200,7 @@ UUID_CHAR_TIMESEC16 = short_uuid(0x2B16)
 UUID_CHAR_DATA_AGGREGATE = UUID("75134bec-dd06-49b1-bac2-c15e05fd7199")
 UUID_CHAR_FAN_TACHO = UUID("03f61fe0-9fe7-4516-98e6-056de551687f")
 UUID_CHAR_FAN_AGGREGATE = UUID("79cd747f-91af-49a6-95b2-5b597c683129")
+UUID_CHAR_FAN_THERMAL = UUID("45d2e7d7-40c4-46a6-a160-43eb02d01e27")
 UUID_CHAR_VOC_INDEX = UUID("216aa791-97d0-46ac-8752-60bbc00611e1")
 UUID_CHAR_WS2812_UPDATE = UUID("5d91b6ce-7db1-4e06-b8cb-d75e7dd49aae")
 UUID_CHAR_CONFIG_FLAGS64 = UUID("d4b66bf4-3d8f-4746-b6a2-8a59d2eac3ce")
@@ -309,6 +310,28 @@ class BleAttrReader:
 
     def _as_int(self, x: Optional[float]):
         return None if x is None else int(x)
+
+
+class BleAttrWriter:
+    def __init__(self, raw: bytes = b""):
+        self.value = raw
+
+    def temperature(self, t: Optional[float]):
+        return self._presentation_format(t, 2, 2, 0x8000, signed=True)
+
+    def percentage16_10(self, t: Optional[float]):
+        return self._presentation_format(t, 2, 2, 0xFFFF, signed=False)
+
+    def _presentation_format(
+        self, t: Optional[float], size: int, digits: int, not_known: int, signed: bool
+    ):
+        if t is None:
+            # 0xFFFF -> temperature special value: not-known
+            self.value += not_known.to_bytes(size, "little")
+        else:
+            self.value += int(t * 10**digits).to_bytes(size, "little", signed=signed)
+
+        return self
 
 
 def parse_agg_env(reader: BleAttrReader) -> Tuple[SensorState, SensorState]:
@@ -505,6 +528,22 @@ class CmdFanPolicyVocImproveMin(Command):
 
     def params(self):
         return _clamp(self.value, 0, VOC_INDEX_MAX).to_bytes(2, "little")
+
+
+@dataclass(frozen=True)
+class CmdFanPolicyThermalLimit(Command):
+    temp_min: float
+    temp_max: float
+    percent: Optional[float]
+
+    def params(self):
+        return (
+            BleAttrWriter()
+            .temperature(self.temp_min)
+            .temperature(self.temp_max)
+            .percentage16_10(None if self.percent is None else self.percent * 100)
+            .value
+        )
 
 
 @dataclass(frozen=True)
@@ -786,6 +825,9 @@ class NevermoreBackgroundWorker:
         fan_policy_voc_passive_max, fan_policy_voc_improve_min = require_chars(
             service_fan_policy, UUID_CHAR_VOC_INDEX, 2, {P.WRITE}
         )
+        fan_thermal_limit = require_char(
+            service_fan_policy, UUID_CHAR_FAN_THERMAL, {P.WRITE}
+        )
         config_flags = require_char(service_config, UUID_CHAR_CONFIG_FLAGS64, {P.WRITE})
 
         self._connected.set()
@@ -840,6 +882,8 @@ class NevermoreBackgroundWorker:
                 char = fan_policy_voc_passive_max
             elif isinstance(cmd, CmdFanPolicyVocImproveMin):
                 char = fan_policy_voc_improve_min
+            elif isinstance(cmd, CmdFanPolicyThermalLimit):
+                char = fan_thermal_limit
             elif isinstance(cmd, CmdWs2812Length):
                 char = ws2812_length
             elif isinstance(cmd, CmdConfigFlags):
@@ -972,6 +1016,46 @@ class Nevermore:
         self._fan_policy = CmdFanPolicy(config)
         self._fan_power_auto = cfg_fan_power(CmdFanPowerAuto, "fan_power_automatic")
         self._fan_power_coeff = cfg_fan_power(CmdFanPowerCoeff, "fan_power_coefficient")
+
+        fan_thermal_min: Optional[float] = config.getfloat(
+            "fan_thermal_limit_temperature_min", default=None
+        )
+        fan_thermal_max: Optional[float] = config.getfloat(
+            "fan_thermal_limit_temperature_max", default=None
+        )
+        fan_thermal_coeff: Optional[float] = config.getfloat(
+            "fan_thermal_limit_coefficient", default=None, maxval=1
+        )
+        if (
+            fan_thermal_min is None
+            and fan_thermal_max is None
+            and fan_thermal_coeff is None
+        ):
+            self._fan_thermal_limit = None  # use the controller's defaults
+        else:
+            # TODO: unspecified values should be queried from the controller
+            #       (better user-visible behaviour if defaults change)
+            fan_thermal_min = 50 if fan_thermal_min is None else fan_thermal_min
+            fan_thermal_max = 60 if fan_thermal_max is None else fan_thermal_max
+            fan_thermal_coeff = 0 if fan_thermal_coeff is None else fan_thermal_coeff
+            if fan_thermal_coeff == -1:
+                fan_thermal_coeff = None
+            elif fan_thermal_coeff < 0:
+                raise config.error(
+                    "`fan_thermal_limit_coefficient` must be in range [0, 1] or -1 (disables)"
+                )
+
+            if fan_thermal_max < fan_thermal_min:
+                raise config.error(
+                    "`fan_thermal_limit_temperature_min` must <= `fan_thermal_limit_temperature_max`"
+                )
+
+            self._fan_thermal_limit = CmdFanPolicyThermalLimit(
+                fan_thermal_min, fan_thermal_max, fan_thermal_coeff
+            )
+            LOG.info(self._fan_thermal_limit)
+            LOG.info(self._fan_thermal_limit.params())
+
         self._interface: Optional[NevermoreBackgroundWorker] = None
         self._handle_request_restart(None)
 
@@ -1022,6 +1106,7 @@ class Nevermore:
         self._interface.send_command(self._fan_policy)
         self._interface.send_command(self._fan_power_auto)
         self._interface.send_command(self._fan_power_coeff)
+        self._interface.send_command(self._fan_thermal_limit)
         self._interface.send_command(CmdWs2812Length(len(self.led_colour_idxs)))
         self._interface.send_command(CmdWs2812MarkDirty())
 
