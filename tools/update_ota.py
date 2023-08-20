@@ -459,6 +459,7 @@ async def _main(args: CmdLnArgs):
         #     args.bt_address = address_found
         await _update_via_bt_spp(args)
 
+    print("update complete.")
     print(f"waiting for device to reboot ({REBOOT_DELAY} seconds)...")
     await asyncio.sleep(REBOOT_DELAY)  # block b/c we need to wait for it to reboot
 
