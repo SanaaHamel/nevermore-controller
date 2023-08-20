@@ -215,7 +215,7 @@ async def discover_device_address(
             logging.error(x)
         return None
 
-    return bt_address
+    return xs[0].address
 
 
 async def software_revision(client: BleakClient):
