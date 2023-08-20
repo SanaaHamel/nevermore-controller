@@ -403,13 +403,26 @@ async def _update_via_bt_spp(args: CmdLnArgs):
         logging.error("no BT address specified")
         return
 
-    serial_flash.run(
-        SppArgs(
-            filename=str(args.file.absolute()),
-            addr=args.bt_address,
-            channel=1,
-        )
-    )
+    while True:
+        try:
+            serial_flash.run(
+                SppArgs(
+                    filename=str(args.file.absolute()),
+                    addr=args.bt_address,
+                    channel=1,
+                )
+            )
+            break
+        except OSError as e:
+            TRANSIENT_ERRORS = {
+                112,  # host is down
+            }
+            if e.errno not in TRANSIENT_ERRORS:
+                raise  # unhandled
+
+            logging.warning(
+                f"potentially transient comm error, retrying...", exc_info=e
+            )
 
 
 async def _main(args: CmdLnArgs):
