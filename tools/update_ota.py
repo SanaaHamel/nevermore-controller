@@ -311,7 +311,7 @@ class ConnectToWifiAccessPoint:
             await self._disconnect()
 
     async def _connect_forever(self):
-        while not self._connect_attempt():
+        while not await self._connect_attempt():
             await asyncio.sleep(self._retry_delay)
 
     @abstractmethod
