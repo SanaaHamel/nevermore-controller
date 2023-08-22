@@ -425,6 +425,33 @@ async def _update_via_bt_spp(args: CmdLnArgs):
             )
 
 
+async def _report_new_version(args: CmdLnArgs, prev_version: str):
+    if args.bt_address is None:
+        return
+
+    print(f"connecting to {args.bt_address} to get installed version")
+    print("(this may take longer than usual)")
+    print(
+        "NOTE: Ignore logged exceptions about `A message handler raised an exception: 'org.bluez.Device1'.`"
+    )
+    print(
+        "      This is caused by a bug in `bleak` but should be benign for this application."
+    )
+
+    while True:
+        try:
+            async with BleakClient(args.bt_address) as client:
+                curr_version = await software_revision(client)
+                print(f"previous version: {prev_version}")
+                print(f" current version: {curr_version}")
+                break
+        except TimeoutError:
+            pass
+        except bleak.exc.BleakError as e:
+            if "not connected" not in str(e).lower():
+                raise
+
+
 async def _main(args: CmdLnArgs):
     if args.bt_address is not None and not _bt_address_validate(args.bt_address):
         logging.error("invalid address for `--bt-address`")
@@ -473,31 +500,16 @@ async def _main(args: CmdLnArgs):
         await _update_via_bt_spp(args)
 
     print("update complete.")
-    print(f"waiting for device to reboot ({REBOOT_DELAY} seconds)...")
-    await asyncio.sleep(REBOOT_DELAY)  # block b/c we need to wait for it to reboot
+    print("(You may safely abort if the following steps take too long [ctrl-c].)")
 
-    if args.bt_address is not None:
-        print(f"connecting to {args.bt_address} to get installed version")
-        print("(this may take longer than usual)")
-        print(
-            "NOTE: Ignore logged exceptions about `A message handler raised an exception: 'org.bluez.Device1'.`"
-        )
-        print(
-            "      This is caused by a bug in `bleak` but should be benign for this application."
-        )
-
-        while True:
-            try:
-                async with BleakClient(args.bt_address) as client:
-                    curr_version = await software_revision(client)
-                    print(f"previous version: {prev_version}")
-                    print(f" current version: {curr_version}")
-                    break
-            except TimeoutError:
-                pass
-            except bleak.exc.BleakError as e:
-                if "not connected" not in str(e).lower():
-                    raise
+    try:
+        print(f"waiting for device to reboot ({REBOOT_DELAY} seconds)...")
+        await asyncio.sleep(REBOOT_DELAY)  # block b/c we need to wait for it to reboot
+        await _report_new_version(args, prev_version)
+    except asyncio.exceptions.CancelledError:
+        pass
+    except KeyboardInterrupt:
+        pass
 
 
 def main():
