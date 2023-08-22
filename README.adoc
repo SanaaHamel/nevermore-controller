@@ -166,8 +166,6 @@ Configured MCU 'mcu' (283 moves)
 [#guide-updating]
 == Updating Guide For Dummies
 
-WARNING: Your host will temporarily disconnect from the current wifi as part of update process. If you're SSH'd in you will notice the shell briefly stops responding during this time.
-
 If you've flashed a OTA-capable UF2 to your controller (v0.3+) you can update it wirelessly. The process is simple:
 ```sh
 # switch to your nevermore-controller installation
@@ -185,32 +183,45 @@ If you have multiple controllers in range, you can specify which to update using
 
 See `./tools/update_ota.py --help` for all options.
 
+NOTE: The controller will automatically restart if left idle in bootloader mode for 60 seconds.
+
 Overall, you should see output similar to the following:
 
 ```
 Tool environment seems up to date.
 This program will attempt to update a Nevermore controller.
-The host will disconnect from the current WiFi, and then later reconnect.
 -------------------------------------------------------------------------
 
 discovering Nevermores...
-connecting to 28:CD:C1:0B:7B:64
+connecting to XX:XX:XX:XX:XX:XX
+current revision: v0.7.0
 sending reboot-to-OTA command...
-waiting for OTA access point...
-Error: No access point with BSSID '28:CD:C1:0B:7B:63' found. # this will often repeat several times
-...
-Device 'wlp0s20f3' successfully activated with '0dc7e5d7-8363-4dc7-91fe-cd9ef6997d0c'.
 connecting to device...
 requesting device info...
-Info(flash_addr=268808192, flash_size=1724416, erase_size=4096, write_size=256, max_data_len=32767)
-img size: 737792
-chunk size: 0x7000
-updating: 100%|██████████████████████████████████████████████████████████████████████| 724k/724k [00:00<00:00, 894kb/s]
+sync w/ device...
+trying to update bootloader...
+requesting device info...
+img size: 364544
+erasing tail [0x10059000, 0x1005a000]...
+updating: 100%|██████████████████████████████████████████████████████████████████████| 356k/356k [00:02<00:00, 129kb/s]
 # I've already updated this controller, so nothing changed
-update modified 0 of 741376 bytes (0.00%)
+update modified 0 of 364544 bytes (0.00%)
+updating main image...
+requesting device info...
+img size: 390912
+erasing tail [0x100bb000, 0x10200000]...
+updating: 100%|██████████████████████████████████████████████████████████████████████| 384k/384k [00:03<00:00, 120kb/s]
+update modified 0 of 393216 bytes (0.00%)
 finalising...
-launching...
-Connection 'nevermore-update-ota' successfully deactivated (D-Bus active path: /org/freedesktop/NetworkManager/ActiveConnection/216)
+rebooting...
+update complete.
+waiting for device to reboot (1 seconds)...
+connecting to XX:XX:XX:XX:XX:XX to get installed version
+(this may take longer than usual)
+NOTE: Ignore logged exceptions about `A message handler raised an exception: 'org.bluez.Device1'.`
+      This is caused by a bug in `bleak` but should be benign for this application.
+previous version: v0.7.0  # whatever version was installed
+ current version: v0.7.0  # in this example it tried to update to the same version
 ```
 
 
