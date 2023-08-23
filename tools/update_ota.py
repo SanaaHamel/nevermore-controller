@@ -57,10 +57,10 @@ from abc import abstractmethod
 from dataclasses import dataclass
 from pathlib import Path
 from tempfile import NamedTemporaryFile
-from typing import Any, Callable, List, Optional
+from typing import Any, Callable, Coroutine, List, Optional, TypeVar, Union
 from uuid import UUID
-import bleak
 
+import bleak
 import serial_flash
 import typed_argparse as tap
 from aiohttp import ClientSession
@@ -72,6 +72,7 @@ from typing_extensions import override
 
 
 NEVERMORE_CONTROLLER_NAMES = {"Nevermore", "Nevermore Controller"}
+BOOTLOADER_NAME_PREFIX = "picowota "
 
 NEVERMORE_OTA_WIFI_SSID = 'nevermore-update-ota'
 NEVERMORE_OTA_WIFI_KEY = 'raccoons-love-floor-onions'
@@ -109,6 +110,8 @@ UUID_SERVICE_ENVIRONMENTAL_SENSING = short_uuid(0x181A)
 UUID_CHAR_SOFTWARE_REVISION = short_uuid(0x2A28)
 UUID_CHAR_CONFIG_REBOOT = UUID("f48a18bb-e03c-4583-8006-5b54422e2045")
 
+_A = TypeVar("_A")
+
 
 # must be of the form `xx:xx:xx:xx:xx:xx`, where `x` is a hex digit (uppercase)
 # FUTURE WORK: Won't work on MacOS. It uses UUIDs to abstract/hide the BT address.
@@ -139,7 +142,7 @@ class ReleaseInfo:
 
 
 async def discover_bluetooth_devices(
-    filter: Callable[[BLEDevice], bool],
+    filter: Callable[[BLEDevice], Coroutine[Any, Any, bool]],
     address: Optional[str] = None,
     timeout: float = BT_SCAN_GATHER_ALL_TIMEOUT,
 ) -> List[BLEDevice]:
@@ -147,7 +150,7 @@ async def discover_bluetooth_devices(
         device = await BleakScanner.find_device_by_address(address, timeout=timeout)
         return [device] if device is not None else []
 
-    return [x for x in await BleakScanner.discover(timeout=timeout) if filter(x)]
+    return [x for x in await BleakScanner.discover(timeout=timeout) if await filter(x)]
 
 
 async def fetch_latest_release() -> Optional[ReleaseInfo]:
@@ -197,7 +200,9 @@ async def download_update():
 
 
 async def discover_device_address(
-    display_name: str, filter: Callable[[BLEDevice], bool], bt_address: Optional[str]
+    display_name: str,
+    filter: Callable[[BLEDevice], Coroutine[Any, Any, bool]],
+    bt_address: Optional[str],
 ):
     print(f"discovering {display_name}...")
     xs = await discover_bluetooth_devices(filter, bt_address)
@@ -216,6 +221,69 @@ async def discover_device_address(
         return None
 
     return xs[0].address
+
+
+def _is_lost_connection_exception(e: Exception) -> bool:
+    if isinstance(e, bleak.exc.BleakError):
+        msg = str(e).lower()
+        if "not connected" in msg:
+            return True
+        if "device disconnected" in msg:
+            return True
+
+    return False
+
+
+async def retry_if_disconnected(
+    device: Union[BLEDevice, str],
+    go: Callable[[BleakClient], Coroutine[Any, Any, _A]],
+    *,
+    connection_timeout: Optional[float] = 10,
+) -> _A:
+    assert connection_timeout is None or 0 < connection_timeout
+    while True:
+        is_connected = False
+        try:
+            async with BleakClient(
+                device, timeout=10 if connection_timeout is None else connection_timeout
+            ) as client:
+                is_connected = True
+                return await go(client)
+        except asyncio.TimeoutError:
+            # `TimeoutError` after we've connected aren't a connection timeout
+            # and must not be suppressed.
+            if is_connected or connection_timeout is not None:
+                raise
+        except bleak.exc.BleakDeviceNotFoundError:
+            if connection_timeout is not None:
+                raise
+        except bleak.exc.BleakError as e:
+            if not _is_lost_connection_exception(e):
+                raise
+
+            logging.info("lost connection; retrying...", exc_info=e)
+
+
+async def device_is_likely_a_nevermore(device: BLEDevice) -> bool:
+    # should have a short name, be it bootloader or main controller
+    if device.name is None:
+        return False
+
+    if device.name in NEVERMORE_CONTROLLER_NAMES:  # expected/easy case
+        return True
+
+    # Sometimes system caches the old short-name for an address.
+    # In that case, we'll have to connect to test it.
+    if not device.name.startswith(BOOTLOADER_NAME_PREFIX):
+        return False
+
+    async def go(x: BleakClient):
+        return x.services.get_characteristic(UUID_CHAR_CONFIG_REBOOT) is not None
+
+    try:
+        return await retry_if_disconnected(device, go)
+    except TimeoutError:
+        return False  # unable to connect to it in a timely manner, ignore the device
 
 
 async def software_revision(client: BleakClient):
@@ -459,7 +527,7 @@ async def _main(args: CmdLnArgs):
 
     address_found = await discover_device_address(
         "Nevermore controllers",
-        lambda x: x.name is not None and x.name in NEVERMORE_CONTROLLER_NAMES,
+        device_is_likely_a_nevermore,
         args.bt_address,
     )
     if args.bt_address is None:
