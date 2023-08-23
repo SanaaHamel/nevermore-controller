@@ -1053,8 +1053,6 @@ class Nevermore:
             self._fan_thermal_limit = CmdFanPolicyThermalLimit(
                 fan_thermal_min, fan_thermal_max, fan_thermal_coeff
             )
-            LOG.info(self._fan_thermal_limit)
-            LOG.info(self._fan_thermal_limit.params())
 
         self._interface: Optional[NevermoreBackgroundWorker] = None
         self._handle_request_restart(None)
