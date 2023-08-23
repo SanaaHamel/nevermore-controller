@@ -413,13 +413,7 @@ async def _update_via_bt_spp(args: CmdLnArgs):
                 )
             )
             break
-        except OSError as e:
-            TRANSIENT_ERRORS = {
-                112,  # host is down
-            }
-            if e.errno not in TRANSIENT_ERRORS:
-                raise  # unhandled
-
+        except TimeoutError as e:
             logging.warning(
                 f"potentially transient comm error, retrying...", exc_info=e
             )
