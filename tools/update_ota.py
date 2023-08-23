@@ -498,18 +498,12 @@ async def _report_new_version(args: CmdLnArgs, prev_version: str):
         "      This is caused by a bug in `bleak` but should be benign for this application."
     )
 
-    while True:
-        try:
-            async with BleakClient(args.bt_address) as client:
-                curr_version = await software_revision(client)
-                print(f"previous version: {prev_version}")
-                print(f" current version: {curr_version}")
-                break
-        except TimeoutError:
-            pass
-        except bleak.exc.BleakError as e:
-            if "not connected" not in str(e).lower():
-                raise
+    async def go(client: BleakClient):
+        curr_version = await software_revision(client)
+        print(f"previous version: {prev_version}")
+        print(f" current version: {curr_version}")
+
+    await retry_if_disconnected(args.bt_address, go, connection_timeout=None)
 
 
 async def _main(args: CmdLnArgs):
@@ -533,14 +527,19 @@ async def _main(args: CmdLnArgs):
     if args.bt_address is None:
         args.bt_address = address_found
 
+    prev_version = "<unknown>"
+
     if address_found is not None:
         print(f"connecting to {address_found}")
-        async with BleakClient(address_found) as client:
+
+        async def go(client: BleakClient):
+            nonlocal prev_version
             prev_version = await software_revision(client)
             print(f"current revision: {prev_version}")
             await reboot_into_ota_mode(client)
+
+        await retry_if_disconnected(address_found, go, connection_timeout=None)
     else:
-        prev_version = "<unknown>"
         print("attempting to connect to bootloader anyways...")
 
     if args.tcp:
