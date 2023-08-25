@@ -27,6 +27,11 @@ struct EnvironmentalFilter {
         std::get<A&>(main) = x;
     }
 
+    [[nodiscard]] double compensation_temperature(
+            Sensors const& sensors = g_sensors, Config const& config = g_config) const;
+    [[nodiscard]] double compensation_humidity(
+            Sensors const& sensors = g_sensors, Config const& config = g_config) const;
+
 private:
     using Side = std::tuple<BLE::Temperature&, BLE::Humidity&, BLE::Pressure&, VOCIndex&>;
 
@@ -71,6 +76,17 @@ inline BLE::Temperature EnvironmentalFilter::get<BLE::Temperature>(
     // we're intake, have no value, and neither does exhaust -> double fallback to MCU
     if (g_config.fallback_exhaust_mcu) return sensors.temperature_mcu;
     return BLE::NOT_KNOWN;
+}
+
+inline double EnvironmentalFilter::compensation_temperature(
+        Sensors const& sensors, Config const& config) const {
+    return get<BLE::Temperature>(sensors, config).value_or(sensors.temperature_mcu.value_or(20));
+}
+
+inline double EnvironmentalFilter::compensation_humidity(Sensors const& sensors, Config const& config) const {
+    // assume 25% humidity, which is not unreasonable in a hot printer
+    // TODO: make fallback value based off temperature? is it worth the trouble?
+    return get<BLE::Humidity>(sensors, config).value_or(25);
 }
 
 }  // namespace nevermore::sensors

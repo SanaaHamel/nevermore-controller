@@ -74,10 +74,6 @@ bool sgp40_measure_issue(i2c_inst_t& bus, double temperature, double humidity) {
     return i2c_write("SGP40", bus, SGP40_ADDRESS, cmd);
 }
 
-bool sgp40_measure_issue(i2c_inst_t& bus, Temperature const& temperature, Humidity const& humidity) {
-    return sgp40_measure_issue(bus, temperature.value_or(25), humidity.value_or(50));
-}
-
 optional<uint16_t> sgp40_measure_read(i2c_inst_t& bus) {
     auto response = i2c_read_blocking_crc<0xFF, uint16_t>("SGP40", bus, SGP40_ADDRESS);
     if (!response) return false;
@@ -121,7 +117,7 @@ struct SGP40 final : SensorPeriodic {
         case 3: return sgp40_measure_issue(bus, NOT_KNOWN, NOT_KNOWN);
         }
 #endif
-        return sgp40_measure_issue(bus, side.get<Temperature>(), side.get<Humidity>());
+        return sgp40_measure_issue(bus, side.compensation_temperature(), side.compensation_humidity());
     }
 
     void read() override {

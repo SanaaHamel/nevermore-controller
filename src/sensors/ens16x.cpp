@@ -77,6 +77,11 @@ struct [[gnu::packed]] Status {
 };
 static_assert(sizeof(Status) == sizeof(uint8_t));
 
+struct [[gnu::packed]] Compensation {
+    uint16_t temperature;
+    uint16_t humidity;
+};
+
 struct MISR {
     uint8_t expected = 0;  // mirror of DATA_MISR (0 is hardware default)
 
@@ -128,6 +133,12 @@ struct ENS16xSensor final : SensorPeriodic {
     }
 
     void read() override {
+        Compensation compensation{
+                .temperature = uint16_t(max(0., (side.compensation_humidity() + 273.15) * 64)),
+                .humidity = uint16_t(side.compensation_humidity() * 512),
+        };
+        if (!i2c.write(Reg::TempIn, compensation)) return;
+
         // Data* calls must be read via `read_crc` to update checksum
         auto status = read_data_verified<Status>(Reg::DataStatus);
         if (!status) {
