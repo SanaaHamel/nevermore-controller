@@ -142,26 +142,12 @@ struct ENS16xSensor final : SensorPeriodic {
         }
 
         // Serendipitously, this sensor also offers an arbitrary AQI value in the range of [0, 500]
-        auto aqi_level = read_data<uint16_t>(Reg::DataAqiScioSense);
+        auto aqi_level = read_data_verified<uint16_t>(Reg::DataAqiScioSense);
         if (!aqi_level) {
             printf("ERR - ENS16x - failed to read AQI-ScioSense\n");
             return;
         }
 
-        struct [[gnu::packed]] TempHumidity {
-            uint16_t temperature;
-            uint16_t humidity;
-        };
-        auto th = read_data<TempHumidity>(Reg::DataTemperature);
-        if (!th) {
-            printf("ERR - ENS16x - failed to read temperature & humidity\n");
-            return;
-        }
-
-        if (!misr_verify()) return;  // something went wrong reading AQI or temp
-
-        side.set(Temperature(th->temperature / 64. - 273.15));
-        side.set(Humidity(th->humidity / 512.));
         side.set(VOCIndex(clamp<uint16_t>(*aqi_level, 1, 500)));
     }
 
