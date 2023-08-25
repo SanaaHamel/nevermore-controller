@@ -16,9 +16,10 @@ struct I2CDevice {
 
     template <typename A>
     bool write(Register reg, A value) const {
-        if (!i2c_write(name, bus, address, reg)) return false;
-        if (!i2c_write(name, bus, address, value)) return false;
-        return true;
+        uint8_t cmd[sizeof(reg) + sizeof(value)];
+        memcpy(cmd, &reg, sizeof(reg));
+        memcpy(cmd + sizeof(reg), &value, sizeof(value));
+        return i2c_write(name, bus, address, cmd);
     }
 
     template <typename A>
