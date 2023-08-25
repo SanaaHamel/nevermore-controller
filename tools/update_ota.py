@@ -53,11 +53,12 @@ import asyncio
 import json
 import logging
 import subprocess
+import typing
 from abc import abstractmethod
 from dataclasses import dataclass
 from pathlib import Path
 from tempfile import NamedTemporaryFile
-from typing import Any, Callable, Coroutine, List, Optional, TypeVar, Union
+from typing import Any, Callable, Coroutine, List, Optional, TypeVar, Union, overload
 from uuid import UUID
 
 import bleak
@@ -69,6 +70,11 @@ from bleak.backends.device import BLEDevice
 from serial_flash.transport.bluetooth.spp import SppArgs
 from serial_flash.transport.tcp import TcpArgs
 from typing_extensions import override
+
+if typing.TYPE_CHECKING:
+    _LoggerAdapter = logging.LoggerAdapter[logging.Logger]
+else:
+    _LoggerAdapter = logging.LoggerAdapter
 
 
 NEVERMORE_CONTROLLER_NAMES = {"Nevermore", "Nevermore Controller"}
@@ -223,7 +229,31 @@ async def discover_device_address(
     return xs[0].address
 
 
-def _is_lost_connection_exception(e: Exception) -> bool:
+def _is_lost_connection_exception(e: Exception, is_connecting: bool) -> bool:
+    if isinstance(e, bleak.exc.BleakDBusError):
+        # potentially caused by noisy environments or poor timing
+        if e.dbus_error == "org.bluez.Error.NotConnected":
+            return True
+
+        ANY_TIME_DBUS_ERRORS = {
+            ("org.bluez.Error.Failed", "br-connection-canceled"),
+            ("org.bluez.Error.Failed", "Software caused connection abort"),
+            ("org.bluez.Error.Failed", "Operation already in progress"),
+        }
+
+        CONNECTING_DBUS_ERRORS = {
+            ("org.bluez.Error.Failed", "Operation already in progress"),
+        }
+
+        if (e.dbus_error, e.dbus_error_details) in ANY_TIME_DBUS_ERRORS:
+            return True
+
+        if (
+            is_connecting
+            and (e.dbus_error, e.dbus_error_details) in CONNECTING_DBUS_ERRORS
+        ):
+            return True
+
     if isinstance(e, bleak.exc.BleakError):
         msg = str(e).lower()
         if "not connected" in msg:
@@ -234,19 +264,58 @@ def _is_lost_connection_exception(e: Exception) -> bool:
     return False
 
 
+# TODO: This function is much more generalised than it needs to be here.
+#       Reason: It is also used by `klipper.py`, but I haven't had the time or
+#       energy to extract them to a shared library.
+@overload
 async def retry_if_disconnected(
-    device: Union[BLEDevice, str],
+    device: Union[
+        Callable[[], Coroutine[Any, Any, Union[BLEDevice, str]]], BLEDevice, str
+    ],
     go: Callable[[BleakClient], Coroutine[Any, Any, _A]],
     *,
     connection_timeout: Optional[float] = 10,
+    exc_filter: Callable[[Exception], bool] = lambda e: False,
+    log: Union[logging.Logger, _LoggerAdapter] = logging.root,
+    retry: None = None,
 ) -> _A:
+    pass
+
+
+@overload
+async def retry_if_disconnected(
+    device: Union[
+        Callable[[], Coroutine[Any, Any, Union[BLEDevice, str]]], BLEDevice, str
+    ],
+    go: Callable[[BleakClient], Coroutine[Any, Any, _A]],
+    *,
+    connection_timeout: Optional[float] = 10,
+    exc_filter: Callable[[Exception], bool] = lambda e: False,
+    log: Union[logging.Logger, _LoggerAdapter] = logging.root,
+    retry: Callable[[], bool] = lambda: True,
+) -> Optional[_A]:
+    pass
+
+
+async def retry_if_disconnected(
+    device: Union[
+        Callable[[], Coroutine[Any, Any, Union[BLEDevice, str]]], BLEDevice, str
+    ],
+    go: Callable[[BleakClient], Coroutine[Any, Any, _A]],
+    *,
+    connection_timeout: Optional[float] = 10,
+    exc_filter: Callable[[Exception], bool] = lambda e: False,
+    log: Union[logging.Logger, _LoggerAdapter] = logging.root,
+    retry: Optional[Callable[[], bool]] = None,
+) -> Optional[_A]:
     assert connection_timeout is None or 0 < connection_timeout
-    while True:
+
+    while retry is None or retry():
         is_connected = False
         try:
-            async with BleakClient(
-                device, timeout=10 if connection_timeout is None else connection_timeout
-            ) as client:
+            addr = device if isinstance(device, (BLEDevice, str)) else await device()
+            timeout = 10 if connection_timeout is None else connection_timeout
+            async with BleakClient(addr, timeout=timeout) as client:
                 is_connected = True
                 return await go(client)
         except asyncio.TimeoutError:
@@ -255,13 +324,16 @@ async def retry_if_disconnected(
             if is_connected or connection_timeout is not None:
                 raise
         except bleak.exc.BleakDeviceNotFoundError:
-            if connection_timeout is not None:
+            # same thing as `TimeoutError`
+            if is_connected or connection_timeout is not None:
                 raise
-        except bleak.exc.BleakError as e:
-            if not _is_lost_connection_exception(e):
+        except Exception as e:
+            if _is_lost_connection_exception(e, not is_connected):
+                # don't be (too) noisy about it, it happens
+                log.debug("connection lost.", exc_info=e)
+                log.info("connection lost. attempting reconnection...")
+            elif not exc_filter(e):
                 raise
-
-            logging.info("lost connection; retrying...", exc_info=e)
 
 
 async def device_is_likely_a_nevermore(device: BLEDevice) -> bool:
