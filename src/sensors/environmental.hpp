@@ -32,7 +32,7 @@ private:
 
     template <typename A>
         requires(!std::is_reference_v<A>)
-    A get_(Sensors const& sensors = g_sensors, Config const& config = g_config) const {
+    [[nodiscard]] A get_(Sensors const& sensors = g_sensors, Config const& config = g_config) const {
         // NOLINTNEXTLINE(cppcoreguidelines-pro-type-const-cast)
         auto [main, other] = pick(const_cast<Sensors&>(sensors));
         if (auto value = std::get<A&>(main); value != BLE::NOT_KNOWN) return value;
