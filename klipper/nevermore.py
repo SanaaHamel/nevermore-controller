@@ -33,12 +33,12 @@ from typing import (
 )
 from uuid import UUID
 
+import bleak
 import janus
 from bleak import BleakClient, BleakScanner
 from bleak.backends.characteristic import BleakGATTCharacteristic
 from bleak.backends.device import BLEDevice
 from bleak.backends.service import BleakGATTService
-from bleak.exc import BleakDBusError, BleakDeviceNotFoundError, BleakError
 from configfile import ConfigWrapper
 from extras.led import LEDHelper
 from gcode import GCodeCommand, GCodeDispatch
@@ -58,6 +58,9 @@ __all__ = [
 # Non-configurable constants
 CONTROLLER_ADVERTISEMENT_PERIOD = 0.5  # seconds, upper bound on adverts
 CONTROLLER_CONNECTION_DELAY = 5  # seconds, expected upper bound based on tests
+
+CONTROLLER_NAMES = {"Nevermore", "Nevermore Controller"}
+BOOTLOADER_NAME_PREFIX = "picowota "
 
 # Derived constants
 # must cover at least 2-3 advert periods
@@ -226,6 +229,106 @@ def _bt_address_validate(addr: str):
         return False
 
     return True
+
+
+def _is_lost_connection_exception(e: Exception, is_connecting: bool = False) -> bool:
+    if isinstance(e, bleak.exc.BleakDBusError):
+        # potentially caused by noisy environments or poor timing
+        if e.dbus_error == "org.bluez.Error.NotConnected":
+            return True
+
+        ANY_TIME_DBUS_ERRORS = {
+            ("org.bluez.Error.Failed", "br-connection-canceled"),
+            ("org.bluez.Error.Failed", "Software caused connection abort"),
+            ("org.bluez.Error.Failed", "Operation already in progress"),
+        }
+
+        CONNECTING_DBUS_ERRORS = {
+            ("org.bluez.Error.Failed", "Operation already in progress"),
+        }
+
+        if (e.dbus_error, e.dbus_error_details) in ANY_TIME_DBUS_ERRORS:
+            return True
+
+        if (
+            is_connecting
+            and (e.dbus_error, e.dbus_error_details) in CONNECTING_DBUS_ERRORS
+        ):
+            return True
+
+    if isinstance(e, bleak.exc.BleakError):
+        msg = str(e).lower()
+        if "not connected" in msg:
+            return True
+        if "device disconnected" in msg:
+            return True
+
+    return False
+
+
+# TODO: There are significant chunks of duplicated code shared between
+#       `nevermore.py` and the tooling scripts.
+#       Ideally these should be extracted to a shared library, but the Klipper
+#       path requirements makes this more complicated...
+async def retry_if_disconnected(
+    device: Union[
+        Callable[[], Coroutine[Any, Any, Union[BLEDevice, str]]], BLEDevice, str
+    ],
+    go: Callable[[BleakClient], Coroutine[Any, Any, _A]],
+    *,
+    connection_timeout: Optional[float] = 10,
+    exc_filter: Callable[[Exception], bool] = lambda e: False,
+    log: Union[logging.Logger, _LoggerAdapter] = logging.root,
+    retry: Optional[Callable[[], bool]] = None,
+) -> Optional[_A]:
+    assert connection_timeout is None or 0 < connection_timeout
+
+    while retry is None or retry():
+        is_connected = False
+        try:
+            addr = device if isinstance(device, (BLEDevice, str)) else await device()
+            timeout = 10 if connection_timeout is None else connection_timeout
+            async with BleakClient(addr, timeout=timeout) as client:
+                is_connected = True
+                return await go(client)
+        except asyncio.TimeoutError:
+            # `TimeoutError` after we've connected aren't a connection timeout
+            # and must not be suppressed.
+            if is_connected or connection_timeout is not None:
+                raise
+        except bleak.exc.BleakDeviceNotFoundError:
+            # same thing as `TimeoutError`
+            if is_connected or connection_timeout is not None:
+                raise
+        except Exception as e:
+            if _is_lost_connection_exception(e, not is_connected):
+                # don't be (too) noisy about it, it happens
+                log.debug("connection lost.", exc_info=e)
+                log.info("connection lost. attempting reconnection...")
+            elif not exc_filter(e):
+                raise
+
+
+async def _device_is_likely_a_nevermore(device: BLEDevice) -> bool:
+    # should have a short name, be it bootloader or main controller
+    if device.name is None:
+        return False
+
+    if device.name in CONTROLLER_NAMES:  # expected/easy case
+        return True
+
+    # Sometimes system caches the old short-name for an address.
+    # In that case, we'll have to connect to test it.
+    if not device.name.startswith(BOOTLOADER_NAME_PREFIX):
+        return False
+
+    async def go(x: BleakClient):
+        return x.services.get_characteristic(UUID_CHAR_CONFIG_FLAGS64) is not None
+
+    try:
+        return await retry_if_disconnected(device, go, log=LOG) or False
+    except TimeoutError:
+        return False  # unable to connect to it in a timely manner, ignore the device
 
 
 class BleAttrReaderNotEnoughData(Exception):
@@ -397,9 +500,6 @@ def require_char(
 async def discover_controllers(
     address: Optional[str] = None, timeout: float = BT_SCAN_GATHER_ALL_TIMEOUT
 ) -> List[BLEDevice]:
-    NAME_SHORTENED = "Nevermore"
-    NAME_COMPLETE = "Nevermore Controller"
-
     if address is not None:
         device = await BleakScanner.find_device_by_address(address, timeout=timeout)
         return [device] if device is not None else []
@@ -407,8 +507,8 @@ async def discover_controllers(
     return [
         x
         for x in await BleakScanner.discover(timeout=timeout)
-        if x.name in {NAME_SHORTENED, NAME_COMPLETE}
-    ]  # type: ignore mistake in overload resolution
+        if await _device_is_likely_a_nevermore(x)
+    ]
 
 
 @dataclass
@@ -682,6 +782,63 @@ class NevermoreBackgroundWorker:
         worker_log = LogPrefixed(LOG, lambda x: f"{self._thread.name} - {x}")
 
         async def handle_connection(device_address: Optional[str]) -> None:
+            class CantInferWhichNevermoreTooUse(Exception):
+                pass
+
+            async def discover_device():
+                nonlocal device_address
+                scan_timeout = (
+                    BT_SCAN_GATHER_ALL_TIMEOUT
+                    if device_address is None
+                    else BT_SCAN_KNOWN_ADDRESS_TIMEOUT
+                )
+
+                while True:  # keep scanning until we find some devices...
+                    devices = await discover_controllers(device_address, scan_timeout)
+                    if not not devices:
+                        break
+
+                if 1 < len(devices):  # multiple devices found
+                    worker_log.error(
+                        f"multiple nevermore controllers discovered.\n"
+                        f"specify which to use by setting `bt_address: <insert-address-here>` in your klipper config.\n"
+                        f"discovered controllers (ordered by signal strength):\n"
+                        f"\taddress           | signal strength\n"
+                        f"\t-----------------------------------\n"
+                        f"\t"
+                        + "\n\t".join(
+                            f"{x.address} | {x.rssi} dBm"
+                            for x in sorted(devices, key=lambda x: -x.rssi)
+                        )
+                    )
+                    # don't bother trying again. abort & let the user deal with it
+                    raise CantInferWhichNevermoreTooUse()
+
+                # remember the discovered device's address, just in case another
+                # controller wanders into range and we need to reconnect to this one
+                if device_address is None:
+                    device_address = devices[0].address
+
+                worker_log.info(f"discovered controller {devices[0].address}")
+                return devices[0]
+
+            def exc_filter(e: Exception):
+                # if it's not a bleak error, don't suppress it
+                if not isinstance(e, bleak.exc.BleakError):
+                    return False
+
+                # be noisy about it, something unexpected happened.
+                # try to recovery by resetting the connection.
+                # This sucks, but there's huge variety of errors that
+                # can happen due to a lost connection, and I can't think
+                # of a good way to recognise them with this API.
+                # TODO: Log this in the console area. Ostensibly you can
+                #       do this with `GCode::response_info`, but I don't
+                #       know if there are rules/invariants about this.
+                #       (e.g. only the active GCode/command may write)
+                worker_log.exception("BT error - attempting reconnection...")
+                return True
+
             # Attempt (re)connection. Might have to do this multiple times if we lose connection.
             #
             # HACK: FIXME: Very rarely (race?) it happens that the cancel exception fires, but that
@@ -704,67 +861,17 @@ class NevermoreBackgroundWorker:
             # As a hack/workaround, check that the exit isn't set.
             # This should never be true, since the canceller task should cancel
             # us when it fires, but apparently I've a bug in here.
-            while not self._loop_exit.is_set():
-                try:
-                    scan_timeout = (
-                        BT_SCAN_GATHER_ALL_TIMEOUT
-                        if device_address is None
-                        else BT_SCAN_KNOWN_ADDRESS_TIMEOUT
-                    )
-                    devices = await discover_controllers(device_address, scan_timeout)
-                    if not devices:
-                        continue  # no devices found, try again
-
-                    if 1 < len(devices):  # multiple devices found
-                        worker_log.error(
-                            f"multiple nevermore controllers discovered.\n"
-                            f"specify which to use by setting `bt_address: <insert-address-here>` in your klipper config.\n"
-                            f"discovered controllers (ordered by signal strength):\n"
-                            f"\taddress           | signal strength\n"
-                            f"\t-----------------------------------\n"
-                            f"\t"
-                            + "\n\t".join(
-                                f"{x.address} | {x.rssi} dBm"
-                                for x in sorted(devices, key=lambda x: -x.rssi)
-                            )
-                        )
-                        return  # don't bother trying again. abort & let the user deal with it
-
-                    # remember the discovered device's address, just in case another
-                    # controller wanders into range and we need to reconnect to this one
-                    if device_address is None:
-                        device_address = devices[0].address
-
-                    worker_log.info(f"discovered controller {devices[0].address}")
-                    async with BleakClient(devices[0]) as client:
-                        await self._worker_using(worker_log, client)
-                except TimeoutError:
-                    pass  # ignore, keep trying to (re)connect
-                except BleakDeviceNotFoundError:
-                    pass  # ignore, keep trying to (re)connect
-                except BleakDBusError as e:
-                    # potentially caused by noisy environments or poor timing
-                    transient = (e.dbus_error == "org.bluez.Error.NotConnected") or (
-                        e.dbus_error == "org.bluez.Error.Failed"
-                        and e.dbus_error_details == "Software caused connection abort"
-                    )
-                    if not transient:
-                        raise
-                except BleakError as e:
-                    if e.args[0] == "Not connected":
-                        # don't be noisy about it, it happens
-                        worker_log.info("connection lost. attempting reconnection...")
-                    else:
-                        # be noisy about it, something unexpected happened.
-                        # try to recovery by resetting the connection.
-                        # This sucks, but there's huge variety of errors that
-                        # can happen due to a lost connection, and I can't think
-                        # of a good way to recognise them with this API.
-                        # TODO: Log this in the console area. Ostensibly you can
-                        #       do this with `GCode::response_info`, but I don't
-                        #       know if there are rules/invariants about this.
-                        #       (e.g. only the active GCode/command may write)
-                        worker_log.exception("BT error - attempting reconnection...")
+            try:
+                await retry_if_disconnected(
+                    discover_device,
+                    lambda client: self._worker_using(worker_log, client),
+                    connection_timeout=None,
+                    exc_filter=exc_filter,
+                    log=worker_log,
+                    retry=lambda: not self._loop_exit.is_set(),
+                )
+            except CantInferWhichNevermoreTooUse:
+                pass  # quietly fail and move on
 
         async def go():
             # set this up ASAP once we're in an asyncio loop
@@ -893,12 +1000,13 @@ class NevermoreBackgroundWorker:
 
             try:
                 await client.write_gatt_char(char, cmd.params())
-            except BleakError as e:
-                # consider non-fatal. don't to abort due to potentially transient error
+            except bleak.exc.BleakError as e:
                 # special case: lost connection -> wait and attempt reconnect
-                if e.args[0] == "Not connected":
+                if _is_lost_connection_exception(e):
                     raise
 
+                # consider non-fatal. if we're in the wrong (API error), then
+                # we can do nothing but log it and limp on...
                 log.exception(f"command failed cmd={cmd}")
 
         async def handle_led():
