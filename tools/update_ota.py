@@ -18,9 +18,50 @@ for ARG; do
   set -- "$@" "$ARG"
 done
 
+# HACK: A GATT client can spuriously connect to a BlueTooth device that only
+#       exposes a BlueTooth Classic interface and then interrupt/close an
+#       active SPP stream.
+#       I'm not sure of the how or why, but for now that means we have to make
+#       sure Klipper isn't trying to connect to the controller while updating.
+KLIPPER_SUSPENDED=0
+ensure_klipper_not_running() {
+  if [ "$(systemctl list-units --full -all -t service --no-legend --no-pager --state active | grep -F "klipper.service")" ]; then
+    echo "Klipper service is active."
+    echo "Due to software quirks you should stop klipper during the firmware update."
+    echo "(Make sure you don't have a print in progress!)"
+
+    while true; do
+        read -r -p "Stop Klipper during update? [Yn]" ANSWER
+        case $ANSWER in
+        ""|[Yy])
+        echo "Stopping klipper... "
+        sudo systemctl stop klipper.service
+        KLIPPER_SUSPENDED=1
+        break
+        ;;
+        [Nn])
+        echo "Klipper is active, cannot safely update controller. Exiting."
+        exit 1
+        ;;
+        *) echo "Stop Klipper during update" ;;
+        esac
+    done
+  fi
+}
+
+finish() {
+  if [[ "$KLIPPER_SUSPENDED" = 1 ]]; then
+    echo "Restarting klipper... "
+    sudo systemctl start klipper.service
+  fi
+}
+trap finish EXIT
+
+
 # only run in `tmux` if we'd switch wifi (i.e. using `tcp`)
 if [[ "$TCP" = 0 || "$NO_TMUX" = 1 ]]; then
   "$ROOT_DIR/setup-tool-env.bash"
+  ensure_klipper_not_running
   "$ROOT_DIR/.venv/bin/python" "$FILE" "$@"
   exit 0
 fi
