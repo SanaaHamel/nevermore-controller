@@ -39,9 +39,9 @@ enum class Reg : uint8_t {
     DataReserved0 = 0x28u,  // 10 octets (??)
     DataTemperature = 0x30u,
     DataRelativeHumidity = 0x32u,  // 16 bits
-    DataChecksum = 0x38u,
-    GprWrite0 = 0x40u,  // up to 8 octets
-    GprRead0 = 0x48u,   // up to 8 octets
+    DataChecksum = 0x38u,          // AKA `MISR`
+    GprWrite0 = 0x40u,             // up to 8 octets
+    GprRead0 = 0x48u,              // up to 8 octets
     GprRead4 = GprRead0 + 4,
 };
 
@@ -59,7 +59,7 @@ enum class Cmd : uint8_t {
     ClearGPR = 0xCCu,
 };
 
-enum class Kind { ENS160, ENS161 };
+enum class Kind : unsigned { ENS160 = 160, ENS161 = 161 };
 
 struct [[gnu::packed]] AppVersion {
     uint8_t major, minor, revision;
@@ -73,7 +73,7 @@ struct [[gnu::packed]] Status {
     uint8_t validity : 2;  // 0 = normal, 1 = warm-up, 2 = startup, 3 = invalid
     uint8_t _reserved : 2;
     uint8_t error : 1;   // 0 = normal, 1 = error detected
-    uint8_t statas : 1;  // not sure what they mean, datasheet unclear
+    uint8_t statas : 1;  // (sic) "High indicates that an OPMODE is running" -> mode change in progress?
 };
 static_assert(sizeof(Status) == sizeof(uint8_t));
 
@@ -112,53 +112,24 @@ struct ENS16xSensor final : SensorPeriodic {
     }
 
     bool setup() {
-        // fail silently for reset; assume there's no device
-        if (!mode(OpMode::Reset)) return false;
-        task_delay(ENS16x_POWER_ON_DELAY);
+        if (!mode(OpMode::Reset, true)) return false;
+        if (!mode(OpMode::Idle)) return false;
 
-        // Mode should now be `Idle`
+        auto kind = read_kind();
+        if (!kind) return false;
+        this->kind = *kind;
+        printf("ENS16x - kind: %u\n", unsigned(this->kind));
 
-        auto part_id = i2c.read<uint16_t>(Reg::PartID);
-        if (!part_id) {
-            printf("ERR - ENS16x - failed to read part ID\n");
-            return false;
-        }
-
-        switch (*part_id) {
-        case PART_ID_ENS160: kind = Kind::ENS160; break;
-        case PART_ID_ENS161: kind = Kind::ENS161; break;
-        default: {
-            printf("ERR - ENS16x - unrecognised ID 0x%04x\n", *part_id);
-            return false;
-        } break;
-        }
-
-        if (!i2c.write(Reg::Command, Cmd::GetAppVersion)) {
-            printf("ERR - ENS16x - failed to send cmd `GetAppVersion`\n");
-            return false;
-        }
-
-        auto version = i2c.read<AppVersion>(Reg::GprRead4);
-        if (!version) {
-            printf("ERR - ENS16x - failed to read version\n");
-            return false;
-        }
-
+        auto version = read_app_version();
+        if (!version) return false;
         printf("ENS16x - version: %d.%d.%d\n", version->major, version->minor, version->revision);
-        if (!mode(OpMode::Operational)) {
-            printf("ERR - ENS16x - failed to change to operational mode\n");
-            return false;
-        }
 
-        return true;
+        return mode(OpMode::Operational);
     }
 
-    // TODO: This is a multi-query sensor: we can't batch read issues and then batch read-backs
-    //       Ideally we'd like to be able to chain issue/read pairs.
-    //       For now, just bite the bullet, we're spending ~66ms blocked.
     void read() override {
         // Data* calls must be read via `read_crc` to update checksum
-        auto status = read_data<Status>(Reg::DataStatus);
+        auto status = read_data_verified<Status>(Reg::DataStatus);
         if (!status) {
             printf("ERR - ENS16x - failed to fetch status\n");
             return;
@@ -187,17 +158,78 @@ struct ENS16xSensor final : SensorPeriodic {
             return;
         }
 
-        if (!misr_verify()) return;  // error in transmission, try again next time...
+        if (!misr_verify()) return;  // something went wrong reading AQI or temp
 
         side.set(Temperature(th->temperature / 64. - 273.15));
         side.set(Humidity(th->humidity / 512.));
         side.set(VOCIndex(clamp<uint16_t>(*aqi_level, 1, 500)));
     }
 
-    bool mode(OpMode mode) {  // NOLINT(readability-make-member-function-const)
-        return i2c.write(Reg::OpMode, mode);
+    bool mode(OpMode mode, bool quiet = false) {  // NOLINT(readability-make-member-function-const)
+        if (!i2c.write(Reg::OpMode, mode)) {
+            if (!quiet) {
+                printf("ERR - ENS16x - failed to change to mode=%02x\n", uint8_t(mode));
+            }
+
+            return false;
+        }
+
+        // Reset does *NOT* clear/set MISR. Have to query the current state from the device.
+        // Might as well do this now when we're changing modes.
+        auto curr_misr = i2c.read<uint8_t>(Reg::DataChecksum);
+        if (!curr_misr) {
+            printf("ERR - ENS16x - failed to sync checksum\n");
+            return false;
+        }
+        misr.expected = *curr_misr;
+
+        // `statas` is low when mode change is complete
+        return status_await([](auto& x) { return !x.statas; });
     }
 
+    optional<Kind> read_kind() {
+        auto part_id = read_data_verified<uint16_t>(Reg::PartID);
+        if (!part_id) {
+            printf("ERR - ENS16x - failed to read part ID\n");
+            return {};
+        }
+
+        switch (*part_id) {
+        case PART_ID_ENS160: return Kind::ENS160; break;
+        case PART_ID_ENS161: return Kind::ENS161; break;
+        default: {
+            printf("ERR - ENS16x - unrecognised part ID 0x%04x\n", *part_id);
+            return {};
+        } break;
+        }
+    }
+
+    optional<AppVersion> read_app_version() {
+        // clear GPR to ensure new-gpr is triggered
+        if (!i2c.write(Reg::Command, Cmd::ClearGPR)) {
+            printf("ERR - ENS16x - failed to send cmd `ClearGPR`\n");
+            return {};
+        }
+
+        if (!i2c.write(Reg::Command, Cmd::GetAppVersion)) {
+            printf("ERR - ENS16x - failed to send cmd `GetAppVersion`\n");
+            return {};
+        }
+
+        if (!status_await([](auto& x) { return x.new_gpr; })) return {};
+
+        auto version = read_data_verified<AppVersion>(Reg::GprRead4);
+        if (!version) {
+            printf("ERR - ENS16x - failed to read version\n");
+            return {};
+        }
+
+        return version;
+    }
+
+    // NB:  Datasheet says registers in [0x20, 0x37] trigger a MSIR update.
+    //      This is a lie. It looks like *every* read updates MISR,
+    //      *except* the MSIR register itself.
     template <typename A>
     optional<A> read_data(Reg reg) {
         auto x = i2c.read<A>(reg);
@@ -207,22 +239,41 @@ struct ENS16xSensor final : SensorPeriodic {
         return x;
     }
 
+    template <typename A>
+    optional<A> read_data_verified(Reg reg) {
+        auto x = read_data<A>(reg);
+        if (x && !misr_verify()) return {};
+        return x;
+    }
+
+    [[nodiscard]] optional<Status> status() {
+        return read_data_verified<Status>(Reg::DataStatus);
+    }
+
+    template <typename F>
+    bool status_await(F&& filter) {
+        for (;;) {
+            auto status = this->status();
+            if (!status) return false;
+            if (filter(*status)) return true;
+            vTaskYieldWithinAPI();
+        }
+    }
+
     bool misr_verify() {
-        auto prev = i2c.read<uint8_t>(Reg::DataChecksum);
-        if (!prev) {
-            printf("ERR - ENS16x - failed to read MISR\n");
+        auto actual = i2c.read<uint8_t>(Reg::DataChecksum);
+        if (!actual) {
+            printf("ERR - ENS16x - failed to read checksum\n");
             return false;
         }
 
-        auto expected = misr.expected;
-        misr.expected = *prev;  // sync w/ actual previous value
-        misr.update(prev);      // MISR is itself a data register -> this read needs to be included
-
-        if (expected != prev) {
+        if (misr.expected != actual) {
             // just warn for now since I don't have hardware to test.
             // FIXME: verify, strengthen to error, return false.
-            printf("WARN - ENS16x - checksum mismatch. expected=0x%02x actual=0x%02x\n", expected, *prev);
-            return true;
+            printf("WARN - ENS16x - checksum mismatch. expected=0x%02x actual=0x%02x\n", misr.expected,
+                    *actual);
+            misr.expected = *actual;  // sync w/ actual previous value
+            return false;
         }
 
         return true;
