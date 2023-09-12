@@ -261,8 +261,8 @@ class Sensors:
     ] = None  # Celsius, `float` but Maybe Float simplifies handling
     humidity_intake: Optional[float] = None  # %
     humidity_exhaust: Optional[float] = None  # %
-    pressure_intake: Optional[float] = None  # hPa
-    pressure_exhaust: Optional[float] = None  # hPa
+    pressure_intake: Optional[float] = None  # kPa
+    pressure_exhaust: Optional[float] = None  # kPa
     voc_intake: Optional[int] = None  # [1, VOC_INDEX_MAX]
     voc_exhaust: Optional[int] = None  # [1, VOC_INDEX_MAX]
 
@@ -371,9 +371,9 @@ def parse_agg_env(reader: BleAttrReader) -> Sensors:
         voc_exhaust=reader.voc_index(),
     )
     if sensors.pressure_intake is not None:
-        sensors.pressure_intake /= 1000
+        sensors.pressure_intake /= 1000  # in kPA
     if sensors.pressure_exhaust is not None:
-        sensors.pressure_exhaust /= 1000
+        sensors.pressure_exhaust /= 1000  # in kPA
 
     return sensors
 
