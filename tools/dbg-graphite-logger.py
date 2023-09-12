@@ -67,7 +67,9 @@ def short_uuid(x: int):
 
 
 UUID_SERVICE_ENVIRONMENTAL_SENSING = short_uuid(0x181A)
+UUID_SERVICE_FAN = UUID("4553d138-1d00-4b6f-bc42-955a89cf8c36")
 UUID_CHAR_DATA_AGGREGATE = UUID("75134bec-dd06-49b1-bac2-c15e05fd7199")
+UUID_CHAR_FAN_AGGREGATE = UUID("79cd747f-91af-49a6-95b2-5b597c683129")
 UUID_CHAR_CONFIG_REBOOT = UUID("f48a18bb-e03c-4583-8006-5b54422e2045")
 
 _A = TypeVar("_A")
@@ -378,11 +380,35 @@ def parse_agg_env(reader: BleAttrReader) -> Sensors:
     return sensors
 
 
+@dataclass
+class FanState:
+    power: Optional[float] = None
+    tacho: Optional[float] = None
+
+    def as_dict(self) -> Dict[str, float]:
+        return {
+            f.name: getattr(self, f.name)
+            for f in dataclasses.fields(self)
+            if getattr(self, f.name) is not None
+        }
+
+
+def parse_agg_fan(reader: BleAttrReader) -> FanState:
+    return FanState(
+        power=reader.percentage8(),
+        tacho=reader.tachometer(),
+    )
+
+
 async def _log_sensors(client: BleakClient):
     service_env = client.services.get_service(UUID_SERVICE_ENVIRONMENTAL_SENSING)
     assert service_env is not None
-    char_env_agg = service_env.get_characteristic(UUID_CHAR_DATA_AGGREGATE)
-    assert char_env_agg is not None
+    service_fan = client.services.get_service(UUID_SERVICE_FAN)
+    assert service_fan is not None
+    char_env = service_env.get_characteristic(UUID_CHAR_DATA_AGGREGATE)
+    assert char_env is not None
+    char_fan = service_fan.get_characteristic(UUID_CHAR_FAN_AGGREGATE)
+    assert char_fan is not None
 
     print("connecting to local graphite...")
     sk = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -390,17 +416,18 @@ async def _log_sensors(client: BleakClient):
     print("connected")
 
     while True:
-        sensors = parse_agg_env(
-            BleAttrReader(await client.read_gatt_char(char_env_agg))
-        )
+        env = parse_agg_env(BleAttrReader(await client.read_gatt_char(char_env)))
+        fan = parse_agg_fan(BleAttrReader(await client.read_gatt_char(char_fan)))
 
         timestamp = datetime.datetime.now().strftime("%s")
-        metrics: List[Tuple[str, Tuple[str, float]]] = [
-            (f"{client.address}.{k}", (timestamp, v))
-            for k, v in sensors.as_dict().items()
+        metrics_env: List[Tuple[str, Tuple[str, float]]] = [
+            (f"{client.address}.{k}", (timestamp, v)) for k, v in env.as_dict().items()
+        ]
+        metrics_fan: List[Tuple[str, Tuple[str, float]]] = [
+            (f"{client.address}.{k}", (timestamp, v)) for k, v in fan.as_dict().items()
         ]
 
-        payload = pickle.dumps(metrics, protocol=2)
+        payload = pickle.dumps(metrics_env + metrics_fan, protocol=2)
         header = struct.pack("!L", len(payload))
         message = header + payload
         sk.send(message)
