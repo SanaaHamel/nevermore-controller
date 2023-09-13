@@ -2,6 +2,7 @@
 #include "hardware/adc.h"
 #include "hardware/i2c.h"
 #include "sdk/ble_data_types.hpp"
+#include "sensors/ahtxx.hpp"
 #include "sensors/async_sensor.hpp"
 #include "sensors/bme280.hpp"
 #include "sensors/bme68x.hpp"
@@ -27,6 +28,7 @@ namespace {
 constexpr uint32_t ADC_CHANNEL_TEMP_SENSOR = 4;
 
 constexpr auto SENSOR_POWER_ON_DELAY = max({
+        AHTxx_POWER_ON_DELAY,
         BME280_POWER_ON_DELAY,
         BME68x_POWER_ON_DELAY,
         ENS16x_POWER_ON_DELAY,
@@ -75,6 +77,7 @@ VecSensors sensors_init_bus(i2c_inst_t& bus, EnvironmentalFilter state) {
         sensors.push_back(std::move(p));
     };
 
+    probe_for(ahtxx(bus, state));
     probe_for(bme280(bus, state));
     probe_for(bme68x(bus, state));
     probe_for(ens16x(bus, state));

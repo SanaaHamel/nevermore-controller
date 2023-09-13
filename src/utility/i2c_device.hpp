@@ -23,11 +23,16 @@ struct I2CDevice {
     }
 
     template <typename A>
-    std::optional<A> read(Register reg) const {
+    std::optional<A> read() const {
         A value;
-        if (!i2c_write(name, bus, address, uint8_t(reg))) return {};
         if (!i2c_read(name, bus, address, value)) return {};
         return value;
+    }
+
+    template <typename A>
+    std::optional<A> read(Register reg) const {
+        if (!i2c_write(name, bus, address, reg)) return {};
+        return read<A>();
     }
 };
 
