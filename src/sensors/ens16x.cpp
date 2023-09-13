@@ -269,8 +269,6 @@ struct ENS16xSensor final : SensorPeriodic {
         }
 
         if (misr.expected != actual) {
-            // just warn for now since I don't have hardware to test.
-            // FIXME: verify, strengthen to error, return false.
             printf("WARN - ENS16x - checksum mismatch. expected=0x%02x actual=0x%02x\n", misr.expected,
                     *actual);
             misr.expected = *actual;  // sync w/ actual previous value
