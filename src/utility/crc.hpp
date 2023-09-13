@@ -1,7 +1,9 @@
 #pragma once
 
+#include <bit>
 #include <cstdint>
 #include <span>
+#include <type_traits>
 
 namespace nevermore {
 
@@ -28,6 +30,13 @@ constexpr inline CRC8_t crc8(std::span<uint8_t const> data, CRC8_t init) {
 template <typename A>
 constexpr CRC8_t crc8(A const& blob, CRC8_t init) {
     static_assert(!std::is_pointer_v<A>, "probably a mistake, pass blob by ref");
+    if (std::is_constant_evaluated()) {
+        struct Foo {
+            uint8_t data[sizeof(blob)];
+        } const buffer = std::bit_cast<Foo>(blob);
+        return crc8(std::span{buffer.data, sizeof(buffer.data)}, init);
+    }
+
     return crc8(std::span{reinterpret_cast<uint8_t const*>(&blob), sizeof(A)}, init);
 }
 
