@@ -14,7 +14,6 @@ using namespace BLE;
 
 namespace nevermore::sensors {
 
-// ENS160 supports "up to 400 kbits/s"
 static_assert(
         I2C_BAUD_RATE <= 1'000'000, "`config.hpp`'s `I2C_BAUD_RATE` is too high for ENS16x (max 1 M/s)");
 
