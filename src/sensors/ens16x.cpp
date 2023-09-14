@@ -277,18 +277,11 @@ struct ENS16xSensor final : SensorPeriodic {
     }
 };
 
-unique_ptr<SensorPeriodic> ens16x(uint8_t address, i2c_inst_t& bus, EnvironmentalFilter side) {
-    auto p = make_unique<ENS16xSensor>(bus, address, side);
-    if (!p->setup()) return {};  // no sensor or failed to set up
-
-    return p;
-}
-
 }  // namespace
 
 unique_ptr<SensorPeriodic> ens16x(i2c_inst_t& bus, EnvironmentalFilter side) {
     for (auto address : ADDRESSES)
-        if (auto p = ens16x(address, bus, side)) return p;
+        if (auto p = make_unique<ENS16xSensor>(bus, address, side); p->setup()) return p;
 
     return {};
 }

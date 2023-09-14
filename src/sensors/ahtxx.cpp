@@ -126,18 +126,11 @@ struct AHTxxSensor final : SensorPeriodic {
     }
 };
 
-unique_ptr<SensorPeriodic> ahtxx(uint8_t address, i2c_inst_t& bus, EnvironmentalFilter side) {
-    auto p = make_unique<AHTxxSensor>(bus, address, side);
-    if (!p->setup()) return {};  // no sensor or failed to set up
-
-    return p;
-}
-
 }  // namespace
 
 unique_ptr<SensorPeriodic> ahtxx(i2c_inst_t& bus, EnvironmentalFilter side) {
     for (auto address : ADDRESSES)
-        if (auto p = ahtxx(address, bus, side)) return p;
+        if (auto p = make_unique<AHTxxSensor>(bus, address, side); p->setup()) return p;
 
     return {};
 }
