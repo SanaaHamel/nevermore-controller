@@ -20,8 +20,6 @@ static_assert(
 namespace {
 
 constexpr array ADDRESSES{0x52_u8, 0x53_u8};
-constexpr uint16_t PART_ID_ENS160 = 0x0160u;
-constexpr uint16_t PART_ID_ENS161 = 0x0161u;
 
 enum class Reg : uint8_t {
     PartID = 0x00u,  // 16 bits
@@ -58,7 +56,8 @@ enum class Cmd : uint8_t {
     ClearGPR = 0xCCu,
 };
 
-enum class Kind : unsigned { ENS160 = 160, ENS161 = 161 };
+// enum values must match official part IDs and must be a classed to `uint16_t`
+enum class Kind : uint16_t { ENS160 = 0x0160u, ENS161 = 0x0161u };
 
 struct [[gnu::packed]] AppVersion {
     uint8_t major, minor, revision;
@@ -194,9 +193,9 @@ struct ENS16xSensor final : SensorPeriodic {
             return {};
         }
 
-        switch (*part_id) {
-        case PART_ID_ENS160: return Kind::ENS160; break;
-        case PART_ID_ENS161: return Kind::ENS161; break;
+        switch ((Kind)*part_id) {
+        case Kind::ENS160:  // FALL THROUGH
+        case Kind::ENS161: return (Kind)*part_id; break;
         default: {
             printf("ERR - ENS16x - unrecognised part ID 0x%04x\n", *part_id);
             return {};
