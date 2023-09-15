@@ -132,7 +132,7 @@ struct ENS16xSensor final : SensorPeriodicEnvI2C<Reg, "ENS16x"> {
         auto version = read_app_version();
         if (!version) return false;
 
-        i2c.log("kind: %u, version: %d.%d.%d", to_underlying(this->kind), version->major, version->minor,
+        i2c.log("kind: 0x%04x, version: %d.%d.%d", to_underlying(this->kind), version->major, version->minor,
                 version->revision);
 
         return mode(OpMode::Operational);
