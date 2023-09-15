@@ -59,7 +59,6 @@ NOTE: In the future, you'll be able to use Klipper sensors/thermistors to provid
 | AHT{10, 20, 21}   | Humidity, Temperature
 | BME280            | Humidity, Temperature, Pressure
 | BME680, BME688    | Humidity, Temperature, Pressure footnote:[This specific multi-sensor has a gas sensor, but does not reliably detect VOCs relevant to 3D printing.]
-| ENS160            | VOCs footnote:[Genuine versions of this sensor can detect printing relevant VOCs reasonably well, but are not as sensitive as the SGP40. Have a care! AliE sourced parts have been reported as being terrible for detecting VOCs.]
 | HTU2xD            | Humidity, Temperature
 | SGP40             | Volatile Organic Compounds
 |===
@@ -649,6 +648,7 @@ If you would like to limit the maximum speed of the fan, e.g. to reduce noise, x
 
 * https://github.com/julianschill/klipper-led_effect[Julian Schill] - installation script (derived)
 * https://github.com/boschsensortec/BME280_driver[Bosch Sensors] - BME280, BME68x library (included)
+* https://github.com/sciosense/ENS160_driver [ScioSense] - ENS160 library (referenced)
 * https://github.com/Sensirion/gas-index-algorithm[Sensirion] - SGP40 gas index library (included)
 * https://github.com/klipper3d/klipper [Klipper] - AHTxx library (referenced)
 * https://github.com/apache/nuttx[Apache Nuttx] - I2C software reset (derived)
