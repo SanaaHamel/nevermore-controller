@@ -52,7 +52,6 @@ const ESM ESM_PRESSURE{
 // using SGP40
 const ESM ESM_VOC_INDEX{
         .sampling = ESM::Sampling::Instantaneous,
-        .measure_period = 1,  // for now, we only
         .update_interval = SENSOR_UPDATE_PERIOD / 1s,
         .application = ESM::Application::Supplementary,
 };
