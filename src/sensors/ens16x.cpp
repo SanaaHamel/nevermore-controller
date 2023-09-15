@@ -150,6 +150,53 @@ struct ENS16xSensor final : SensorPeriodicEnvI2C<Reg, "ENS16x"> {
         };
         if (!i2c.write(Reg::TemperatureIn, compensation)) return;
 
+#if 0
+        struct [[gnu::packed]] Everything {
+            Status status;
+            uint8_t aqi;  // range: [1, 5]
+            uint16_t tvoc_ppb;
+            uint16_t eco2_ppm;
+            uint16_t aqi_scio_sense;
+            uint16_t baseline[4];
+            uint16_t temp_in;
+            uint16_t humi_in;
+        };
+        static_assert(sizeof(Everything) ==
+                      (2 + to_underlying(Reg::DataRelHumidity) - to_underlying(Reg::DeviceStatus)));
+        auto result = read_data_verified<Everything>(Reg::DeviceStatus);
+        if (!result || !(result->status.new_data || result->status.new_gpr)) return;
+        i2c.log("-----------------");
+        i2c.log("status.new_gpr   %d", result->status.new_gpr);
+        i2c.log("status.new_data  %d", result->status.new_data);
+        i2c.log("status.validity  %d", result->status.validity);
+        i2c.log("status.reserved  %d", result->status._reserved);
+        i2c.log("status.error     %d", result->status.error);
+        i2c.log("status.statas    %d", result->status.statas);
+        if (result->status.new_data) {
+            i2c.log("aqi              %d", result->aqi);
+            i2c.log("tvoc_ppb         %d", result->tvoc_ppb);
+            i2c.log("eco2_ppm         %d", result->eco2_ppm);
+            i2c.log("aqi_scio_sense   %d", result->aqi_scio_sense);
+            i2c.log("baseline         0x%04x 0x%04x 0x%04x 0x%04x", result->baseline[0], result->baseline[1],
+                    result->baseline[2], result->baseline[3]);
+            i2c.log("temp_in          %d", result->temp_in);
+            i2c.log("humi_in          %d", result->humi_in);
+        }
+
+        struct [[gnu::packed]] GprState {
+            uint16_t raw0;
+            uint16_t raw1;
+            uint16_t raw2;
+            uint16_t raw3;
+        };
+        if (auto raw = read_data_verified<GprState>(Reg::GprRead0); raw && result->status.new_gpr) {
+            i2c.log("raw0   0x%04x (%d)", raw->raw0, raw->raw0);
+            i2c.log("raw1   0x%04x (%d)", raw->raw1, raw->raw1);
+            i2c.log("raw2   0x%04x (%d)", raw->raw2, raw->raw2);
+            i2c.log("raw3   0x%04x (%d)", raw->raw3, raw->raw3);
+        }
+        i2c.log("-----------------");
+#else
         // Data* calls must be read via `read_crc` to update checksum
         auto status = read_data_verified<Status>(Reg::DeviceStatus);
         if (!status) {
@@ -172,6 +219,7 @@ struct ENS16xSensor final : SensorPeriodicEnvI2C<Reg, "ENS16x"> {
         }
 
         side.set(VOCIndex(clamp<uint16_t>(*aqi_level, 1, 500)));
+#endif
     }
 
     // NB:  Spec says switching to an operational mode (i.e. {0x2, 0x3, 0x4})
