@@ -197,28 +197,30 @@ struct ENS16xSensor final : SensorPeriodicEnvI2C<Reg, "ENS16x"> {
         }
         i2c.log("-----------------");
 #else
+        struct [[gnu::packed]] State {
+            Status status;
+            uint8_t aqi;  // range: [1, 5]
+            uint16_t tvoc_ppb;
+            uint16_t eco2_ppm;
+            uint16_t aqi_scio_sense;
+        };
         // Data* calls must be read via `read_crc` to update checksum
-        auto status = read_data_verified<Status>(Reg::DeviceStatus);
-        if (!status) {
-            i2c.log_error("failed to fetch status");
+        auto r = read_data_verified<State>(Reg::DeviceStatus);
+        if (!r) {
+            i2c.log_error("failed to fetch state");
             return;
         }
-        if (!status->new_data) return;  // nothing to read
+        if (!r->status.new_data) return;  // nothing to read
 
-        if (status->validity == Status::Invalid) {
+        if (r->status.validity == Status::Invalid) {
             i2c.log_error("invalid status for read");
             return;
         }
 
         // Serendipitously, this sensor also offers an arbitrary AQI value in the range of [0, 500]
         // FIXME: This is probably not suitable. 100 marks a 24h average, not an absolute value...
-        auto aqi_level = read_data_verified<uint16_t>(Reg::DataAqiScioSense);
-        if (!aqi_level) {
-            i2c.log_error("failed to read AQI-ScioSense");
-            return;
-        }
-
-        side.set(VOCIndex(clamp<uint16_t>(*aqi_level, 1, 500)));
+        side.set(VOCIndex(clamp<uint16_t>(r->aqi_scio_sense, 1, 500)));
+        side.set(VOCRaw(min(r->tvoc_ppb, VOCRaw::not_known_value)));
 #endif
     }
 

@@ -139,6 +139,8 @@ struct SGP40 final : SensorPeriodic {
         }
 #endif
 
+        side.set(VOCRaw(min(*voc_raw, VOCRaw::not_known_value)));
+
         // ~330 us during steady-state, ~30 us during startup blackout
         int32_t gas_index{};
         GasIndexAlgorithm_process(&gas_index_algorithm, *voc_raw, &gas_index);

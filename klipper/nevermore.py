@@ -77,6 +77,7 @@ RGBW = Tuple[float, float, float, float]
 # BLE Constants (inclusive)
 TIMESEC16_MAX = 2**16 - 2
 VOC_INDEX_MAX = 500
+VOC_RAW_MAX = 2**16 - 2
 
 
 # Not actually provided by `bleak`. IDK why not.
@@ -136,6 +137,7 @@ class SensorState:
     # HACK: Must be named `gas` b/c Fluidd only looks at `temperature`, `humidity`, `pressure`, and `gas`.
     #       Also happens to be what the bme680 reports.
     gas: Optional[int] = None  # [1, VOC_INDEX_MAX]
+    gas_raw: Optional[int] = None  # [0, VOC_RAW_MAX]
 
     def as_dict(self) -> Dict[str, float]:
         return {
@@ -150,12 +152,14 @@ class SensorState:
         # TFW you need rank-2 polymorphism but python typing doesn't support it
         fn: Callable[[Optional[float], Optional[float]], Optional[float]],
     ) -> "SensorState":
-        x = fn(self.gas, rhs.gas)
+        gas = fn(self.gas, rhs.gas)
+        gas_raw = fn(self.gas_raw, rhs.gas_raw)
         return SensorState(
             temperature=fn(self.temperature, rhs.temperature),
             humidity=fn(self.humidity, rhs.humidity),
             pressure=fn(self.pressure, rhs.pressure),
-            gas=None if x is None else int(x),  # rank-2 poly support pls :(
+            gas=None if gas is None else int(gas),  # rank-2 poly support pls :(
+            gas_raw=None if gas_raw is None else int(gas_raw),
         )
 
 
@@ -354,8 +358,11 @@ class BleAttrReader:
     def tachometer(self):
         return int(self._unsigned(2, 1, 0, 0))
 
-    def voc_index(self) -> Optional[int]:
+    def voc_index(self) -> Optional[int]:  # [1, VOC_INDEX_MAX]
         return self._as_int(self._unsigned(2, 1, 0, 0, not_known=0))
+
+    def voc_raw(self) -> Optional[int]:  # [0, VOC_RAW_MAX]
+        return self._as_int(self._unsigned(2, 1, 0, 0, not_known=0xFFFF))
 
     @overload
     def _signed(self, sz: int, M: int, d: int, e: int) -> float:
@@ -447,6 +454,8 @@ def parse_agg_env(reader: BleAttrReader) -> Tuple[SensorState, SensorState]:
     p_out = reader.pressure()
     voc_in = reader.voc_index()
     voc_out = reader.voc_index()
+    voc_raw_in = reader.voc_raw()
+    voc_raw_out = reader.voc_raw()
 
     if p_in is not None:
         p_in /= 100  # need it in hPa instead of Pa
@@ -455,8 +464,8 @@ def parse_agg_env(reader: BleAttrReader) -> Tuple[SensorState, SensorState]:
         p_out /= 100  # need it in hPa instead of Pa
 
     return (
-        SensorState(t_in, h_in, p_in, voc_in),
-        SensorState(t_out, h_out, p_out, voc_out),
+        SensorState(t_in, h_in, p_in, voc_in, voc_raw_in),
+        SensorState(t_out, h_out, p_out, voc_out, voc_raw_out),
     )
 
 

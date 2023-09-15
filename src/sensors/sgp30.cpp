@@ -139,6 +139,7 @@ struct SGP30Sensor final : SensorPeriodicEnvI2C<Reg, "SGP30", 0xFF> {
         voc_index = clamp(voc_index, 0.f, 500.f);
 
         side.set(VOCIndex(voc_index));
+        side.set(VOCRaw(min(result->tvoc_ppb, VOCRaw::not_known_value)));
     }
 
     [[nodiscard]] optional<FeatureSet> feature_set() const {

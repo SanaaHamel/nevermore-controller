@@ -265,8 +265,10 @@ class Sensors:
     humidity_exhaust: Optional[float] = None  # %
     pressure_intake: Optional[float] = None  # kPa
     pressure_exhaust: Optional[float] = None  # kPa
-    voc_intake: Optional[int] = None  # [1, VOC_INDEX_MAX]
-    voc_exhaust: Optional[int] = None  # [1, VOC_INDEX_MAX]
+    voc_index_intake: Optional[int] = None  # [1, VOC_INDEX_MAX]
+    voc_index_exhaust: Optional[int] = None  # [1, VOC_INDEX_MAX]
+    voc_raw_intake: Optional[int] = None  # [0, VOC_RAW_MAX]
+    voc_raw_exhaust: Optional[int] = None  # [0, VOC_RAW_MAX]
 
     def as_dict(self) -> Dict[str, float]:
         return {
@@ -299,8 +301,11 @@ class BleAttrReader:
     def tachometer(self):
         return int(self._unsigned(2, 1, 0, 0))
 
-    def voc_index(self) -> Optional[int]:
+    def voc_index(self) -> Optional[int]:  # [1, VOC_INDEX_MAX]
         return self._as_int(self._unsigned(2, 1, 0, 0, not_known=0))
+
+    def voc_raw(self) -> Optional[int]:  # [0, VOC_RAW_MAX]
+        return self._as_int(self._unsigned(2, 1, 0, 0, not_known=0xFFFF))
 
     @overload
     def _signed(self, sz: int, M: int, d: int, e: int) -> float:
@@ -369,8 +374,10 @@ def parse_agg_env(reader: BleAttrReader) -> Sensors:
         humidity_exhaust=reader.humidity(),
         pressure_intake=reader.pressure(),
         pressure_exhaust=reader.pressure(),
-        voc_intake=reader.voc_index(),
-        voc_exhaust=reader.voc_index(),
+        voc_index_intake=reader.voc_index(),
+        voc_index_exhaust=reader.voc_index(),
+        voc_raw_intake=reader.voc_raw(),
+        voc_raw_exhaust=reader.voc_raw(),
     )
     if sensors.pressure_intake is not None:
         sensors.pressure_intake /= 1000  # in kPA

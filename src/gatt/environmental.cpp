@@ -15,6 +15,8 @@ using namespace std;
 
 #define VOC_INDEX_01 216aa791_97d0_46ac_8752_60bbc00611e1_01
 #define VOC_INDEX_02 216aa791_97d0_46ac_8752_60bbc00611e1_02
+#define VOC_RAW_01 c3acb286_8071_427b_bbed_d64987373f23_01
+#define VOC_RAW_02 c3acb286_8071_427b_bbed_d64987373f23_02
 #define ENV_AGGREGATE_01 75134bec_dd06_49b1_bac2_c15e05fd7199_01
 
 namespace nevermore::gatt::environmental {
@@ -51,6 +53,12 @@ const ESM ESM_PRESSURE{
 
 // using SGP40
 const ESM ESM_VOC_INDEX{
+        .sampling = ESM::Sampling::Instantaneous,
+        .update_interval = SENSOR_UPDATE_PERIOD / 1s,
+        .application = ESM::Application::Supplementary,
+};
+
+const ESM ESM_VOC_RAW{
         .sampling = ESM::Sampling::Instantaneous,
         .update_interval = SENSOR_UPDATE_PERIOD / 1s,
         .application = ESM::Application::Supplementary,
@@ -104,6 +112,8 @@ optional<uint16_t> attr_read(
         USER_DESCRIBE(BT(PRESSURE_02), "Exhaust Pressure")
         USER_DESCRIBE(VOC_INDEX_01, "Intake VOC Index")
         USER_DESCRIBE(VOC_INDEX_02, "Exhaust VOC Index")
+        USER_DESCRIBE(VOC_RAW_01, "Intake VOC Raw")
+        USER_DESCRIBE(VOC_RAW_02, "Exhaust VOC Raw")
         USER_DESCRIBE(ENV_AGGREGATE_01, "Aggregated Service Data")
 
         ESM_DESCRIBE(BT(TEMPERATURE_01), ESM_TEMPERATURE)
@@ -115,6 +125,8 @@ optional<uint16_t> attr_read(
         ESM_DESCRIBE(BT(PRESSURE_02), ESM_PRESSURE)
         ESM_DESCRIBE(VOC_INDEX_01, ESM_VOC_INDEX)
         ESM_DESCRIBE(VOC_INDEX_02, ESM_VOC_INDEX)
+        ESM_DESCRIBE(VOC_RAW_01, ESM_VOC_RAW)
+        ESM_DESCRIBE(VOC_RAW_02, ESM_VOC_RAW)
 
         HANDLE_READ_BLOB(VOC_INDEX_01, VALID_RANGE, VALID_RANGE_VOC_INDEX)
         HANDLE_READ_BLOB(VOC_INDEX_02, VALID_RANGE, VALID_RANGE_VOC_INDEX)
@@ -129,6 +141,8 @@ optional<uint16_t> attr_read(
         READ_VALUE(BT(PRESSURE_02), sensors().pressure_exhaust)
         READ_VALUE(VOC_INDEX_01, sensors().voc_index_intake)
         READ_VALUE(VOC_INDEX_02, sensors().voc_index_exhaust)
+        READ_VALUE(VOC_RAW_01, sensors().voc_raw_intake)
+        READ_VALUE(VOC_RAW_02, sensors().voc_raw_exhaust)
         READ_VALUE(ENV_AGGREGATE_01, sensors())
 
         READ_CLIENT_CFG(ENV_AGGREGATE_01, g_notify_aggregate)

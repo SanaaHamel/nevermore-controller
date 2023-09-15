@@ -5,7 +5,8 @@
 
 namespace nevermore::sensors {
 
-BLE_DECL_SCALAR_OPTIONAL(VOCIndex, uint16_t, 1, 0, 0, 0);  // range [0, 500], 0 = not-known;
+BLE_DECL_SCALAR_OPTIONAL(VOCIndex, uint16_t, 1, 0, 0, 0);      // range [0, 500], 0 = not-known;
+BLE_DECL_SCALAR_OPTIONAL(VOCRaw, uint16_t, 1, 0, 0, 0xFFFFu);  // range [0, 2^16-2], 0xFFFF = not-known;
 
 struct Config {
     // If a sensor in a `FilterSide` is missing, then try to fall back to the other side's sensor.
@@ -31,6 +32,8 @@ struct [[gnu::packed]] Sensors {
     BLE::Pressure pressure_exhaust;
     VOCIndex voc_index_intake;
     VOCIndex voc_index_exhaust;
+    VOCRaw voc_raw_intake;
+    VOCRaw voc_raw_exhaust;
 
     [[nodiscard]] Sensors with_fallbacks(Config const& config = g_config) const;
 

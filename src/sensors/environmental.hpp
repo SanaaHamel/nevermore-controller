@@ -33,7 +33,7 @@ struct EnvironmentalFilter {
             Sensors const& sensors = g_sensors, Config const& config = g_config) const;
 
 private:
-    using Side = std::tuple<BLE::Temperature&, BLE::Humidity&, BLE::Pressure&, VOCIndex&>;
+    using Side = std::tuple<BLE::Temperature&, BLE::Humidity&, BLE::Pressure&, VOCIndex&, VOCRaw&>;
 
     template <typename A>
         requires(!std::is_reference_v<A>)
@@ -47,9 +47,9 @@ private:
 
     [[nodiscard]] std::tuple<Side, Side> pick(Sensors& sensors = g_sensors) const {
         Side intake{sensors.temperature_intake, sensors.humidity_intake, sensors.pressure_intake,
-                sensors.voc_index_intake};
+                sensors.voc_index_intake, sensors.voc_raw_intake};
         Side exhaust{sensors.temperature_exhaust, sensors.humidity_exhaust, sensors.pressure_exhaust,
-                sensors.voc_index_exhaust};
+                sensors.voc_index_exhaust, sensors.voc_raw_exhaust};
 
         switch (kind) {
         case Kind::Intake: return {intake, exhaust};
