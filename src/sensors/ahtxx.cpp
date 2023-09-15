@@ -1,13 +1,10 @@
 #include "ahtxx.hpp"
 #include "config.hpp"
+#include "environmental_i2c.hpp"
 #include "sdk/ble_data_types.hpp"
 #include "sdk/task.hpp"
-#include "sensors.hpp"
-#include "utility/i2c_device.hpp"
 #include "utility/numeric_suffixes.hpp"
 #include <cstdint>
-#include <cstdio>
-#include <numeric>
 #include <optional>
 
 using namespace std;
@@ -71,15 +68,8 @@ struct [[gnu::packed]] State {
 };
 static_assert(sizeof(State) == 6);
 
-struct AHTxxSensor final : SensorPeriodic {
-    I2CDevice<Reg, "AHTxx"> i2c;
-    EnvironmentalFilter side;
-
-    AHTxxSensor(i2c_inst_t& bus, uint8_t address, EnvironmentalFilter side) : i2c{bus, address}, side(side) {}
-
-    [[nodiscard]] char const* name() const override {
-        return "AHTxx";
-    }
+struct AHTxxSensor final : SensorPeriodicEnvI2C<Reg, "AHTxx"> {
+    using SensorPeriodicEnvI2C::SensorPeriodicEnvI2C;
 
     bool setup() {  // NOLINT(readability-make-member-function-const)
         if (!i2c.write(Reg::Init_1x, CMD_PAYLOAD_INIT)) return false;

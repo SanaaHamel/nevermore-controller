@@ -2,12 +2,12 @@
 #include "config.hpp"
 #include "sdk/ble_data_types.hpp"
 #include "sensors.hpp"
+#include "sensors/environmental_i2c.hpp"
 #include "utility/i2c_device.hpp"
 #include "utility/numeric_suffixes.hpp"
 #include <cstdint>
-#include <cstdio>
-#include <numeric>
 #include <optional>
+#include <utility>
 
 using namespace std;
 using namespace BLE;
@@ -101,18 +101,11 @@ private:
     }
 };
 
-struct ENS16xSensor final : SensorPeriodic {
-    I2CDevice<Reg, "ENS16x"> i2c;
-    EnvironmentalFilter side;
+struct ENS16xSensor final : SensorPeriodicEnvI2C<Reg, "ENS16x"> {
+    using SensorPeriodicEnvI2C::SensorPeriodicEnvI2C;
+
     Kind kind = Kind::ENS160;  // assume we're the simpler one until we test
     MISR misr;
-
-    ENS16xSensor(i2c_inst_t& bus, uint8_t address, EnvironmentalFilter side)
-            : i2c{bus, address}, side(side) {}
-
-    [[nodiscard]] char const* name() const override {
-        return "ENS16x";
-    }
 
     bool setup() {
         if (!mode(OpMode::Reset, true)) return false;
@@ -121,11 +114,12 @@ struct ENS16xSensor final : SensorPeriodic {
         auto kind = read_kind();
         if (!kind) return false;
         this->kind = *kind;
-        printf("ENS16x - kind: %u\n", unsigned(this->kind));
 
         auto version = read_app_version();
         if (!version) return false;
-        printf("ENS16x - version: %d.%d.%d\n", version->major, version->minor, version->revision);
+
+        i2c.log("kind: %u, version: %d.%d.%d", to_underlying(this->kind), version->major, version->minor,
+                version->revision);
 
         return mode(OpMode::Operational);
     }
@@ -140,20 +134,20 @@ struct ENS16xSensor final : SensorPeriodic {
         // Data* calls must be read via `read_crc` to update checksum
         auto status = read_data_verified<Status>(Reg::DataStatus);
         if (!status) {
-            printf("ERR - ENS16x - failed to fetch status\n");
+            i2c.log_error("failed to fetch status");
             return;
         }
         if (!status->new_data) return;  // nothing to read
 
         if (status->validity == Status::Invalid) {
-            printf("ERR - ENS16x - invalid status for read\n");
+            i2c.log_error("invalid status for read");
             return;
         }
 
         // Serendipitously, this sensor also offers an arbitrary AQI value in the range of [0, 500]
         auto aqi_level = read_data_verified<uint16_t>(Reg::DataAqiScioSense);
         if (!aqi_level) {
-            printf("ERR - ENS16x - failed to read AQI-ScioSense\n");
+            i2c.log_error("failed to read AQI-ScioSense");
             return;
         }
 
@@ -163,7 +157,7 @@ struct ENS16xSensor final : SensorPeriodic {
     bool mode(OpMode mode, bool quiet = false) {  // NOLINT(readability-make-member-function-const)
         if (!i2c.write(Reg::OpMode, mode)) {
             if (!quiet) {
-                printf("ERR - ENS16x - failed to change to mode=%02x\n", uint8_t(mode));
+                i2c.log_error("failed to change to mode=%02x", uint8_t(mode));
             }
 
             return false;
@@ -177,7 +171,7 @@ struct ENS16xSensor final : SensorPeriodic {
         // Might as well do this now when we're changing modes.
         auto curr_misr = i2c.read<uint8_t>(Reg::DataChecksum);
         if (!curr_misr) {
-            printf("ERR - ENS16x - failed to sync checksum\n");
+            i2c.log_error("failed to sync checksum");
             return false;
         }
         misr.expected = *curr_misr;
@@ -189,7 +183,7 @@ struct ENS16xSensor final : SensorPeriodic {
     optional<Kind> read_kind() {
         auto part_id = read_data_verified<uint16_t>(Reg::PartID);
         if (!part_id) {
-            printf("ERR - ENS16x - failed to read part ID\n");
+            i2c.log_error("failed to read part ID");
             return {};
         }
 
@@ -197,7 +191,7 @@ struct ENS16xSensor final : SensorPeriodic {
         case Kind::ENS160:  // FALL THROUGH
         case Kind::ENS161: return (Kind)*part_id; break;
         default: {
-            printf("ERR - ENS16x - unrecognised part ID 0x%04x\n", *part_id);
+            i2c.log_error("unrecognised part ID 0x%04x", *part_id);
             return {};
         } break;
         }
@@ -206,12 +200,12 @@ struct ENS16xSensor final : SensorPeriodic {
     optional<AppVersion> read_app_version() {
         // clear GPR to ensure new-gpr is triggered
         if (!i2c.write(Reg::Command, Cmd::ClearGPR)) {
-            printf("ERR - ENS16x - failed to send cmd `ClearGPR`\n");
+            i2c.log_error("failed to send cmd `ClearGPR`");
             return {};
         }
 
         if (!i2c.write(Reg::Command, Cmd::GetAppVersion)) {
-            printf("ERR - ENS16x - failed to send cmd `GetAppVersion`\n");
+            i2c.log_error("failed to send cmd `GetAppVersion`");
             return {};
         }
 
@@ -219,7 +213,7 @@ struct ENS16xSensor final : SensorPeriodic {
 
         auto version = read_data_verified<AppVersion>(Reg::GprRead4);
         if (!version) {
-            printf("ERR - ENS16x - failed to read version\n");
+            i2c.log_error("failed to read version");
             return {};
         }
 
@@ -262,13 +256,12 @@ struct ENS16xSensor final : SensorPeriodic {
     bool misr_verify() {
         auto actual = i2c.read<uint8_t>(Reg::DataChecksum);
         if (!actual) {
-            printf("ERR - ENS16x - failed to read checksum\n");
+            i2c.log_error("failed to read checksum");
             return false;
         }
 
         if (misr.expected != actual) {
-            printf("WARN - ENS16x - checksum mismatch. expected=0x%02x actual=0x%02x\n", misr.expected,
-                    *actual);
+            i2c.log_warn("checksum mismatch. expected=0x%02x actual=0x%02x", misr.expected, *actual);
             misr.expected = *actual;  // sync w/ actual previous value
             return false;
         }
