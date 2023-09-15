@@ -143,10 +143,10 @@ struct ENS16xSensor final : SensorPeriodicEnvI2C<Reg, "ENS16x"> {
                 .temperature = uint16_t(max(0., (side.compensation_humidity() + 273.15) * 64)),
                 .humidity = uint16_t(side.compensation_humidity() * 512),
         };
-        if (!i2c.write(Reg::TempIn, compensation)) return;
+        if (!i2c.write(Reg::TemperatureIn, compensation)) return;
 
         // Data* calls must be read via `read_crc` to update checksum
-        auto status = read_data_verified<Status>(Reg::DataStatus);
+        auto status = read_data_verified<Status>(Reg::DeviceStatus);
         if (!status) {
             i2c.log_error("failed to fetch status");
             return;
@@ -159,6 +159,7 @@ struct ENS16xSensor final : SensorPeriodicEnvI2C<Reg, "ENS16x"> {
         }
 
         // Serendipitously, this sensor also offers an arbitrary AQI value in the range of [0, 500]
+        // FIXME: This is probably not suitable. 100 marks a 24h average, not an absolute value...
         auto aqi_level = read_data_verified<uint16_t>(Reg::DataAqiScioSense);
         if (!aqi_level) {
             i2c.log_error("failed to read AQI-ScioSense");
