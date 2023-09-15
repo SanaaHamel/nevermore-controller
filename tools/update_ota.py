@@ -8,10 +8,13 @@ ROOT_DIR="$(dirname "$FILE")"
 
 TCP=0
 NO_TMUX=0
+IGNORE_KLIPPER=0
 for ARG; do
   shift
   if [ "$ARG" = "--no-tmux" ]; then
     NO_TMUX=1
+  elif [ "$ARG" = "--ignore-klipper" ]; then
+    IGNORE_KLIPPER=1
   elif [ "$ARG" = "--tcp" ]; then
     TCP=1
   fi
@@ -61,7 +64,9 @@ trap finish EXIT
 # only run in `tmux` if we'd switch wifi (i.e. using `tcp`)
 if [[ "$TCP" = 0 || "$NO_TMUX" = 1 ]]; then
   "$ROOT_DIR/setup-tool-env.bash"
-  ensure_klipper_not_running
+  if [[ "$IGNORE_KLIPPER" = 0 ]]; then
+    ensure_klipper_not_running
+  fi
   "$ROOT_DIR/.venv/bin/python" "$FILE" "$@"
   exit 0
 fi
@@ -544,8 +549,10 @@ class ConnectToWifiAccessPointNetworkManager(ConnectToWifiAccessPoint):
 class CmdLnArgs(tap.TypedArgs):
     bt_address: Optional[str] = tap.arg(help="device's BT adddress")
     file: Optional[Path] = tap.arg(help="filepath for image")
-    # `--no-tmux` is used/handled by the shell wrapper script. list it here for `--help`
+    # `--no-tmux` and `--ignore-klipper` are used/handled by the shell wrapper script.
+    # They're listed here for `--help` and unknown-argument checking.
     no_tmux: bool = tap.arg(help="don't run in a tmux session")
+    ignore_klipper: bool = tap.arg(help="don't check if klipper is running")
     tcp: bool = tap.arg(help="connect via TCP instead of BT SPP")
     ip: str = tap.arg(
         default="192.168.4.1", help="if non-empty, connect via TCP to given IP"
