@@ -21,31 +21,40 @@ namespace {
 
 constexpr array ADDRESSES{0x52_u8, 0x53_u8};
 
+// `DataAqiScioSense` \in [0, 500], 100 = avg over last 24h
+// `DataAqiUBI`       \in [1, 5]
 enum class Reg : uint8_t {
-    PartID = 0x00u,  // 16 bits
-    OpMode = 0x10u,
-    Config = 0x11u,
-    Command = 0x12u,
-    TempIn = 0x13u,
-    RelHumidityIn = 0x15u,
-    DataStatus = 0x20u,
-    DataAqiUBI = 0x21u,
-    DataTVOC = 0x22u,
-    DataECO2 = 0x24u,
-    DataAqiScioSense = 0x26u,
-    DataReserved0 = 0x28u,  // 10 octets (??)
-    DataTemperature = 0x30u,
-    DataRelativeHumidity = 0x32u,  // 16 bits
-    DataChecksum = 0x38u,          // AKA `MISR`
-    GprWrite0 = 0x40u,             // up to 8 octets
-    GprRead0 = 0x48u,              // up to 8 octets
-    GprRead4 = GprRead0 + 4,
+    PartID = 0x00u,            // 2 octets, R
+    OpMode = 0x10u,            // 1 octet, RW
+    Config = 0x11u,            // 1 octet, RW
+    Command = 0x12u,           // 1 octet, RA
+    TemperatureIn = 0x13u,     // 2 octets, RW
+    RelHumidityIn = 0x15u,     // 2 octets, RW
+    Reserved0 = 0x17u,         // 16 octets
+    DeviceStatus = 0x20u,      // 1 octets, R
+    DataAqiUBI = 0x21u,        // 1 octets, R
+    DataTVOC = 0x22u,          // 2 octets, R
+    DataECO2 = 0x24u,          // 2 octets, R
+    DataAqiScioSense = 0x26u,  // 2 octets, R; documented in ENS161, but looks like its available on ENS160?
+    SensorBaseline0 = 0x28u,   // 2 octets, R; undocumented, seen in reference driver
+    SensorBaseline1 = 0x2Au,   // 2 octets, R; undocumented, seen in reference driver
+    SensorBaseline2 = 0x2Cu,   // 2 octets, R; undocumented, seen in reference driver
+    SensorBaseline3 = 0x2Eu,   // 2 octets, R; undocumented, seen in reference driver
+    DataTemperature = 0x30u,   // 2 octets, R
+    DataRelHumidity = 0x32u,   // 2 octets, R
+    Reserved4 = 0x34u,         // 4 octets
+    DataChecksum = 0x38u,      // 1 octet, R; AKA `MISR`
+    GprWrite0 = 0x40u,         // 8 octets, RW
+    GprRead0 = 0x48u,          // 8 octets, R
+    GprRead4 = GprRead0 + 4,   // subset of `GprRead0`
 };
 
 enum class OpMode : uint8_t {
     DeepSleep = 0x00u,
     Idle = 0x01u,
-    Operational = 0x02u,
+    Operational = 0x02u,      // 1 hz sampling
+    LowPowerGas = 0x03u,      // ENS161 documented only, not tested on ENS160, 1/ 60 hz sampling
+    UltaLowPowerGas = 0x04u,  // ENS161 documented only, not tested on ENS160, 1/300 hz sampling
     Reset = 0xF0u,
 };
 
@@ -54,6 +63,7 @@ enum class Cmd : uint8_t {
     NoOp = 0x00u,
     GetAppVersion = 0x0Eu,
     ClearGPR = 0xCCu,
+    SetSeq = 0xC2u,  // undocumented, noted in reference driver for ENS160
 };
 
 // enum values must match official part IDs and must be a classed to `uint16_t`
@@ -70,8 +80,12 @@ struct [[gnu::packed]] Status {
     uint8_t new_data : 1;
     uint8_t validity : 2;  // 0 = normal, 1 = warm-up, 2 = startup, 3 = invalid
     uint8_t _reserved : 2;
-    uint8_t error : 1;   // 0 = normal, 1 = error detected
-    uint8_t statas : 1;  // (sic) "High indicates that an OPMODE is running" -> mode change in progress?
+    uint8_t error : 1;  // 0 = normal, 1 = error detected
+    // (sic) "High indicates that an OPMODE is running"
+    // No idea what that means. Used to think it meant an op-mode change is in
+    // progress, but their reference driver doesn't care about that and I've seen
+    // `statas=1` during the measurement loop. Maybe it means measure-in-progress?
+    uint8_t statas : 1;
 };
 static_assert(sizeof(Status) == sizeof(uint8_t));
 
@@ -154,6 +168,9 @@ struct ENS16xSensor final : SensorPeriodicEnvI2C<Reg, "ENS16x"> {
         side.set(VOCIndex(clamp<uint16_t>(*aqi_level, 1, 500)));
     }
 
+    // NB:  Spec says switching to an operational mode (i.e. {0x2, 0x3, 0x4})
+    //      *must* be done from idle mode. This is not enforced/checked by this
+    //      function.
     bool mode(OpMode mode, bool quiet = false) {  // NOLINT(readability-make-member-function-const)
         if (!i2c.write(Reg::OpMode, mode)) {
             if (!quiet) {
@@ -176,8 +193,7 @@ struct ENS16xSensor final : SensorPeriodicEnvI2C<Reg, "ENS16x"> {
         }
         misr.expected = *curr_misr;
 
-        // `statas` is low when mode change is complete
-        return status_await([](auto& x) { return !x.statas; });
+        return true;
     }
 
     optional<Kind> read_kind() {
@@ -240,7 +256,7 @@ struct ENS16xSensor final : SensorPeriodicEnvI2C<Reg, "ENS16x"> {
     }
 
     [[nodiscard]] optional<Status> status() {
-        return read_data_verified<Status>(Reg::DataStatus);
+        return read_data_verified<Status>(Reg::DeviceStatus);
     }
 
     template <typename F>
