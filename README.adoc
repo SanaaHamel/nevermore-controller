@@ -649,6 +649,7 @@ If you would like to limit the maximum speed of the fan, e.g. to reduce noise, x
 * https://github.com/julianschill/klipper-led_effect[Julian Schill] - installation script (derived)
 * https://github.com/boschsensortec/BME280_driver[Bosch Sensors] - BME280, BME68x library (included)
 * https://github.com/sciosense/ENS160_driver [ScioSense] - ENS160 library (referenced)
+* https://github.com/Sensirion/embedded-sgp[Sensirion] - SGP30 library (referenced)
 * https://github.com/Sensirion/gas-index-algorithm[Sensirion] - SGP40 gas index library (included)
 * https://github.com/klipper3d/klipper [Klipper] - AHTxx library (referenced)
 * https://github.com/apache/nuttx[Apache Nuttx] - I2C software reset (derived)

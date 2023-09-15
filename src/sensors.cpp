@@ -10,6 +10,7 @@
 #include "sensors/ens16x.hpp"
 #include "sensors/environmental.hpp"
 #include "sensors/htu2xd.hpp"
+#include "sensors/sgp30.hpp"
 #include "sensors/sgp40.hpp"
 #include <algorithm>
 #include <array>
@@ -33,6 +34,7 @@ constexpr auto SENSOR_POWER_ON_DELAY = max({
         BME68x_POWER_ON_DELAY,
         ENS16x_POWER_ON_DELAY,
         HTU21D_POWER_ON_DELAY,
+        SGP30_POWER_ON_DELAY,
         SGP40_POWER_ON_DELAY,
 });
 
@@ -82,6 +84,7 @@ VecSensors sensors_init_bus(i2c_inst_t& bus, EnvironmentalFilter state) {
     probe_for(bme68x(bus, state));
     probe_for(ens16x(bus, state));
     probe_for(htu2xd(bus, state));
+    probe_for(sgp30(bus, state));
     probe_for(sgp40(bus, state));
     probe_for(CST816S::mk(bus));
 
