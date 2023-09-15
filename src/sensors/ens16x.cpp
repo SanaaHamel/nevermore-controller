@@ -138,6 +138,11 @@ struct ENS16xSensor final : SensorPeriodicEnvI2C<Reg, "ENS16x"> {
         return mode(OpMode::Operational);
     }
 
+    // `OpMode::Operational` only samples at 1 Hz, no point going faster
+    [[nodiscard]] chrono::milliseconds update_period() const override {
+        return max<chrono::milliseconds>(SENSOR_UPDATE_PERIOD, 1s);
+    }
+
     void read() override {
         Compensation compensation{
                 .temperature = uint16_t(max(0., (side.compensation_humidity() + 273.15) * 64)),
