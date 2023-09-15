@@ -134,6 +134,7 @@ struct NOT_KNOWN {
 
 namespace internal {
 
+// does nothing. just here to trigger compiler warning if literal arg doesn't fit in `A`
 template <typename A>
 constexpr A check_for_overflow(A x) {
     return x;
