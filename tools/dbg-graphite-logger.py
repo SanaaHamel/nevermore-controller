@@ -462,9 +462,19 @@ async def _main(args: CmdLnArgs):
 
     print(f"connecting to {address_found}")
 
+    # HACK: Only want to consider these as cause for reconnect once we're
+    #       in the main query loop. Mistakes during setup should be fatal.
+    #       Fine for now b/c we're not a typical user tool.
+    def exc_filter(e: Exception) -> bool:
+        if isinstance(e, bleak.exc.BleakError):
+            logging.exception("bleak error, reconnecting...", exc_info=e)
+            return True
+
+        return False
+
     try:
         await retry_if_disconnected(
-            address_found, _log_sensors, connection_timeout=None
+            address_found, _log_sensors, connection_timeout=None, exc_filter=exc_filter
         )
     except asyncio.exceptions.CancelledError:
         pass
