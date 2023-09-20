@@ -62,15 +62,17 @@ bool sgp40_self_test(i2c_inst_t& bus) {
     return false;
 }
 
-bool sgp40_measure_issue(i2c_inst_t& bus, double temperature, double humidity) {
-    auto to_tick = [](double n, double min, double max) {
-        return byteswap(uint16_t((clamp(n, min, max) - min) / (max - min) * UINT16_MAX));
-    };
+constexpr uint16_t to_tick(double n, double min, double max) {
+    return uint16_t((clamp(n, min, max) - min) / (max - min) * UINT16_MAX);
+}
+static_assert(to_tick(50, 0, 100) == 0x8000 - 1, "humidity check");  // -1 b/c of truncation
+static_assert(to_tick(25, -45, 130) == 0x6666, "temperature check");
 
-    auto temperature_tick = to_tick(temperature, -45, 130);
-    auto humidity_tick = to_tick(humidity, 0, 100);
-    PackedTuple cmd{Cmd::SGP40_MEASURE, temperature_tick, crc8(temperature_tick, 0xFF), humidity_tick,
-            crc8(humidity_tick, 0xFF)};
+bool sgp40_measure_issue(i2c_inst_t& bus, double temperature, double humidity) {
+    uint16_t temperature_tick = byteswap(to_tick(temperature, -45, 130));
+    uint16_t humidity_tick = byteswap(to_tick(humidity, 0, 100));
+    PackedTuple cmd{Cmd::SGP40_MEASURE, humidity_tick, crc8(humidity_tick, 0xFF), temperature_tick,
+            crc8(temperature_tick, 0xFF)};
     return i2c_write("SGP40", bus, SGP40_ADDRESS, cmd);
 }
 
