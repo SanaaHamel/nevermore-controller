@@ -49,13 +49,13 @@ bool sgp40_self_test(i2c_inst_t& bus) {
 
     task_delay(320ms);  // spec says max delay of 320ms
 
-    auto response = i2c_read_blocking_crc<0xFF, uint8_t, uint8_t>("SGP40", bus, SGP40_ADDRESS);
+    auto response = i2c_read_blocking_crc<0xFF, uint16_t>("SGP40", bus, SGP40_ADDRESS);
     if (!response) return false;
 
-    auto&& [code, _] = *response;
+    auto code = byteswap(get<0>(*response));
     switch (code) {
-    case 0xD4: return true;   // tests passed
-    case 0x4B: return false;  // tests failed
+    case 0xD400: return true;   // tests passed
+    case 0x4B00: return false;  // tests failed
     }
 
     printf("WARN - SGP40 - unexpected response code from self-test: 0x%02x\n", int(code));
