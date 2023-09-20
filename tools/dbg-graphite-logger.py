@@ -18,16 +18,81 @@ exit 0 # required to stop shell execution here
 #
 # This file may be distributed under the terms of the GNU AGPLv3 license.
 
-__doc__ = """Script for logging sensors to local Graphite instance"""
+__doc__ = """Script for logging sensors to local Graphite instance.
+
+If you need a graphite instance you can set one up with the following commands:
+
+sudo apt-get install docker.io --install-suggests
+# expose web-server on port 81 instead of 80 b/c 80 is likely in use by Mainsail
+sudo docker run -d\
+ --name graphite\
+ --restart=always\
+ -p 81:80\
+ -p 2003-2004:2003-2004\
+ -p 2023-2024:2023-2024\
+ -p 8125:8125/udp\
+ -p 8126:8126\
+ graphiteapp/graphite-statsd
+
+
+You can then open the Graphite Dashboard via: http://localhost:81/dashboard
+I suggest the following dashboard snippet (paste it via `Dashboard -> Edit Dashboard`):
+
+```
+[
+  {
+    "target": [
+      "seriesByTag(\"name=gas\")"
+    ],
+    "vtitle": "VOC Index",
+    "title": "VOC Index"
+  },
+  {
+    "target": [
+      "scale(seriesByTag(\"name=gas_raw\"),0.00001525902)"
+    ],
+    "title": "VOC Raw"
+  },
+  {
+    "target": [
+      "seriesByTag(\"name=temperature\", \"side=~(intake|exhaust)\")",
+      "seriesByTag(\"name=temperature\", \"side!=~(intake|exhaust)\")",
+    ],
+    "title": "Temperature",
+    "vtitle": "C"
+  },
+  {
+    "target": [
+      "seriesByTag(\"name=humidity\")"
+    ],
+    "vtitle": "Relative Humidity %",
+    "title": "Humidity"
+  },
+  {
+    "target": [
+      "seriesByTag(\"name=pressure\")"
+    ],
+    "vtitle": "hPa",
+    "title": "Pressure"
+  }
+]
+```
+
+"""
 
 import asyncio
 import dataclasses
 import datetime
+import enum
+import json
 import logging
 import pickle
+import re
 import socket
 import struct
 import typing
+import uuid
+from collections import defaultdict
 from dataclasses import dataclass
 from typing import (
     Any,
@@ -45,6 +110,7 @@ from uuid import UUID
 
 import bleak
 import typed_argparse as tap
+import websockets.legacy.client as WSClient
 from bleak import BleakClient, BleakScanner
 from bleak.backends.device import BLEDevice
 
@@ -53,7 +119,27 @@ if typing.TYPE_CHECKING:
 else:
     _LoggerAdapter = logging.LoggerAdapter
 
-SAMPLING_HZ = 1 / 30
+MOONRAKER_DEFAULT_PORT = 7125
+GRAPHITE_DEFAULT_PICKLE_PORT = 2004
+GRAPHITE_DEFAULT_RETENTION_RESOLUTION = 10
+
+# object fields not in this list will not be logged
+# (after some post processing, e.g. `exhaust_foobar` will check for `foobar`)
+MOONRAKER_SENSOR_FIELDS_ALLOWED = {
+    "gas",
+    "gas_raw",
+    "humidity",
+    "pressure",
+    "rpm",
+    "speed",
+    "target",  # used by heaters for target temperature
+    "power",  # used by heaters for applied PWM %
+    "temperature",
+}
+
+MOONRAKER_SENSOR_NAME_BLOCKED = [
+    re.compile("temperature_sensor nevermore_.*_voc"),  # ignore common VOC plotters
+]
 
 NEVERMORE_CONTROLLER_NAMES = {"Nevermore", "Nevermore Controller"}
 BOOTLOADER_NAME_PREFIX = "picowota "
@@ -73,6 +159,78 @@ UUID_CHAR_FAN_AGGREGATE = UUID("79cd747f-91af-49a6-95b2-5b597c683129")
 UUID_CHAR_CONFIG_REBOOT = UUID("f48a18bb-e03c-4583-8006-5b54422e2045")
 
 _A = TypeVar("_A")
+
+
+@dataclass
+class Ip4Port:
+    addr: str
+    port: int
+
+    @staticmethod
+    def parse(default_addr: str, default_port: int):
+        def go(raw: str) -> Ip4Port:
+            parts = raw.split(":", 1)
+            return Ip4Port(
+                parts[0] if parts[0] != "" else default_addr,
+                int(parts[1]) if 1 < len(parts) else default_port,
+            )
+
+        return go
+
+
+# HACK: want `enum.StrEnum`, but that's not available on older versions we need to support
+class Side(enum.Enum):
+    # name must be lowercase
+    intake = "intake"
+    exhaust = "exhaust"
+
+
+@dataclass
+class SystemSnapshot:
+    name: str
+    sensors: Dict[str, Dict[Tuple[str, Optional[Side]], float]]
+    timestamp: Optional[datetime.datetime] = None
+
+
+GraphiteLogger = Callable[[SystemSnapshot], Coroutine[Any, Any, None]]
+
+
+def graphite_connection(dst: Ip4Port, sampling_period: float) -> GraphiteLogger:
+    assert 0 < sampling_period
+
+    if sampling_period < GRAPHITE_DEFAULT_RETENTION_RESOLUTION / 2:
+        print(
+            f"WARN - `--sampling-period` of {sampling_period} sec is less than half the default graphite retention period ({GRAPHITE_DEFAULT_RETENTION_RESOLUTION} sec)."
+        )
+        print(
+            "If you need a more fine-grain retention period then you'll need to modify your graphite installation's `/opt/graphite/conf/storage-schemas.conf`"
+        )
+
+    print(f"connecting to graphite: tcp://{dst.addr}:{dst.port}")
+    sk = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    sk.connect((dst.addr, dst.port))
+
+    async def log(snapshot: SystemSnapshot) -> None:
+        def series_name(sensor_name: str, field: str, side: Optional[Side]) -> str:
+            # FIXME: escape `;` and any `~` prefix?
+            side_tag = "" if side is None else f";side={side.value}"
+            return f"{field};source={snapshot.name};sensor={sensor_name}{side_tag}"
+
+        timestamp = (snapshot.timestamp or datetime.datetime.now()).strftime("%s")
+        metrics: List[Tuple[str, Tuple[str, float]]] = [
+            (series_name(sensor_name, field, side), (timestamp, value))
+            for sensor_name, values in snapshot.sensors.items()
+            for (field, side), value in values.items()
+        ]
+
+        payload = pickle.dumps(metrics, protocol=2)
+        header = struct.pack("!L", len(payload))
+        message = header + payload
+        sk.send(message)
+
+        await asyncio.sleep(sampling_period)
+
+    return log
 
 
 # must be of the form `xx:xx:xx:xx:xx:xx`, where `x` is a hex digit (uppercase)
@@ -256,6 +414,7 @@ async def device_is_likely_a_nevermore(device: BLEDevice) -> bool:
 
 @dataclass
 class Sensors:
+    # key names must match those used by moonraker/klipper status (e.g. `gas` instead of `voc`)
     temperature_intake: Optional[float] = None  # Celsius
     temperature_exhaust: Optional[float] = None  # Celsius
     temperature_mcu: Optional[
@@ -263,12 +422,12 @@ class Sensors:
     ] = None  # Celsius, `float` but Maybe Float simplifies handling
     humidity_intake: Optional[float] = None  # %
     humidity_exhaust: Optional[float] = None  # %
-    pressure_intake: Optional[float] = None  # kPa
-    pressure_exhaust: Optional[float] = None  # kPa
-    voc_index_intake: Optional[int] = None  # [1, VOC_INDEX_MAX]
-    voc_index_exhaust: Optional[int] = None  # [1, VOC_INDEX_MAX]
-    voc_raw_intake: Optional[int] = None  # [0, VOC_RAW_MAX]
-    voc_raw_exhaust: Optional[int] = None  # [0, VOC_RAW_MAX]
+    pressure_intake: Optional[float] = None  # hPa
+    pressure_exhaust: Optional[float] = None  # hPa
+    gas_intake: Optional[int] = None  # [1, VOC_INDEX_MAX]
+    gas_exhaust: Optional[int] = None  # [1, VOC_INDEX_MAX]
+    gas_raw_intake: Optional[int] = None  # [0, VOC_RAW_MAX]
+    gas_raw_exhaust: Optional[int] = None  # [0, VOC_RAW_MAX]
 
     def as_dict(self) -> Dict[str, float]:
         return {
@@ -374,23 +533,24 @@ def parse_agg_env(reader: BleAttrReader) -> Sensors:
         humidity_exhaust=reader.humidity(),
         pressure_intake=reader.pressure(),
         pressure_exhaust=reader.pressure(),
-        voc_index_intake=reader.voc_index(),
-        voc_index_exhaust=reader.voc_index(),
-        voc_raw_intake=reader.voc_raw(),
-        voc_raw_exhaust=reader.voc_raw(),
+        gas_intake=reader.voc_index(),
+        gas_exhaust=reader.voc_index(),
+        gas_raw_intake=reader.voc_raw(),
+        gas_raw_exhaust=reader.voc_raw(),
     )
     if sensors.pressure_intake is not None:
-        sensors.pressure_intake /= 1000  # in kPA
+        sensors.pressure_intake /= 1000  # in hPA
     if sensors.pressure_exhaust is not None:
-        sensors.pressure_exhaust /= 1000  # in kPA
+        sensors.pressure_exhaust /= 1000  # in hPA
 
     return sensors
 
 
 @dataclass
 class FanState:
-    power: Optional[float] = None
-    tacho: Optional[float] = None
+    # key names must match those used by moonraker/klipper status (e.g. `rpm` instead of `tacho`)
+    speed: Optional[float] = None
+    rpm: Optional[float] = None
 
     def as_dict(self) -> Dict[str, float]:
         return {
@@ -402,65 +562,51 @@ class FanState:
 
 def parse_agg_fan(reader: BleAttrReader) -> FanState:
     return FanState(
-        power=reader.percentage8(),
-        tacho=reader.tachometer(),
+        speed=reader.percentage8(),
+        rpm=reader.tachometer(),
     )
 
 
-async def _log_sensors(client: BleakClient):
-    service_env = client.services.get_service(UUID_SERVICE_ENVIRONMENTAL_SENSING)
-    assert service_env is not None
-    service_fan = client.services.get_service(UUID_SERVICE_FAN)
-    assert service_fan is not None
-    char_env = service_env.get_characteristic(UUID_CHAR_DATA_AGGREGATE)
-    assert char_env is not None
-    char_fan = service_fan.get_characteristic(UUID_CHAR_FAN_AGGREGATE)
-    assert char_fan is not None
-
-    print("connecting to local graphite...")
-    sk = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    sk.connect(("localhost", 2004))
-    print("connected")
-
-    while True:
-        env = parse_agg_env(BleAttrReader(await client.read_gatt_char(char_env)))
-        fan = parse_agg_fan(BleAttrReader(await client.read_gatt_char(char_fan)))
-
-        timestamp = datetime.datetime.now().strftime("%s")
-        metrics_env: List[Tuple[str, Tuple[str, float]]] = [
-            (f"{client.address}.{k}", (timestamp, v)) for k, v in env.as_dict().items()
-        ]
-        metrics_fan: List[Tuple[str, Tuple[str, float]]] = [
-            (f"{client.address}.{k}", (timestamp, v)) for k, v in fan.as_dict().items()
-        ]
-
-        payload = pickle.dumps(metrics_env + metrics_fan, protocol=2)
-        header = struct.pack("!L", len(payload))
-        message = header + payload
-        sk.send(message)
-
-        await asyncio.sleep(1 / SAMPLING_HZ)
-
-
-class CmdLnArgs(tap.TypedArgs):
-    bt_address: Optional[str] = tap.arg(help="device's BT adddress")
-
-
-async def _main(args: CmdLnArgs):
-    if args.bt_address is not None and not _bt_address_validate(args.bt_address):
-        logging.error("invalid address for `--bt-address`")
-        return
-
-    address_found = await discover_device_address(
+async def _main_bluetooth(log: GraphiteLogger, address: Optional[str]):
+    address = await discover_device_address(
         "Nevermore controllers",
         device_is_likely_a_nevermore,
-        args.bt_address,
+        address,
     )
-    if address_found is None:
+    if address is None:
         print(f"failed to find a nevermore")
         return
 
-    print(f"connecting to {address_found}")
+    async def _log_sensors(client: BleakClient):
+        service_env = client.services.get_service(UUID_SERVICE_ENVIRONMENTAL_SENSING)
+        service_fan = client.services.get_service(UUID_SERVICE_FAN)
+        assert service_env is not None
+        assert service_fan is not None
+        char_env = service_env.get_characteristic(UUID_CHAR_DATA_AGGREGATE)
+        char_fan = service_fan.get_characteristic(UUID_CHAR_FAN_AGGREGATE)
+        assert char_env is not None
+        assert char_fan is not None
+
+        async def snapshot() -> SystemSnapshot:
+            def key(name: str) -> Tuple[str, Optional[Side]]:
+                for side in Side:
+                    suffix = f"_{side.name}"
+                    if name.endswith(suffix):
+                        name = name[: -len(suffix)]
+                        return (name, side)
+
+                return (name, None)
+
+            env = parse_agg_env(BleAttrReader(await client.read_gatt_char(char_env)))
+            fan = parse_agg_fan(BleAttrReader(await client.read_gatt_char(char_fan)))
+            sensors = {key(k): v for k, v in env.as_dict().items()}
+            sensors.update((key(k), v) for k, v in fan.as_dict().items())
+
+            return SystemSnapshot(address.replace(":", "-"), {"nevermore": sensors})
+
+        print("ready. logging...")
+        while True:
+            await log(await snapshot())
 
     # HACK: Only want to consider these as cause for reconnect once we're
     #       in the main query loop. Mistakes during setup should be fatal.
@@ -473,13 +619,140 @@ async def _main(args: CmdLnArgs):
         return False
 
     try:
+        print(f"connecting to {address}")
         await retry_if_disconnected(
-            address_found, _log_sensors, connection_timeout=None, exc_filter=exc_filter
+            address, _log_sensors, connection_timeout=None, exc_filter=exc_filter
         )
     except asyncio.exceptions.CancelledError:
         pass
     except KeyboardInterrupt:
         pass
+
+
+async def _main_moonraker(log: GraphiteLogger, moonraker: Ip4Port):
+    uri = f"ws://{moonraker.addr}:{moonraker.port}/websocket"
+    print(f"connecting to moonraker: {uri}")
+
+    async with WSClient.connect(uri) as ws:
+
+        async def cmd_raw(args: Dict[str, Any]) -> Dict[str, Any]:
+            args = args.copy()
+            args["jsonrpc"] = "2.0"
+            args["id"] = str(uuid.uuid4())
+
+            await ws.send(json.dumps(args))
+            while True:
+                response = json.loads(await ws.recv())
+                if response.get("id") == args["id"]:
+                    return response["result"]
+
+        async def cmd(method: str, args: Optional[Dict[str, Any]] = None):
+            cmd: Dict[str, Any] = {"method": method}
+            if args is not None:
+                cmd["params"] = args
+            return await cmd_raw(cmd)
+
+        async def snapshot() -> SystemSnapshot:
+            all_objects: list[str] = (await cmd("printer.objects.list"))["objects"]
+            # future support for if/when we allow multiple nevermore instances
+            nevermore_objects = [
+                x for x in all_objects if x == "nevermore" or x.startswith("nevermore ")
+            ]
+
+            sensor_names: list[str] = (
+                await cmd(
+                    "printer.objects.query",
+                    {"objects": {"heaters": ["available_sensors"]}},
+                )
+            )["status"]["heaters"]["available_sensors"]
+
+            sensor_values = (
+                await cmd(
+                    "printer.objects.query",
+                    {
+                        "objects": {
+                            name: None
+                            for name in set(sensor_names).union(nevermore_objects)
+                        }
+                    },
+                )
+            )["status"]
+
+            sensors: Dict[str, Dict[Tuple[str, Optional[Side]], float]] = defaultdict(
+                lambda: {}
+            )
+
+            fields: Dict[str, Any]
+            for sensor_name, fields in sensor_values.items():
+                if any(
+                    pattern.match(sensor_name.lower())
+                    for pattern in MOONRAKER_SENSOR_NAME_BLOCKED
+                ):
+                    continue
+
+                for field, value in fields.items():
+                    if not isinstance(value, (int, float)):
+                        continue
+
+                    field_parts = field.split("_")
+                    if field_parts[-1] in {"min", "max"}:
+                        continue  # skip statistic fields in `nevermore`
+
+                    try:
+                        side = Side(field_parts[0].lower())
+                        field_parts.pop(0)
+                        if not field_parts:
+                            continue  # ignore, malformed
+                    except ValueError:
+                        side = None
+
+                    name = "_".join(field_parts)
+                    if name not in MOONRAKER_SENSOR_FIELDS_ALLOWED:
+                        continue
+
+                    sensors[sensor_name][(name, side)] = value
+
+            return SystemSnapshot(f"{moonraker.addr}:{moonraker.port}", sensors)
+
+        print("ready. logging...")
+        while True:
+            await log(await snapshot())
+
+
+class CmdLnArgs(tap.TypedArgs):
+    # HACK: cast to `float` b/c `type-args` is stupid and doesn't do subtyping checks
+    sampling_period: float = tap.arg(
+        help="seconds between samples",
+        # a bit less than the resolution to ensure we fill every slot
+        default=float(GRAPHITE_DEFAULT_RETENTION_RESOLUTION * 0.75),
+    )
+    bt_address: Optional[str] = tap.arg(help="device's BT adddress")
+    moonraker: Optional[Ip4Port] = tap.arg(
+        help=f"ip4:port, mutex w/ `bt-address`, \"\" for \"localhost:{MOONRAKER_DEFAULT_PORT}\"",
+        type=Ip4Port.parse("localhost", MOONRAKER_DEFAULT_PORT),
+    )
+    graphite: Ip4Port = tap.arg(
+        help=f"ip4:port for graphite instance",
+        default=Ip4Port("localhost", GRAPHITE_DEFAULT_PICKLE_PORT),
+        type=Ip4Port.parse("localhost", GRAPHITE_DEFAULT_PICKLE_PORT),
+    )
+
+
+async def _main(args: CmdLnArgs):
+    if args.bt_address is not None and not _bt_address_validate(args.bt_address):
+        logging.error("invalid address for `--bt-address`")
+        exit(1)
+
+    if args.bt_address is not None and args.moonraker is not None:
+        logging.error("can't specify both `--moonraker` and `--bt-address`")
+        exit(1)
+
+    log_entry = graphite_connection(args.graphite, args.sampling_period)
+
+    if args.moonraker is None:
+        await _main_bluetooth(log_entry, args.bt_address)
+    else:
+        await _main_moonraker(log_entry, args.moonraker)
 
 
 def main():

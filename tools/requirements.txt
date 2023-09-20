@@ -1,2 +1,3 @@
 aiohttp>=3.8
 typed-argparse>=0.2.11<1
+websockets>=11.0.3
