@@ -459,7 +459,7 @@ fan_thermal_limit_coefficient: 0
 # report the value from the other side (if available).
 # Useful for builds where you only have one temperature or humidity sensor,
 # and you want to use it for both intake/exhaust.
-sensors_fallback: true
+sensors_fallback: false
 
 # Use the MCU's temperature as an exhaust temperature fallback.
 # Only useful for filters which have the MCU in the exhaust airflow (e.g. StealthMax)

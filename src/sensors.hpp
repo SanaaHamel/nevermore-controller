@@ -10,7 +10,7 @@ BLE_DECL_SCALAR_OPTIONAL(VOCRaw, uint16_t, 1, 0, 0, 0xFFFFu);  // range [0, 2^16
 
 struct Config {
     // If a sensor in a `FilterSide` is missing, then try to fall back to the other side's sensor.
-    bool fallback = true;
+    bool fallback = false;
     // StealthMax MCU is positioned inside the exhaust airflow.
     // Disabled by default because not all Nevermores are StealthMaxes.
     bool fallback_exhaust_mcu = false;
