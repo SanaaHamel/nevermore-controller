@@ -259,21 +259,16 @@ Alternatively, you can flash Klipper to the Pico and use it like any other Klipp
 +
 NOTE: I intend to improve the experience for people using a wired connection instead of wireless (via the Klipper MCU), but have no concrete timeline.
 
-* Mainsail doesn't show sensor values other than temperature.
+. I'm using the xref:klipper-config-minimal[minimal configuration] and I only see the VOC plot entry in Mainsail, there's no 'Nevermore' item.
 +
-https://github.com/mainsail-crew/mainsail/pull/1437[There's a PR for Mainsail which has unofficial support] but until that's merged xref:klipper-config-full[you'll need to use the `class_name_override` hack].
-
-* Mainsail doesn't show sensor values other than temperature and, yes, I applied the `class_name_override` hack.
-+
-Update your Mainsail. Older versions had a bug where it would assume that multi-value sensors always had the same fields once they were seen for the first time. This isn't true for Nevermore controller sensors.
-+
-NOTE: This is very common with the VOC sensors during controller startup. They take a few seconds to initialise.
+Verify that your Mainsail version is at least 2.7.1 (first release w/ official support).
+If that's fine then double check there isn't any config errors.
 
 * Fluidd doesn't show sensor values other than temperature, even with the `class_name_override` hack.
 +
 Can't fix due to how Fluidd interprets Klipper state data. https://github.com/fluidd-core/fluidd/pull/1114[There's a PR fixing the issue, but it hasn't received much support.]
 +
-Fluidd is more or less unsupported with regards to sensor display and visualisation. I recommend Mainsail instead.
+Fluidd is more or less unsupported with regards to sensor display and visualisation. I recommend Mainsail 2.7.1 or later instead.
 
 == Touch Display Support
 
@@ -349,24 +344,14 @@ This example configuration is intended for quickly getting up and running. You c
 
 ```ini
 [nevermore]
-# BOM specifies a 16 pixel ring
+# BOM specifies a 16 pixel ring.
+# If you don't have LEDs, you can omit the two `led_*` lines entirely
 led_colour_order: GBR
 led_chain_count: 16
-# Uncomment if this controller is for a StealthMax
-# sensors_fallback_exhaust_mcu: true
 
-[temperature_sensor nevermore_intake]
-sensor_type: NevermoreSensor
-sensor_kind: intake
-# Need `class_name_override` to fool mainsail into showing all values. Remove once mainsail PR is merged.
-class_name_override: bme280
-
-[temperature_sensor nevermore_exhaust]
-sensor_type: NevermoreSensor
-sensor_kind: exhaust
-# Need `class_name_override` to fool mainsail into showing all values. Remove once mainsail PR is merged.
-class_name_override: bme280
-
+# Optional
+# This 'temperature' sensor only serves to draw the intake VOC index on
+# Mainsail's temperature plot.
 [temperature_sensor nevermore_intake_VOC]
 sensor_type: NevermoreSensor
 sensor_kind: intake
@@ -477,19 +462,27 @@ fan_thermal_limit_coefficient: 0
 sensors_fallback: true
 
 # Use the MCU's temperature as an exhaust temperature fallback.
-# Only useful for filters which have the MCU in the exhaust airflow. (e.g. StealthMax)
+# Only useful for filters which have the MCU in the exhaust airflow (e.g. StealthMax)
+# and don't have any dedicated temperature sensors.
 sensors_fallback_exhaust_mcu: false
 
 
-[temperature_sensor nevermore_sensor]
+# MOSTLY OBSOLETE.
+# Mainsail 2.7.1 introduced dedicated support for Nevermore controllers, simply having
+# `[nevermore]` is sufficient to display sensor values in the 'Temperatures' panel.
+#
+# Only remaining useful behaviour for `temperature_sensors` is the `plot_voc` option
+# which allows drawing the VOC index values for intake/exhaust in the temperature plot.
+[temperature_sensor <name>]
 sensor_type: NevermoreSensor # fixed, must be `NevermoreSensor`
 
 # valid values: `intake`, `exhaust`
 sensor_kind: <required, no defaults>
 
-# If you do not wish to edit your mainsail installation to add `NevermoreSensor`,
-# to its list of known sensors, you can use an already recognised classname.
-# Using `bme280` is strongly suggested, at least until the relevant PRs are merged.
+# Mainsail 2.7.1 doesn't recognise `NevermoreSensor` as sensor it should plot.
+# This hacky option allows overriding the class name with one it does recognise
+# as something that should be plotted.
+# Using `bme280` is strongly suggested.
 class_name_override: <optional, not set by default>
 
 # Pretends the VOC index is a temperature, allowing it to be plotted in Mainsail/Fluidd.
