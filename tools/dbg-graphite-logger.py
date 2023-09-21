@@ -561,10 +561,13 @@ class FanState:
 
 
 def parse_agg_fan(reader: BleAttrReader) -> FanState:
-    return FanState(
+    x = FanState(
         speed=reader.percentage8(),
         rpm=reader.tachometer(),
     )
+    if x.speed is not None:
+        x.speed /= 100  # remap [0, 1] to match moonraker's data
+    return x
 
 
 async def _main_bluetooth(log: GraphiteLogger, address: Optional[str]):
