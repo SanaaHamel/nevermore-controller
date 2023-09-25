@@ -110,6 +110,7 @@ from uuid import UUID
 
 import bleak
 import typed_argparse as tap
+import websockets.exceptions
 import websockets.legacy.client as WSClient
 from bleak import BleakClient, BleakScanner
 from bleak.backends.device import BLEDevice
@@ -632,12 +633,13 @@ async def _main_bluetooth(log: GraphiteLogger, address: Optional[str]):
         pass
 
 
-async def _main_moonraker(log: GraphiteLogger, moonraker: Ip4Port):
+async def _main_moonraker(
+    log: GraphiteLogger, moonraker: Ip4Port, retry_delay: Optional[float] = None
+):
+    assert retry_delay is None or 0 <= retry_delay
     uri = f"ws://{moonraker.addr}:{moonraker.port}/websocket"
-    print(f"connecting to moonraker: {uri}")
 
-    async with WSClient.connect(uri) as ws:
-
+    async def go(ws: WSClient.WebSocketClientProtocol):
         async def cmd_raw(args: Dict[str, Any]) -> Dict[str, Any]:
             args = args.copy()
             args["jsonrpc"] = "2.0"
@@ -721,6 +723,26 @@ async def _main_moonraker(log: GraphiteLogger, moonraker: Ip4Port):
         while True:
             await log(await snapshot())
 
+    while True:
+        try:
+            print(f"connecting to moonraker: {uri}")
+            async with WSClient.connect(uri) as ws:
+                await go(ws)
+        except Exception as e:
+            if retry_delay is not None and isinstance(
+                e,
+                (
+                    OSError,
+                    websockets.exceptions.ConnectionClosedError,
+                    websockets.exceptions.ConnectionClosedOK,
+                ),
+            ):
+                logging.exception("connection error, retrying...", exc_info=e)
+                print(f"retrying connection in {retry_delay} seconds")
+                await asyncio.sleep(retry_delay)
+            else:
+                raise
+
 
 class CmdLnArgs(tap.TypedArgs):
     # HACK: cast to `float` b/c `type-args` is stupid and doesn't do subtyping checks
@@ -739,6 +761,9 @@ class CmdLnArgs(tap.TypedArgs):
         default=Ip4Port("localhost", GRAPHITE_DEFAULT_PICKLE_PORT),
         type=Ip4Port.parse("localhost", GRAPHITE_DEFAULT_PICKLE_PORT),
     )
+    retry_delay: Optional[float] = tap.arg(
+        help="wait n seconds before re-connecting (moonraker only for now)"
+    )
 
 
 async def _main(args: CmdLnArgs):
@@ -755,7 +780,7 @@ async def _main(args: CmdLnArgs):
     if args.moonraker is None:
         await _main_bluetooth(log_entry, args.bt_address)
     else:
-        await _main_moonraker(log_entry, args.moonraker)
+        await _main_moonraker(log_entry, args.moonraker, args.retry_delay)
 
 
 def main():
