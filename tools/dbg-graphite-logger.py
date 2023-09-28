@@ -57,7 +57,7 @@ I suggest the following dashboard snippet (paste it via `Dashboard -> Edit Dashb
   {
     "target": [
       "seriesByTag(\"name=temperature\", \"side=~(intake|exhaust)\")",
-      "seriesByTag(\"name=temperature\", \"side!=~(intake|exhaust)\")",
+      "seriesByTag(\"name=temperature\", \"side!=~(intake|exhaust)\")"
     ],
     "title": "Temperature",
     "vtitle": "C"
