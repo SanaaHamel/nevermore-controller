@@ -57,7 +57,7 @@ I suggest the following dashboard snippet (paste it via `Dashboard -> Edit Dashb
   {
     "target": [
       "seriesByTag(\"name=temperature\", \"side=~(intake|exhaust)\")",
-      "seriesByTag(\"name=temperature\", \"side!=~(intake|exhaust)\")"
+      "seriesByTag(\"name=temperature\", \"side!=~(intake|exhaust)\", \"sensor!=~temperature_sensor\")"
     ],
     "title": "Temperature",
     "vtitle": "C"
@@ -75,6 +75,15 @@ I suggest the following dashboard snippet (paste it via `Dashboard -> Edit Dashb
     ],
     "vtitle": "hPa",
     "title": "Pressure"
+  },
+  {
+    "target": [
+      "seriesByTag(\"name=speed\", \"sensor=nevermore\")",
+      "secondYAxis(seriesByTag(\"name=rpm\", \"sensor=nevermore\"))"
+    ],
+    "title": "Fan",
+    "vtitle": "PWM %",
+    "vtitleRight": "RPM"
   }
 ]
 ```
