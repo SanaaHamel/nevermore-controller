@@ -27,6 +27,7 @@ sudo apt-get install docker.io --install-suggests
 sudo docker run -d\
  --name graphite\
  --restart=always\
+ --env "GRAPHITE_WSGI_PROCESSES=1"\
  -p 81:80\
  -p 2003-2004:2003-2004\
  -p 2023-2024:2023-2024\
