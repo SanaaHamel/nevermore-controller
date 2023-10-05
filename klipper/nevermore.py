@@ -726,6 +726,11 @@ class UNSAFE_LazyAsyncioEvent(asyncio.Event):
         loop.call_soon_threadsafe(lambda: self.set())
 
 
+class NevermoreForceReconnection(Exception):
+    "Exception used to trigger a reconnection."
+    pass
+
+
 # HACK: This class *heavily* abuses the GIL for data synchronisation between
 # the klipper thread and the background worker thread.
 class NevermoreBackgroundWorker:
@@ -844,6 +849,10 @@ class NevermoreBackgroundWorker:
                 #       (e.g. only the active GCode/command may write)
                 if isinstance(e, bleak.exc.BleakError) or isinstance(e, EOFError):
                     worker_log.exception("attempting reconnection...", exc_info=e)
+                    return True
+
+                # Raiser is responsible for any associated logging w/ this exception.
+                if isinstance(e, NevermoreForceReconnection):
                     return True
 
                 return False
@@ -1036,8 +1045,7 @@ class NevermoreBackgroundWorker:
             elapsed = (datetime.datetime.now() - last_notify_timestamp).total_seconds()
             if CONTROLLER_NOTIFY_TIMEOUT < elapsed:
                 log.warning(f"last notify was {elapsed} seconds ago. reconnecting...")
-                # HACK: `EOFError` is recognised as a transient error by retry exception filter
-                raise EOFError
+                raise NevermoreForceReconnection("notify timeout", elapsed)
 
             await asyncio.sleep(CONTROLLER_NOTIFY_TIMEOUT)
 
