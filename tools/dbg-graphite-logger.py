@@ -124,6 +124,7 @@ import websockets.exceptions
 import websockets.legacy.client as WSClient
 from bleak import BleakClient, BleakScanner
 from bleak.backends.device import BLEDevice
+from typing_extensions import override
 
 if typing.TYPE_CHECKING:
     _LoggerAdapter = logging.LoggerAdapter[logging.Logger]
@@ -643,6 +644,15 @@ async def _main_bluetooth(log: GraphiteLogger, address: Optional[str]):
         pass
 
 
+@dataclass
+class MoonrakerMalformedResponse(Exception):
+    response: Union[str, bytes]
+
+    @override
+    def __str__(self) -> str:
+        return f"malformed moonraker response: `{self.response}`"
+
+
 async def _main_moonraker(
     log: GraphiteLogger, moonraker: Ip4Port, retry_delay: Optional[float] = None
 ):
@@ -657,9 +667,23 @@ async def _main_moonraker(
 
             await ws.send(json.dumps(args))
             while True:
-                response = json.loads(await ws.recv())
-                if response.get("id") == args["id"]:
-                    return response["result"]
+                response_raw = await ws.recv()
+
+                try:
+                    response = json.loads(response_raw)
+                except json.JSONDecodeError:
+                    raise MoonrakerMalformedResponse(response_raw)
+
+                if not isinstance(response, dict):
+                    raise MoonrakerMalformedResponse(response_raw)
+
+                if response.get("id") != args["id"]:
+                    continue
+
+                if not isinstance(response.get("result"), dict):
+                    raise MoonrakerMalformedResponse(response_raw)
+
+                return response["result"]
 
         async def cmd(method: str, args: Optional[Dict[str, Any]] = None):
             cmd: Dict[str, Any] = {"method": method}
@@ -738,6 +762,15 @@ async def _main_moonraker(
             print(f"connecting to moonraker: {uri}")
             async with WSClient.connect(uri) as ws:
                 await go(ws)
+        except MoonrakerMalformedResponse as e:
+            if retry_delay is not None:
+                logging.exception(
+                    "malformed/unexpected response, retrying...", exc_info=e
+                )
+                print(f"reconnecting in {retry_delay} seconds")
+                await asyncio.sleep(retry_delay)
+            else:
+                raise
         except Exception as e:
             if retry_delay is not None and isinstance(
                 e,
