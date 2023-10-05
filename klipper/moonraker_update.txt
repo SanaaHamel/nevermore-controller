@@ -4,3 +4,4 @@ path: ~/nevermore-controller
 origin: https://github.com/sanaahamel/nevermore-controller.git
 primary_branch: main
 is_system_service: False
+managed_services: klipper
