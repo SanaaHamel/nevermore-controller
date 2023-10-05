@@ -340,7 +340,7 @@ class BleAttrReaderNotEnoughData(Exception):
 
 
 class BleAttrReader:
-    def __init__(self, raw: bytes):
+    def __init__(self, raw: bytearray):
         self.remaining = raw
 
     def humidity(self):
