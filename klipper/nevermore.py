@@ -791,7 +791,7 @@ class NevermoreBackgroundWorker:
         worker_log = LogPrefixed(LOG, lambda x: f"{self._thread.name} - {x}")
 
         async def handle_connection(device_address: Optional[str]) -> None:
-            class CantInferWhichNevermoreTooUse(Exception):
+            class CantInferWhichNevermoreToUse(Exception):
                 pass
 
             async def discover_device():
@@ -821,7 +821,7 @@ class NevermoreBackgroundWorker:
                         )
                     )
                     # don't bother trying again. abort & let the user deal with it
-                    raise CantInferWhichNevermoreTooUse()
+                    raise CantInferWhichNevermoreToUse()
 
                 # remember the discovered device's address, just in case another
                 # controller wanders into range and we need to reconnect to this one
@@ -879,7 +879,7 @@ class NevermoreBackgroundWorker:
                     log=worker_log,
                     retry=lambda: not self._loop_exit.is_set(),
                 )
-            except CantInferWhichNevermoreTooUse:
+            except CantInferWhichNevermoreToUse:
                 pass  # quietly fail and move on
 
         async def go():
