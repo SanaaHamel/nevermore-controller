@@ -58,6 +58,7 @@ __all__ = [
 # Non-configurable constants
 CONTROLLER_ADVERTISEMENT_PERIOD = 0.5  # seconds, upper bound on adverts
 CONTROLLER_CONNECTION_DELAY = 5  # seconds, expected upper bound based on tests
+CONTROLLER_NOTIFY_TIMEOUT = 30  # seconds, reconnect if no updates found
 
 CONTROLLER_NAMES = {"Nevermore", "Nevermore Controller"}
 BOOTLOADER_NAME_PREFIX = "picowota "
@@ -832,12 +833,8 @@ class NevermoreBackgroundWorker:
                 return devices[0]
 
             def exc_filter(e: Exception):
-                # if it's not a bleak error, don't suppress it
-                if not isinstance(e, bleak.exc.BleakError):
-                    return False
-
-                # be noisy about it, something unexpected happened.
-                # try to recovery by resetting the connection.
+                # Be noisy about this, something unexpected happened.
+                # Try to recovery by resetting the connection.
                 # This sucks, but there's huge variety of errors that
                 # can happen due to a lost connection, and I can't think
                 # of a good way to recognise them with this API.
@@ -845,8 +842,11 @@ class NevermoreBackgroundWorker:
                 #       do this with `GCode::response_info`, but I don't
                 #       know if there are rules/invariants about this.
                 #       (e.g. only the active GCode/command may write)
-                worker_log.exception("BT error - attempting reconnection...")
-                return True
+                if isinstance(e, bleak.exc.BleakError) or isinstance(e, EOFError):
+                    worker_log.exception("attempting reconnection...", exc_info=e)
+                    return True
+
+                return False
 
             # Attempt (re)connection. Might have to do this multiple times if we lose connection.
             #
@@ -959,11 +959,16 @@ class NevermoreBackgroundWorker:
         nevermore.handle_controller_connect()
         nevermore = None  # release local ref
 
+        last_notify_timestamp = datetime.datetime.now()
+
         async def notify(
             char: BleakGATTCharacteristic,
             callback: Callable[["Nevermore", BleAttrReader], Any],
         ):
             def go(_: BleakGATTCharacteristic, params: bytearray):
+                nonlocal last_notify_timestamp
+                last_notify_timestamp = datetime.datetime.now()
+
                 nevermore = self._nevermore()
                 if nevermore is not None:  # if frontend is dead -> nothing to do
                     callback(nevermore, BleAttrReader(params))
@@ -1026,18 +1031,28 @@ class NevermoreBackgroundWorker:
                 params = bytearray([offset, len(data)]) + data
                 await client.write_gatt_char(ws2812_update, params)
 
+        async def handle_notify_timeout():
+            nonlocal last_notify_timestamp
+            elapsed = (datetime.datetime.now() - last_notify_timestamp).total_seconds()
+            if CONTROLLER_NOTIFY_TIMEOUT < elapsed:
+                log.warning(f"last notify was {elapsed} seconds ago. reconnecting...")
+                # HACK: `EOFError` is recognised as a transient error by retry exception filter
+                raise EOFError
+
+            await asyncio.sleep(CONTROLLER_NOTIFY_TIMEOUT)
+
         async def forever(go: Callable[[], Coroutine[Any, Any, Any]]):
             while True:
                 await go()
 
-        tasks = asyncio.gather(*[forever(x) for x in [handle_commands, handle_led]])
+        tasks = asyncio.gather(
+            *[forever(x) for x in [handle_commands, handle_led, handle_notify_timeout]]
+        )
 
         try:
             await notify(aggregate_env, notify_env)
             await notify(aggregate_fan, notify_fan)
             await tasks
-        except EOFError:  # consider non-fatal, potentially transient
-            return
         finally:
             tasks.cancel()  # kill off all active tasks if any fail
 
