@@ -22,7 +22,7 @@ __doc__ = """Script for logging sensors to local Graphite instance.
 
 If you need a graphite instance you can set one up with the following commands:
 
-sudo apt-get install docker.io --install-suggests
+sudo apt-get install docker.io apparmor cgroupfs-mount needrestart criu
 # expose web-server on port 81 instead of 80 b/c 80 is likely in use by Mainsail
 sudo docker run -d\
  --name graphite\
