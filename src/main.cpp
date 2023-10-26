@@ -89,6 +89,7 @@ void pins_setup() {
 #endif
 }
 
+// NB: changes pin function assignments
 void pins_i2c_reset() {
     auto get = [](uint8_t bus, I2C_Pin kind) {
         for (auto pin : PINS_I2C)
@@ -99,6 +100,7 @@ void pins_i2c_reset() {
 
     static_assert(size(PINS_I2C) == 4, "too many pins - not impl");
     for (uint8_t i = 0; i < NUM_I2CS; ++i) {
+        // `i2c_bitbang_reset` is responsible for changing the pin functions
         if (!i2c_bitbang_reset(get(i, I2C_Pin::SDA), get(i, I2C_Pin::SCL)))
             printf("WARN - I2C%d - failed to reset bus\n", i);
     }
