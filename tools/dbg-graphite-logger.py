@@ -96,10 +96,14 @@ import datetime
 import enum
 import json
 import logging
+import os
 import pickle
 import re
+import shlex
 import socket
 import struct
+import sys
+import tempfile
 import typing
 import uuid
 from collections import defaultdict
@@ -134,6 +138,9 @@ else:
 MOONRAKER_DEFAULT_PORT = 7125
 GRAPHITE_DEFAULT_PICKLE_PORT = 2004
 GRAPHITE_DEFAULT_RETENTION_RESOLUTION = 10
+
+SYSTEMD_SERVICE_FILENAME = "nevermore-graphite-logger.service"
+SYSTEMD_SERVICE_PATH = f"/etc/systemd/system/{SYSTEMD_SERVICE_FILENAME}"
 
 # object fields not in this list will not be logged
 # (after some post processing, e.g. `exhaust_foobar` will check for `foobar`)
@@ -171,6 +178,30 @@ UUID_CHAR_FAN_AGGREGATE = UUID("79cd747f-91af-49a6-95b2-5b597c683129")
 UUID_CHAR_CONFIG_REBOOT = UUID("f48a18bb-e03c-4583-8006-5b54422e2045")
 
 _A = TypeVar("_A")
+
+
+def systemd_service_definition(args: List[str]) -> str:
+    script_file = sys.argv[0]
+    work_dir = os.path.abspath(".")
+    return f"""
+[Unit]
+Description=Nevermore Graphite Logger
+# we might be using moonraker, so wait for network to be up
+Requires=network-online.target
+After=network-online.target
+
+[Install]
+WantedBy=multi-user.target
+
+[Service]
+Type=simple
+User={os.getlogin()}
+RemainAfterExit=no
+WorkingDirectory={work_dir}
+ExecStart={script_file} {shlex.join(args)}
+Restart=on-failure
+RestartSec=1m
+"""
 
 
 @dataclass
@@ -807,6 +838,9 @@ class CmdLnArgs(tap.TypedArgs):
     retry_delay: Optional[float] = tap.arg(
         help="wait n seconds before re-connecting (moonraker only for now)"
     )
+    install_systemd_service: bool = tap.arg(
+        default=False, help="install a systemd startup service using current arguments"
+    )
 
 
 async def _main(args: CmdLnArgs):
@@ -817,6 +851,27 @@ async def _main(args: CmdLnArgs):
     if args.bt_address is not None and args.moonraker is not None:
         logging.error("can't specify both `--moonraker` and `--bt-address`")
         exit(1)
+
+    if args.install_systemd_service:
+        # FIXME: we should be unparsing a copy of `args` w/ `install_systemd_service` disabled
+        #        instead of abusing `sys.argv`.
+        raw_args = sys.argv[1:]
+        raw_args.remove("--install-systemd-service")
+        service_def = systemd_service_definition(raw_args)
+
+        def sudo_cmd(cmd: str):
+            cmd = f"sudo {cmd}"
+            print(cmd)
+            os.system(cmd)
+
+        with tempfile.NamedTemporaryFile() as f:
+            f.write(service_def.encode("utf-8"))
+            f.flush()
+            sudo_cmd(f"cp {shlex.join([f.name, SYSTEMD_SERVICE_PATH])}")
+            sudo_cmd(f"systemctl enable {SYSTEMD_SERVICE_FILENAME}")
+            sudo_cmd(f"systemctl start {SYSTEMD_SERVICE_FILENAME}")
+
+        exit(0)
 
     log_entry = graphite_connection(args.graphite, args.sampling_period)
 
