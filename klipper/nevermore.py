@@ -686,7 +686,7 @@ class CmdConfiguration(PseudoCommand):
     def __init__(self, config: ConfigWrapper) -> None:
         self.flags = 0
 
-        def cfg_flag(key: str, default: bool, flag_idx: int) -> Optional[int]:
+        def cfg_flag(key: str, default: bool, flag_idx: int):
             if config.getboolean(key, default):
                 self.flags |= 1 << flag_idx
 
