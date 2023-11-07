@@ -440,7 +440,7 @@ fan_policy_cooldown: 900
 # voc index, 0 to disable, filter if any sensor meets this threshold
 fan_policy_voc_passive_max: 125
 # voc index, 0 to disable, filter if the intake exceeds exhaust by at least this much
-fan_policy_voc_improve_min: 5
+fan_policy_voc_improve_min: 25
 
 # Fan Policy - Thermal Limit
 # Controls how/when the fan power is throttled down if the temperature is too high.

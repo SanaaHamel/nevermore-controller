@@ -13,7 +13,7 @@ struct FanPolicyEnvironmental {
     // How long to keep spinning after `should_filter` returns `false`
     BLE::TimeSecond16 cooldown = 60 * 15;
     VOCIndex voc_passive_max = 125;  // <= max(intake, exhaust)  -> filthy in here; get scrubbin'
-    VOCIndex voc_improve_min = 5;    // <= (intake - exhaust)    -> things are improving, keep filtering
+    VOCIndex voc_improve_min = 25;   // <= (intake - exhaust)    -> things are improving, keep filtering
 
     struct Instance {
         FanPolicyEnvironmental const& params;  // NOLINT(cppcoreguidelines-avoid-const-or-ref-data-members)
