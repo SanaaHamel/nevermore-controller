@@ -801,6 +801,26 @@ class NevermoreBackgroundWorker:
 
         worker_log = LogPrefixed(LOG, lambda x: f"{self._thread.name} - {x}")
 
+        def exc_filter(e: Exception):
+            # Be noisy about this, something unexpected happened.
+            # Try to recovery by resetting the connection.
+            # This sucks, but there's huge variety of errors that
+            # can happen due to a lost connection, and I can't think
+            # of a good way to recognise them with this API.
+            # TODO: Log this in the console area. Ostensibly you can
+            #       do this with `GCode::response_info`, but I don't
+            #       know if there are rules/invariants about this.
+            #       (e.g. only the active GCode/command may write)
+            if isinstance(e, bleak.exc.BleakError) or isinstance(e, EOFError):
+                worker_log.exception("attempting reconnection...", exc_info=e)
+                return True
+
+            # Raiser is responsible for any associated logging w/ this exception.
+            if isinstance(e, NevermoreForceReconnection):
+                return True
+
+            return False
+
         async def handle_connection(device_address: Optional[str]) -> None:
             class CantInferWhichNevermoreToUse(Exception):
                 pass
@@ -841,26 +861,6 @@ class NevermoreBackgroundWorker:
 
                 worker_log.info(f"discovered controller {devices[0].address}")
                 return devices[0]
-
-            def exc_filter(e: Exception):
-                # Be noisy about this, something unexpected happened.
-                # Try to recovery by resetting the connection.
-                # This sucks, but there's huge variety of errors that
-                # can happen due to a lost connection, and I can't think
-                # of a good way to recognise them with this API.
-                # TODO: Log this in the console area. Ostensibly you can
-                #       do this with `GCode::response_info`, but I don't
-                #       know if there are rules/invariants about this.
-                #       (e.g. only the active GCode/command may write)
-                if isinstance(e, bleak.exc.BleakError) or isinstance(e, EOFError):
-                    worker_log.exception("attempting reconnection...", exc_info=e)
-                    return True
-
-                # Raiser is responsible for any associated logging w/ this exception.
-                if isinstance(e, NevermoreForceReconnection):
-                    return True
-
-                return False
 
             # Attempt (re)connection. Might have to do this multiple times if we lose connection.
             #
