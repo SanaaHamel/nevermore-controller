@@ -284,11 +284,11 @@ async def retry_if_disconnected(
     connection_timeout: Optional[float] = 10,
     exc_filter: Callable[[Exception], bool] = lambda e: False,
     log: Union[logging.Logger, _LoggerAdapter] = logging.root,
-    retry: Optional[Callable[[], bool]] = None,
+    retry: Optional[Callable[[], Union[bool, Coroutine[Any, Any, bool]]]] = None,
 ) -> Optional[_A]:
     assert connection_timeout is None or 0 < connection_timeout
 
-    while retry is None or retry():
+    while True:
         is_connected = False
         try:
             addr = device if isinstance(device, (BLEDevice, str)) else await device()
@@ -312,6 +312,11 @@ async def retry_if_disconnected(
                 log.info("connection lost. attempting reconnection...")
             elif not exc_filter(e):
                 raise
+
+        reattempt = retry is None or retry()
+        reattempt = reattempt if isinstance(reattempt, bool) else await reattempt
+        if not reattempt:
+            return None
 
 
 async def _device_is_likely_a_nevermore(device: BLEDevice) -> bool:
