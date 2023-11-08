@@ -63,6 +63,11 @@ CONTROLLER_NOTIFY_TIMEOUT = 30  # seconds, reconnect if no updates found
 CONTROLLER_NAMES = {"Nevermore", "Nevermore Controller"}
 BOOTLOADER_NAME_PREFIX = "picowota "
 
+# retry quickly during initial setup to minimise likelihood of failing timeout
+CONTROLLER_CONNECTION_RETRY_DELAY_INITIAL = 1
+# be really conservative about this because we don't want to spam the logs
+CONTROLLER_CONNECTION_RETRY_DELAY_POST_CONNECT = 60
+
 # Derived constants
 # must cover at least 2-3 advert periods
 BT_SCAN_KNOWN_ADDRESS_TIMEOUT = CONTROLLER_ADVERTISEMENT_PERIOD * 2
@@ -797,9 +802,11 @@ class NevermoreBackgroundWorker:
 
         self._thread.name = nevermore.name
         device_address = nevermore.bt_address
+        connection_initial_timeout = nevermore.connection_initial_timeout
         nevermore = None  # release reference otherwise call frame keeps it alive
 
         worker_log = LogPrefixed(LOG, lambda x: f"{self._thread.name} - {x}")
+        connection_start = datetime.datetime.now()
 
         def exc_filter(e: Exception):
             # Be noisy about this, something unexpected happened.
@@ -820,6 +827,19 @@ class NevermoreBackgroundWorker:
                 return True
 
             return False
+
+        async def retry():
+            if self._disconnect.is_set():
+                return False
+
+            delta = (datetime.datetime.now() - connection_start).total_seconds()
+            await asyncio.sleep(
+                CONTROLLER_CONNECTION_RETRY_DELAY_INITIAL
+                if delta <= connection_initial_timeout
+                else CONTROLLER_CONNECTION_RETRY_DELAY_POST_CONNECT
+            )
+
+            return True
 
         async def handle_connection(device_address: Optional[str]) -> None:
             class CantInferWhichNevermoreToUse(Exception):
@@ -891,7 +911,7 @@ class NevermoreBackgroundWorker:
                     connection_timeout=None,
                     exc_filter=exc_filter,
                     log=worker_log,
-                    retry=lambda: not self._disconnect.is_set(),
+                    retry=retry,
                 )
             except CantInferWhichNevermoreToUse:
                 pass  # quietly fail and move on
