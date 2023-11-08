@@ -754,7 +754,7 @@ class NevermoreBackgroundWorker:
         #       *ALSO* can't set this up for the same god damn reason, specifically
         #       `asyncio.Event` had a `loop` param that was removed in 3.10
         #       but everyone before that had an implicit get-current-loop in the ctor.
-        self._loop_exit: UNSAFE_LazyAsyncioEvent = None
+        self._disconnect: UNSAFE_LazyAsyncioEvent = None
         self._led_dirty: UNSAFE_LazyAsyncioEvent = None
 
         self._thread.start()
@@ -764,8 +764,8 @@ class NevermoreBackgroundWorker:
         return self._thread.is_alive() and self._connected.wait(timeout)
 
     def disconnect(self):
-        assert self._loop_exit is not None, "pre-condition violated"
-        self._loop_exit.set_threadsafe(self._loop)
+        assert self._disconnect is not None, "pre-condition violated"
+        self._disconnect.set_threadsafe(self._loop)
 
     # PRECONDITION: `self._connected` is set
     def send_command(self, cmd: Optional[Union[Command, PseudoCommand]]):
@@ -891,7 +891,7 @@ class NevermoreBackgroundWorker:
                     connection_timeout=None,
                     exc_filter=exc_filter,
                     log=worker_log,
-                    retry=lambda: not self._loop_exit.is_set(),
+                    retry=lambda: not self._disconnect.is_set(),
                 )
             except CantInferWhichNevermoreToUse:
                 pass  # quietly fail and move on
@@ -900,13 +900,13 @@ class NevermoreBackgroundWorker:
             # set this up ASAP once we're in an asyncio loop
             self._command_queue = janus.Queue()
             # HACK: Python < 3.10 compatibility - See comment in `__init__`.
-            self._loop_exit = UNSAFE_LazyAsyncioEvent()
+            self._disconnect = UNSAFE_LazyAsyncioEvent()
             self._led_dirty = UNSAFE_LazyAsyncioEvent()
 
             main = asyncio.create_task(handle_connection(device_address))
 
             async def canceller():
-                await self._loop_exit.wait()
+                await self._disconnect.wait()
                 main.cancel()
 
             await asyncio.gather(main, canceller())
