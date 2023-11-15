@@ -16,13 +16,15 @@ struct FanPolicyEnvironmental {
     VOCIndex voc_improve_min = 25;   // <= (intake - exhaust)    -> things are improving, keep filtering
 
     struct Instance {
+        using Clock = std::chrono::steady_clock;
+
         FanPolicyEnvironmental const& params;  // NOLINT(cppcoreguidelines-avoid-const-or-ref-data-members)
-        std::chrono::system_clock::time_point last_filter = std::chrono::system_clock::time_point::min();
+        Clock::time_point last_filter = Clock::time_point::min();
 
         // Stateful.
         // Returns fan power [0, 1] based on env state and policy parameters.
-        [[nodiscard]] float operator()(nevermore::sensors::Sensors const& state,
-                std::chrono::system_clock::time_point now = std::chrono::system_clock::now());
+        [[nodiscard]] float operator()(
+                nevermore::sensors::Sensors const& state, Clock::time_point now = Clock::now());
     };
 
     // NB: DANGER - `this` must outlive `instance`

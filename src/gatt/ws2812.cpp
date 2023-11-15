@@ -40,13 +40,13 @@ void DBG_update_rate_log() {
     constexpr size_t MAX_ENTRIES = 100;
     static_assert(0 < MAX_ENTRIES);  // sancheck. logic below depends on this.
 
-    static deque<chrono::system_clock::time_point> g_timestamps;
-    static chrono::system_clock::time_point g_log_next;
+    static deque<chrono::steady_clock::time_point> g_timestamps;
+    static chrono::steady_clock::time_point g_log_next;
 
     if (g_timestamps.size() == MAX_ENTRIES) {
         g_timestamps.pop_front();
     }
-    g_timestamps.push_back(chrono::system_clock::now());
+    g_timestamps.push_back(chrono::steady_clock::now());
 
     if (g_timestamps.size() < 2) return;           // not enough data
     if (g_timestamps.back() < g_log_next) return;  // too soon

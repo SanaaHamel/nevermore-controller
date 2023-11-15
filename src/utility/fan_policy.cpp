@@ -33,7 +33,7 @@ enum class PolicyState { Idle, Filtering, Cooldown };
 using enum PolicyState;
 
 constexpr PolicyState evaluate(FanPolicyEnvironmental::Instance const& instance,
-        nevermore::sensors::Sensors const& state, chrono::system_clock::time_point now) {
+        nevermore::sensors::Sensors const& state, chrono::steady_clock::time_point now) {
     if (should_filter(instance.params, state.voc_index_intake, state.voc_index_exhaust)) return Filtering;
 
     auto cooldown_end =
@@ -46,7 +46,7 @@ constexpr PolicyState evaluate(FanPolicyEnvironmental::Instance const& instance,
 }  // namespace
 
 float FanPolicyEnvironmental::Instance::operator()(
-        nevermore::sensors::Sensors const& state, chrono::system_clock::time_point now) {
+        nevermore::sensors::Sensors const& state, Clock::time_point now) {
     switch (evaluate(*this, state, now)) {
     case Idle: return 0;
     case Cooldown: return 1;
