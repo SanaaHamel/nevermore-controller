@@ -38,19 +38,17 @@ constexpr uint16_t SGP30_SELF_TEST_OK = 0x00D4;  // byte-swapped
 enum class Reg : uint16_t {
     // args are always uint16_t followed by CRC
     // Name = Code,             // [ min-delay, max-delay), in-args, out-args
-    SerialID = 0x8236u,         // [ 0.5ms,  1ms), 0, 3
-    FeatureSet = 0x2F20u,       // [  1ms,   2ms), 0, 2
-    SelfTest = 0x3220u,         // [200ms, 220ms), 0, 1
-    RawMeasure = 0x5020u,       // [ 20ms,  25ms), 0, 2
-    HumiditySet = 0x6120u,      // [  1ms,  10ms), 1, 0
-    IAQ_Init = 0x0320u,         // [  2ms,  10ms), 0, 0
-    IAQ_Measure = 0x0820u,      // [ 10ms,  12ms), 0, 2
-    IAQ_Baseline = 0x1520u,     // [ 10ms,  10ms), 0, 2
-    IAQ_BaselineSet = 0x1E20u,  // [ 10ms,  10ms), 2, 0; weird: reverse order from `IAQ_Baseline` -> TVOC, co2
-    // following two are not in spec, seen in reference library.
-    // requires product version >= 0x21
-    TVOC_Baseline = 0xB320u,     // [ ???,  10ms), 1, 0
-    TVOC_BaselineSet = 0x7720u,  // [ ???,  10ms), 0, 1
+    SerialID = 0x8236u,          // [ 0.5ms,  1ms), 0, 3
+    FeatureSet = 0x2F20u,        // [  1ms,   2ms), 0, 2
+    SelfTest = 0x3220u,          // [200ms, 220ms), 0, 1
+    RawMeasure = 0x5020u,        // [ 20ms,  25ms), 0, 2
+    HumiditySet = 0x6120u,       // [  1ms,  10ms), 1, 0
+    IAQ_Init = 0x0320u,          // [  2ms,  10ms), 0, 0
+    IAQ_Measure = 0x0820u,       // [ 10ms,  12ms), 0, 2
+    IAQ_Baseline = 0x1520u,      // [  1ms,  10ms), 0, 2
+    IAQ_BaselineSet = 0x1E20u,   // [  1ms,  10ms), 2, 0; reverse order from `IAQ_Baseline` -> TVOC, co2
+    TVOC_Baseline = 0xB320u,     // [  1ms,  10ms), 1, 0
+    TVOC_BaselineSet = 0x7720u,  // [  1ms,  10ms), 0, 1
 };
 
 using Version = uint8_t;
