@@ -1,11 +1,13 @@
 #include "sgp30.hpp"
 #include "config.hpp"
 #include "environmental_i2c.hpp"
+#include "lib/sensirion_gas_index_algorithm.h"
 #include "sdk/ble_data_types.hpp"
 #include "sdk/task.hpp"
 #include "utility/crc.hpp"
 #include "utility/humidity.hpp"
 #include "utility/numeric_suffixes.hpp"
+#include <chrono>
 #include <cstdint>
 #include <optional>
 
@@ -33,6 +35,8 @@ constexpr uint8_t SGP30_VERSION_MIN = 0x20;
 // Weird 2: Reference lib from mfg looks for 0x21 (33), but spec says 0x22 (34)...
 [[maybe_unused]] constexpr uint8_t SGP30_VERSION_TVOC_EXTENDED_SUPPORT = 0x22;
 constexpr uint16_t SGP30_SELF_TEST_OK = 0x00D4;  // byte-swapped
+
+constexpr auto IAQ_STARTUP_DURATION = 15s;
 
 // NB: byte-swapped b/c this device works in big endian
 enum class Reg : uint16_t {
@@ -70,13 +74,20 @@ struct [[gnu::packed]] Measurement {
 static_assert(sizeof(Measurement) == 6);
 
 struct SGP30Sensor final : SensorPeriodicEnvI2C<Reg, "SGP30", 0xFF> {
+    using Clock = chrono::steady_clock;
+
     static_assert(crc(0xEFBE_u16) == 0x92);
 
     using SensorPeriodicEnvI2C::SensorPeriodicEnvI2C;
 
+    GasIndexAlgorithmParams gia{};
+    Clock::time_point start = {};
     Version version = 0;
 
-    bool setup() {  // NOLINT(readability-make-member-function-const)
+    bool setup() {
+        GasIndexAlgorithm_init(&gia, GasIndexAlgorithm_ALGORITHM_TYPE_VOC);
+        gia.mSraw_Minimum = 10'000;  // default VOC is 20'000, which is lower than how this sensor reacts
+
         auto features = feature_set();
         if (!features) return false;
 
@@ -101,7 +112,9 @@ struct SGP30Sensor final : SensorPeriodicEnvI2C<Reg, "SGP30", 0xFF> {
             return false;
         }
         task_delay(10ms);  // spec says 10ms for IAQ init
+        start = Clock::now();
 
+        // NOTE:  Once set the baseline seems fixed. Won't work for drift.
         // TODO:  Implement baseline persistance. Will require BLE API extension
         //        or persistent flash storage.
         // if (!baseline_set({.co2_eq_ppm = 215, .tvoc_ppb = 4040})) {
@@ -121,23 +134,38 @@ struct SGP30Sensor final : SensorPeriodicEnvI2C<Reg, "SGP30", 0xFF> {
             return;
         }
 
-        auto result = measure(Reg::IAQ_Measure, 12ms);  // spec says 12ms max wait
-        if (!result) return;
-        i2c.log("measure  - co^2-eq=%6d tvoc-ppb=%6d", result->co2_eq_ppm, result->tvoc_ppb);
-
         auto baseline = measure(Reg::IAQ_Baseline, 10ms);  // spec says 10ms
         if (!baseline) return;
         i2c.log("baseline - co^2-eq=%6d tvoc-ppb=%6d", baseline->co2_eq_ppm, baseline->tvoc_ppb);
 
+        auto result = measure(Reg::IAQ_Measure, 12ms);  // spec says 12ms max wait
+        if (!result) return;
+        i2c.log("measure  - co^2-eq=%6d tvoc-ppb=%6d", result->co2_eq_ppm, result->tvoc_ppb);
+
+        auto raw = measure(Reg::RawMeasure, 25ms);
+        if (!raw) return;
+        i2c.log("raw value-     H^2=%6d  ethanol=%6d", raw->co2_eq_ppm, raw->tvoc_ppb);
+
+        auto idx = voc_index(*result);
+
+        int32_t gas_index{};
+        GasIndexAlgorithm_process(&gia, raw->tvoc_ppb, &gas_index);
+        assert(0 <= gas_index && gas_index <= 500 && "result out of range?");
+        i2c.log("index    -    chip=%6d    sgp40=%6d", int(idx.raw_value), int(gas_index));
+
+        side.set(VOCIndex(gas_index));
+        side.set(VOCRaw(result->tvoc_ppb));
+    }
+
+    [[nodiscard]] VOCIndex voc_index(Measurement const& result) const {
+        if (Clock::now() - start < IAQ_STARTUP_DURATION) return VOCIndex::not_known_value;
+
         // FIXME: Needs tuning.
         constexpr float M_g = 110;     // mean molar mas of gas mix, value drawn from Mølhave et al., g / mol
         constexpr float V_m = 0.0244;  // m^3 / mol
-        float tvoc_ug_per_m3 = (M_g / (V_m * 1000)) * result->tvoc_ppb;
+        float tvoc_ug_per_m3 = (M_g / (V_m * 1000)) * result.tvoc_ppb;
         auto voc_index = lerp(0.f, 100.f, tvoc_ug_per_m3 / float(TVOC_UG_PER_M3_CLEAN_INDOORS));
-        voc_index = clamp(voc_index, 0.f, 500.f);
-
-        side.set(VOCIndex(voc_index));
-        side.set(VOCRaw(min(result->tvoc_ppb, VOCRaw::not_known_value)));
+        return clamp(voc_index, 1.f, 500.f);
     }
 
     [[nodiscard]] optional<FeatureSet> feature_set() const {
