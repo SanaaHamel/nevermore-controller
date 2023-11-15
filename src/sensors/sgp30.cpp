@@ -96,13 +96,13 @@ struct SGP30Sensor final : SensorPeriodicEnvI2C<Reg, "SGP30", 0xFF> {
         version = features->product_version;  // stash this for future reference
         i2c.log("product=%u version=%u", features->product_type, features->product_version);
 
+        if (!self_test()) return false;
+
         if (!i2c.touch(Reg::IAQ_Init)) {
             i2c.log_error("failed to init IAQ");
             return false;
         }
         task_delay(10ms);  // spec says 10ms for IAQ init
-
-        if (!self_test()) return false;
 
         // TODO:  Implement baseline persistance. Will require BLE API extension
         //        or persistent flash storage.
