@@ -52,7 +52,7 @@ set(PICOWOTA_BT_SPP 1)
 add_subdirectory(picowota)
 
 set(SRC_DIR ${CMAKE_SOURCE_DIR}/src)
-set(SRC_CONFIG_DIR ${SRC_DIR}/config) # HACK: libs often include a config header (e.g. lvgl, btstack, etc)
+set(SRC_CONFIG_DIR ${SRC_DIR}/config/lib) # HACK: libs often include a config header (e.g. lvgl, btstack, etc)
 
 # modify lvgl to add config header path & sdk dependencies
 target_include_directories(lvgl PRIVATE ${SRC_CONFIG_DIR})
@@ -77,7 +77,6 @@ foreach(IN_FILE ${SRC_IN})
   endif()
 endforeach()
 
-# target_include_directories(FreeRTOS-Kernel PRIVATE ${SRC_CONFIG_DIR})
 file(GLOB_RECURSE SRC_H ${SRC_DIR}/*.h)
 file(GLOB_RECURSE SRC_C ${SRC_DIR}/*.c)
 file(GLOB_RECURSE SRC_HPP ${SRC_DIR}/*.hpp)

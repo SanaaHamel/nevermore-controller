@@ -1,6 +1,6 @@
 #include "display.hpp"
 #include "config.hpp"
-#include "config/lv_drv_conf.h"  // need the `extern "C"` decls for LVGL driver interface
+#include "config/lib/lv_drv_conf.h"  // need the `extern "C"` decls for LVGL driver interface
 #include "display/gc9a01.hpp"
 #include "hardware/gpio.h"
 #include "hardware/spi.h"
