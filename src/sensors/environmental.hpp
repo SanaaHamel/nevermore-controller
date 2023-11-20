@@ -17,7 +17,7 @@ struct EnvironmentalFilter {
 
     template <typename A>
         requires(!std::is_reference_v<A>)
-    A get(Sensors const& sensors = g_sensors, Config const& config = g_config) const {
+    [[nodiscard]] A get(Sensors const& sensors = g_sensors, Config const& config = g_config) const {
         return get_<A>(sensors, config);
     }
 
