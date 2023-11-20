@@ -154,7 +154,7 @@ struct SGP30Sensor final : SensorPeriodicEnvI2C<Reg, "SGP30", 0xFF> {
         i2c.log("index    -    chip=%6d    sgp40=%6d", int(idx.raw_value), int(gas_index));
 
         side.set(VOCIndex(gas_index));
-        side.set(VOCRaw(result->tvoc_ppb));
+        side.set(VOCRaw(raw->tvoc_ppb));
     }
 
     [[nodiscard]] VOCIndex voc_index(Measurement const& result) const {
