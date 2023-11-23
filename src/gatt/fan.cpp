@@ -55,7 +55,7 @@ nevermore::sensors::Tachometer g_tachometer{PIN_FAN_TACHOMETER, TACHOMETER_PULSE
 struct [[gnu::packed]] ThermalLimit {
     BLE::Temperature min = 50;             // not-known -> disallowed
     BLE::Temperature max = 60;             // not-known -> disallowed
-    BLE::Percentage16_10 coefficient = 0;  // not-known -> disabled
+    BLE::Percentage16_10 coefficient = 0;  // not-known -> disabled (equiv to 100%)
 
     //  [0, 1] or None
     [[nodiscard]] std::optional<double> percent(BLE::Temperature current) const {
@@ -93,11 +93,11 @@ auto g_notify_aggregate = NotifyState<[](hci_con_handle_t conn) {
 
 void fan_power_set(BLE::Percentage8 power) {
     auto thermal_scaler = 1.;
-    if (g_fan_power_thermal_limit.coefficient != BLE::NOT_KNOWN) {
+    if (auto coeff = g_fan_power_thermal_limit.coefficient.value_or(100); coeff < 100) {
         auto temp = max(nevermore::sensors::g_sensors.temperature_intake,
                 nevermore::sensors::g_sensors.temperature_exhaust);
         if (auto perc = g_fan_power_thermal_limit.percent(temp)) {
-            thermal_scaler = lerp(1, (g_fan_power_thermal_limit.coefficient.value_or(0) / 100.), *perc);
+            thermal_scaler = lerp(1, coeff / 100, *perc);
         }
     }
 

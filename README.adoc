@@ -450,7 +450,10 @@ fan_policy_voc_improve_min: 25
 fan_thermal_limit_temperature_min: 50
 # float, Celsius, temperature at which point thermal limiting is fully applied
 fan_thermal_limit_temperature_max: 60
-# float \in [0, 1], -1 to disable the thermal limiter entirely
+# float \in [0, 1], 1 to disable the thermal limiter
+# 0 to disable the fan at max temp
+# 0.5 to half the fan speed at max temp
+# 1 to effectively disable the thermal limiter (no scaling at max temp)
 fan_thermal_limit_coefficient: 0
 
 # Misc. Sensor Options
@@ -621,7 +624,7 @@ In both cases, the fan power is scaled by two factors:
 
 * The `fan_power_coefficient` setting scales in all cases. Useful for limiting noise since the StealthMax recommended fans are more powerful than strictly needed.
 
-* Thermal Limiting scales the actual fan power applied based on the maximum of the intake and exhaust temperatures. This is intended to improve the carbon's effective lifespan, which degrades at high temperatures. This feature can be disabled by setting xref:klipper-config-full[`fan_thermal_limit_coefficient: -1`].
+* Thermal Limiting scales the actual fan power applied based on the maximum of the intake and exhaust temperatures. This is intended to improve the carbon's effective lifespan, which degrades at high temperatures. This feature can be disabled by setting xref:klipper-config-full[`fan_thermal_limit_coefficient: 1`].
 
 
 From within Klipper, the fan can be controlled much like any other fan:

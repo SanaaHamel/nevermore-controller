@@ -1189,7 +1189,7 @@ class Nevermore:
             "fan_thermal_limit_temperature_max", default=None
         )
         fan_thermal_coeff: Optional[float] = config.getfloat(
-            "fan_thermal_limit_coefficient", default=None, maxval=1
+            "fan_thermal_limit_coefficient", default=None, minval=0, maxval=1
         )
         if (
             fan_thermal_min is None
@@ -1203,12 +1203,6 @@ class Nevermore:
             fan_thermal_min = 50 if fan_thermal_min is None else fan_thermal_min
             fan_thermal_max = 60 if fan_thermal_max is None else fan_thermal_max
             fan_thermal_coeff = 0 if fan_thermal_coeff is None else fan_thermal_coeff
-            if fan_thermal_coeff == -1:
-                fan_thermal_coeff = None
-            elif fan_thermal_coeff < 0:
-                raise config.error(
-                    "`fan_thermal_limit_coefficient` must be in range [0, 1] or -1 (disables)"
-                )
 
             if fan_thermal_max < fan_thermal_min:
                 raise config.error(
