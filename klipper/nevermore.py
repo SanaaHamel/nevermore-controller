@@ -617,6 +617,11 @@ class CmdFanPowerOverride(CmdFanPowerAbstract):
 
 
 @dataclass(frozen=True)
+class CmdFanPowerPassive(CmdFanPowerAbstract):
+    percent: float
+
+
+@dataclass(frozen=True)
 class CmdFanPowerAuto(CmdFanPowerAbstract):
     percent: float
 
@@ -962,9 +967,12 @@ class NevermoreBackgroundWorker:
         aggregate_env = require_char(service_env, UUID_CHAR_DATA_AGGREGATE, {P.NOTIFY})
         aggregate_fan = require_char(service_fan, UUID_CHAR_FAN_AGGREGATE, {P.NOTIFY})
         # HACK: it's the first one in the list (ordered by handle #). this is brittle.
-        fan_power_override, fan_power_auto, fan_power_coeff = require_chars(
-            service_fan, UUID_CHAR_PERCENT8, 3, {P.WRITE}
-        )
+        (
+            fan_power_override,
+            fan_power_passive,
+            fan_power_auto,
+            fan_power_coeff,
+        ) = require_chars(service_fan, UUID_CHAR_PERCENT8, 4, {P.WRITE})
         ws2812_length = require_char(service_ws2812, UUID_CHAR_COUNT16, {P.WRITE})
         ws2812_update = require_char(
             service_ws2812, UUID_CHAR_WS2812_UPDATE, {P.WRITE_NO_RESPONSE}
@@ -1027,6 +1035,8 @@ class NevermoreBackgroundWorker:
             cmd = await self._command_queue.async_q.get()
             if isinstance(cmd, CmdFanPowerOverride):
                 char = fan_power_override
+            elif isinstance(cmd, CmdFanPowerPassive):
+                char = fan_power_passive
             elif isinstance(cmd, CmdFanPowerAuto):
                 char = fan_power_auto
             elif isinstance(cmd, CmdFanPowerCoeff):
@@ -1179,6 +1189,7 @@ class Nevermore:
 
         self._configuration = CmdConfiguration(config)
         self._fan_policy = CmdFanPolicy(config)
+        self._fan_power_passive = cfg_fan_power(CmdFanPowerPassive, "fan_power_passive")
         self._fan_power_auto = cfg_fan_power(CmdFanPowerAuto, "fan_power_automatic")
         self._fan_power_coeff = cfg_fan_power(CmdFanPowerCoeff, "fan_power_coefficient")
 
@@ -1261,6 +1272,7 @@ class Nevermore:
 
         self._interface.send_command(self._configuration)
         self._interface.send_command(self._fan_policy)
+        self._interface.send_command(self._fan_power_passive)
         self._interface.send_command(self._fan_power_auto)
         self._interface.send_command(self._fan_power_coeff)
         self._interface.send_command(self._fan_thermal_limit)

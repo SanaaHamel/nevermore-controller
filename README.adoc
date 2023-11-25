@@ -423,6 +423,13 @@ led_chain_count: 0
 # Fan Options
 # Various settings for the fan.
 
+# float \in [0, 1] - Fan power used when the automatic policy nor overridden
+# Useful for helping keep the sensors calibrated by ensuring a steady airflow
+# past them.
+# Suggest the lowest % that successfully kick-starts the fan, you don't need
+# much airflow.
+fan_power_passive: 0
+
 # float \in [0, 1] - Fan power used when the automatic fan policy is active.
 fan_power_automatic: 1
 
