@@ -705,7 +705,7 @@ class CmdConfiguration(PseudoCommand):
             if config.getboolean(key, default):
                 self.flags |= 1 << flag_idx
 
-        cfg_flag("sensors_fallback", True, 0)
+        cfg_flag("sensors_fallback", False, 0)
         cfg_flag("sensors_fallback_exhaust_mcu", False, 1)
 
 
