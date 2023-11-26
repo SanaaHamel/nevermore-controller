@@ -104,15 +104,14 @@ from abc import abstractmethod
 from dataclasses import dataclass
 from pathlib import Path
 from tempfile import NamedTemporaryFile
-from typing import Any, Callable, Coroutine, List, Optional, TypeVar, Union, overload
-from uuid import UUID
+from typing import Any, Callable, Coroutine, List, Optional, TypeVar
 
-import bleak
 import serial_flash
 import typed_argparse as tap
 from aiohttp import ClientSession
-from bleak import BleakClient, BleakScanner
+from bleak import BleakClient
 from bleak.backends.device import BLEDevice
+from nevermore_utilities import *
 from serial_flash.transport.bluetooth.spp import SppArgs
 from serial_flash.transport.tcp import TcpArgs
 from typing_extensions import override
@@ -123,13 +122,9 @@ else:
     _LoggerAdapter = logging.LoggerAdapter
 
 
-NEVERMORE_CONTROLLER_NAMES = {"Nevermore", "Nevermore Controller"}
-BOOTLOADER_NAME_PREFIX = "picowota "
-
 NEVERMORE_OTA_WIFI_SSID = 'nevermore-update-ota'
 NEVERMORE_OTA_WIFI_KEY = 'raccoons-love-floor-onions'
 
-BT_SCAN_GATHER_ALL_TIMEOUT = 10  # seconds
 CONNECT_TO_AP_TIMEOUT = 20  # seconds
 CONNECT_TO_AP_DELAY = 2  # seconds
 REBOOT_DELAY = 1  # seconds
@@ -150,38 +145,12 @@ DOWNLOAD_ASSET_HEADERS = {
     "X-GitHub-Api-Version": "2022-11-28",
 }
 
-
-def short_uuid(x: int):
-    assert 0 <= x <= 0xFFFF
-    return UUID(f"0000{x:04x}-0000-1000-8000-00805f9b34fb")
-
-
-UUID_SERVICE_GAP = short_uuid(0x1801)
-UUID_SERVICE_ENVIRONMENTAL_SENSING = short_uuid(0x181A)
-
-UUID_CHAR_SOFTWARE_REVISION = short_uuid(0x2A28)
-UUID_CHAR_CONFIG_REBOOT = UUID("f48a18bb-e03c-4583-8006-5b54422e2045")
-
 _A = TypeVar("_A")
-
-
-# must be of the form `xx:xx:xx:xx:xx:xx`, where `x` is a hex digit (uppercase)
-# FUTURE WORK: Won't work on MacOS. It uses UUIDs to abstract/hide the BT address.
-def _bt_address_validate(addr: str):
-    octets = addr.split(":")
-    if len(octets) != 6:
-        return False
-    if not all(len(octet) == 2 for octet in octets):
-        return False
-    if not all(x in "0123456789ABCEDF" for octet in octets for x in octet):
-        return False
-
-    return True
 
 
 def _bssid_from_bt_address(bt_address: str):
     # The BSSID of a Pico is by default 1 less than that of its BT address.
-    assert _bt_address_validate(bt_address)
+    assert bt_address_validate(bt_address)
     bssid = bt_address.split(':')
     bssid[-1] = f"{(int(bssid[-1], 16) - 1) & 0xFF:02x}"
     return ":".join(bssid)
@@ -191,18 +160,6 @@ def _bssid_from_bt_address(bt_address: str):
 class ReleaseInfo:
     tag: str
     assets: List[str]
-
-
-async def discover_bluetooth_devices(
-    filter: Callable[[BLEDevice], Coroutine[Any, Any, bool]],
-    address: Optional[str] = None,
-    timeout: float = BT_SCAN_GATHER_ALL_TIMEOUT,
-) -> List[BLEDevice]:
-    if address is not None:
-        device = await BleakScanner.find_device_by_address(address, timeout=timeout)
-        return [device] if device is not None else []
-
-    return [x for x in await BleakScanner.discover(timeout=timeout) if await filter(x)]
 
 
 async def fetch_latest_release() -> Optional[ReleaseInfo]:
@@ -273,135 +230,6 @@ async def discover_device_address(
         return None
 
     return xs[0].address
-
-
-def _is_lost_connection_exception(e: Exception, is_connecting: bool) -> bool:
-    if isinstance(e, bleak.exc.BleakDBusError):
-        # potentially caused by noisy environments or poor timing
-        if e.dbus_error == "org.bluez.Error.NotConnected":
-            return True
-
-        ANY_TIME_DBUS_ERRORS = {
-            ("org.bluez.Error.Failed", "br-connection-canceled"),
-            ("org.bluez.Error.Failed", "Software caused connection abort"),
-            ("org.bluez.Error.Failed", "Operation already in progress"),
-        }
-
-        CONNECTING_DBUS_ERRORS = {
-            ("org.bluez.Error.Failed", "Operation already in progress"),
-        }
-
-        if (e.dbus_error, e.dbus_error_details) in ANY_TIME_DBUS_ERRORS:
-            return True
-
-        if (
-            is_connecting
-            and (e.dbus_error, e.dbus_error_details) in CONNECTING_DBUS_ERRORS
-        ):
-            return True
-
-    if isinstance(e, bleak.exc.BleakError):
-        msg = str(e).lower()
-        if "not connected" in msg:
-            return True
-        if "device disconnected" in msg:
-            return True
-
-    return False
-
-
-# TODO: This function is much more generalised than it needs to be here.
-#       Reason: It is also used by `klipper.py`, but I haven't had the time or
-#       energy to extract them to a shared library.
-@overload
-async def retry_if_disconnected(
-    device: Union[
-        Callable[[], Coroutine[Any, Any, Union[BLEDevice, str]]], BLEDevice, str
-    ],
-    go: Callable[[BleakClient], Coroutine[Any, Any, _A]],
-    *,
-    connection_timeout: Optional[float] = 10,
-    exc_filter: Callable[[Exception], bool] = lambda e: False,
-    log: Union[logging.Logger, _LoggerAdapter] = logging.root,
-    retry: None = None,
-) -> _A:
-    pass
-
-
-@overload
-async def retry_if_disconnected(
-    device: Union[
-        Callable[[], Coroutine[Any, Any, Union[BLEDevice, str]]], BLEDevice, str
-    ],
-    go: Callable[[BleakClient], Coroutine[Any, Any, _A]],
-    *,
-    connection_timeout: Optional[float] = 10,
-    exc_filter: Callable[[Exception], bool] = lambda e: False,
-    log: Union[logging.Logger, _LoggerAdapter] = logging.root,
-    retry: Callable[[], bool] = lambda: True,
-) -> Optional[_A]:
-    pass
-
-
-async def retry_if_disconnected(
-    device: Union[
-        Callable[[], Coroutine[Any, Any, Union[BLEDevice, str]]], BLEDevice, str
-    ],
-    go: Callable[[BleakClient], Coroutine[Any, Any, _A]],
-    *,
-    connection_timeout: Optional[float] = 10,
-    exc_filter: Callable[[Exception], bool] = lambda e: False,
-    log: Union[logging.Logger, _LoggerAdapter] = logging.root,
-    retry: Optional[Callable[[], bool]] = None,
-) -> Optional[_A]:
-    assert connection_timeout is None or 0 < connection_timeout
-
-    while retry is None or retry():
-        is_connected = False
-        try:
-            addr = device if isinstance(device, (BLEDevice, str)) else await device()
-            timeout = 10 if connection_timeout is None else connection_timeout
-            async with BleakClient(addr, timeout=timeout) as client:
-                is_connected = True
-                return await go(client)
-        except asyncio.TimeoutError:
-            # `TimeoutError` after we've connected aren't a connection timeout
-            # and must not be suppressed.
-            if is_connected or connection_timeout is not None:
-                raise
-        except bleak.exc.BleakDeviceNotFoundError:
-            # same thing as `TimeoutError`
-            if is_connected or connection_timeout is not None:
-                raise
-        except Exception as e:
-            if _is_lost_connection_exception(e, not is_connected):
-                # don't be (too) noisy about it, it happens
-                log.debug("connection lost.", exc_info=e)
-                log.info("connection lost. attempting reconnection...")
-            elif not exc_filter(e):
-                raise
-
-
-async def device_is_likely_a_nevermore(device: BLEDevice) -> bool:
-    # should have a short name, be it bootloader or main controller
-    if device.name is None:
-        return False
-
-    if device.name in NEVERMORE_CONTROLLER_NAMES:  # expected/easy case
-        return True
-
-    # Sometimes system caches the old short-name for an address.
-    # In that case, we'll have to connect to test it.
-    if not device.name.startswith(BOOTLOADER_NAME_PREFIX):
-        return False
-
-    async def go(x: BleakClient):
-        return x.services.get_characteristic(UUID_CHAR_CONFIG_REBOOT) is not None
-
-    try:
-        return await retry_if_disconnected(device, go)
-    except TimeoutError:
-        return False  # unable to connect to it in a timely manner, ignore the device
 
 
 async def software_revision(client: BleakClient):
@@ -627,7 +455,7 @@ async def _report_new_version(args: CmdLnArgs, prev_version: str):
 
 
 async def _main(args: CmdLnArgs):
-    if args.bt_address is not None and not _bt_address_validate(args.bt_address):
+    if args.bt_address is not None and not bt_address_validate(args.bt_address):
         logging.error("invalid address for `--bt-address`")
         return
 

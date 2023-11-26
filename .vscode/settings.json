@@ -40,11 +40,15 @@
     ],
     "python.autoComplete.extraPaths": [
         "~/klipper/klippy",
-        "~/projects/klipper/klippy"
+        "~/projects/klipper/klippy",
+        "~/nevermore-controller/tools",
+        "~/pico/nevermore-controller/tools"
     ],
     "python.analysis.extraPaths": [
         "~/klipper/klippy",
-        "~/projects/klipper/klippy"
+        "~/projects/klipper/klippy",
+        "~/nevermore-controller/tools",
+        "~/pico/nevermore-controller/tools"
     ],
     "mypy-type-checker.args": [
         "--follow-imports=silent"

@@ -9,3 +9,5 @@
 # derived from cfg file
 /src/binary_info.cpp
 /src/nevermore.gatt
+# python interpreter artifacts
+__pycache__

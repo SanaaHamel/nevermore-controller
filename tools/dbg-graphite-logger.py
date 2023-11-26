@@ -91,7 +91,6 @@ I suggest the following dashboard snippet (paste it via `Dashboard -> Edit Dashb
 """
 
 import asyncio
-import dataclasses
 import datetime
 import enum
 import json
@@ -104,36 +103,19 @@ import socket
 import struct
 import sys
 import tempfile
-import typing
 import uuid
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import (
-    Any,
-    Callable,
-    Coroutine,
-    Dict,
-    List,
-    Optional,
-    Tuple,
-    TypeVar,
-    Union,
-    overload,
-)
-from uuid import UUID
+from typing import Any, Callable, Coroutine, Dict, List, Optional, Tuple, Union
 
 import bleak
 import typed_argparse as tap
 import websockets.exceptions
 import websockets.legacy.client as WSClient
-from bleak import BleakClient, BleakScanner
+from bleak import BleakClient
 from bleak.backends.device import BLEDevice
+from nevermore_utilities import *
 from typing_extensions import override
-
-if typing.TYPE_CHECKING:
-    _LoggerAdapter = logging.LoggerAdapter[logging.Logger]
-else:
-    _LoggerAdapter = logging.LoggerAdapter
 
 MOONRAKER_DEFAULT_PORT = 7125
 GRAPHITE_DEFAULT_PICKLE_PORT = 2004
@@ -159,25 +141,6 @@ MOONRAKER_SENSOR_FIELDS_ALLOWED = {
 MOONRAKER_SENSOR_NAME_BLOCKED = [
     re.compile("temperature_sensor nevermore_.*_voc"),  # ignore common VOC plotters
 ]
-
-NEVERMORE_CONTROLLER_NAMES = {"Nevermore", "Nevermore Controller"}
-BOOTLOADER_NAME_PREFIX = "picowota "
-
-BT_SCAN_GATHER_ALL_TIMEOUT = 10  # seconds
-
-
-def short_uuid(x: int):
-    assert 0 <= x <= 0xFFFF
-    return UUID(f"0000{x:04x}-0000-1000-8000-00805f9b34fb")
-
-
-UUID_SERVICE_ENVIRONMENTAL_SENSING = short_uuid(0x181A)
-UUID_SERVICE_FAN = UUID("4553d138-1d00-4b6f-bc42-955a89cf8c36")
-UUID_CHAR_DATA_AGGREGATE = UUID("75134bec-dd06-49b1-bac2-c15e05fd7199")
-UUID_CHAR_FAN_AGGREGATE = UUID("79cd747f-91af-49a6-95b2-5b597c683129")
-UUID_CHAR_CONFIG_REBOOT = UUID("f48a18bb-e03c-4583-8006-5b54422e2045")
-
-_A = TypeVar("_A")
 
 
 def systemd_service_definition(args: List[str]) -> str:
@@ -276,32 +239,6 @@ def graphite_connection(dst: Ip4Port, sampling_period: float) -> GraphiteLogger:
     return log
 
 
-# must be of the form `xx:xx:xx:xx:xx:xx`, where `x` is a hex digit (uppercase)
-# FUTURE WORK: Won't work on MacOS. It uses UUIDs to abstract/hide the BT address.
-def _bt_address_validate(addr: str):
-    octets = addr.split(":")
-    if len(octets) != 6:
-        return False
-    if not all(len(octet) == 2 for octet in octets):
-        return False
-    if not all(x in "0123456789ABCEDF" for octet in octets for x in octet):
-        return False
-
-    return True
-
-
-async def discover_bluetooth_devices(
-    filter: Callable[[BLEDevice], Coroutine[Any, Any, bool]],
-    address: Optional[str] = None,
-    timeout: float = BT_SCAN_GATHER_ALL_TIMEOUT,
-) -> List[BLEDevice]:
-    if address is not None:
-        device = await BleakScanner.find_device_by_address(address, timeout=timeout)
-        return [device] if device is not None else []
-
-    return [x for x in await BleakScanner.discover(timeout=timeout) if await filter(x)]
-
-
 async def discover_device_address(
     display_name: str,
     filter: Callable[[BLEDevice], Coroutine[Any, Any, bool]],
@@ -326,291 +263,31 @@ async def discover_device_address(
     return xs[0].address
 
 
-def _is_lost_connection_exception(e: Exception, is_connecting: bool) -> bool:
-    if isinstance(e, bleak.exc.BleakDBusError):
-        # potentially caused by noisy environments or poor timing
-        if e.dbus_error == "org.bluez.Error.NotConnected":
-            return True
+def _extract_fields(fields: Dict[str, Any]):
+    parts: Dict[Tuple[str, Optional[Side]], float] = {}
+    for field, value in fields.items():
+        if not isinstance(value, (int, float)):
+            continue
 
-        ANY_TIME_DBUS_ERRORS = {
-            ("org.bluez.Error.Failed", "br-connection-canceled"),
-            ("org.bluez.Error.Failed", "Software caused connection abort"),
-            ("org.bluez.Error.Failed", "Operation already in progress"),
-        }
+        field_parts = field.split("_")
+        if field_parts[-1] in {"min", "max"}:
+            continue  # skip statistic fields in `nevermore`
 
-        CONNECTING_DBUS_ERRORS = {
-            ("org.bluez.Error.Failed", "Operation already in progress"),
-        }
-
-        if (e.dbus_error, e.dbus_error_details) in ANY_TIME_DBUS_ERRORS:
-            return True
-
-        if (
-            is_connecting
-            and (e.dbus_error, e.dbus_error_details) in CONNECTING_DBUS_ERRORS
-        ):
-            return True
-
-    if isinstance(e, bleak.exc.BleakError):
-        msg = str(e).lower()
-        if "not connected" in msg:
-            return True
-        if "device disconnected" in msg:
-            return True
-
-    return False
-
-
-# TODO: This function is much more generalised than it needs to be here.
-#       Reason: It is also used by `klipper.py`, but I haven't had the time or
-#       energy to extract them to a shared library.
-@overload
-async def retry_if_disconnected(
-    device: Union[
-        Callable[[], Coroutine[Any, Any, Union[BLEDevice, str]]], BLEDevice, str
-    ],
-    go: Callable[[BleakClient], Coroutine[Any, Any, _A]],
-    *,
-    connection_timeout: Optional[float] = 10,
-    exc_filter: Callable[[Exception], bool] = lambda e: False,
-    log: Union[logging.Logger, _LoggerAdapter] = logging.root,
-    retry: None = None,
-) -> _A:
-    pass
-
-
-@overload
-async def retry_if_disconnected(
-    device: Union[
-        Callable[[], Coroutine[Any, Any, Union[BLEDevice, str]]], BLEDevice, str
-    ],
-    go: Callable[[BleakClient], Coroutine[Any, Any, _A]],
-    *,
-    connection_timeout: Optional[float] = 10,
-    exc_filter: Callable[[Exception], bool] = lambda e: False,
-    log: Union[logging.Logger, _LoggerAdapter] = logging.root,
-    retry: Callable[[], bool] = lambda: True,
-) -> Optional[_A]:
-    pass
-
-
-async def retry_if_disconnected(
-    device: Union[
-        Callable[[], Coroutine[Any, Any, Union[BLEDevice, str]]], BLEDevice, str
-    ],
-    go: Callable[[BleakClient], Coroutine[Any, Any, _A]],
-    *,
-    connection_timeout: Optional[float] = 10,
-    exc_filter: Callable[[Exception], bool] = lambda e: False,
-    log: Union[logging.Logger, _LoggerAdapter] = logging.root,
-    retry: Optional[Callable[[], bool]] = None,
-) -> Optional[_A]:
-    assert connection_timeout is None or 0 < connection_timeout
-
-    while retry is None or retry():
-        is_connected = False
         try:
-            addr = device if isinstance(device, (BLEDevice, str)) else await device()
-            timeout = 10 if connection_timeout is None else connection_timeout
-            async with BleakClient(addr, timeout=timeout) as client:
-                is_connected = True
-                return await go(client)
-        except asyncio.TimeoutError:
-            # `TimeoutError` after we've connected aren't a connection timeout
-            # and must not be suppressed.
-            if is_connected or connection_timeout is not None:
-                raise
-        except bleak.exc.BleakDeviceNotFoundError:
-            # same thing as `TimeoutError`
-            if is_connected or connection_timeout is not None:
-                raise
-        except Exception as e:
-            if _is_lost_connection_exception(e, not is_connected):
-                # don't be (too) noisy about it, it happens
-                log.debug("connection lost.", exc_info=e)
-                log.info("connection lost. attempting reconnection...")
-            elif not exc_filter(e):
-                raise
+            side = Side(field_parts[0].lower())
+            field_parts.pop(0)
+            if not field_parts:
+                continue  # ignore, malformed
+        except ValueError:
+            side = None
 
+        name = "_".join(field_parts)
+        if name not in MOONRAKER_SENSOR_FIELDS_ALLOWED:
+            continue
 
-async def device_is_likely_a_nevermore(device: BLEDevice) -> bool:
-    # should have a short name, be it bootloader or main controller
-    if device.name is None:
-        return False
+        parts[(name, side)] = value
 
-    if device.name in NEVERMORE_CONTROLLER_NAMES:  # expected/easy case
-        return True
-
-    # Sometimes system caches the old short-name for an address.
-    # In that case, we'll have to connect to test it.
-    if not device.name.startswith(BOOTLOADER_NAME_PREFIX):
-        return False
-
-    async def go(x: BleakClient):
-        return x.services.get_characteristic(UUID_CHAR_CONFIG_REBOOT) is not None
-
-    try:
-        return await retry_if_disconnected(device, go)
-    except TimeoutError:
-        return False  # unable to connect to it in a timely manner, ignore the device
-
-
-@dataclass
-class Sensors:
-    # key names must match those used by moonraker/klipper status (e.g. `gas` instead of `voc`)
-    temperature_intake: Optional[float] = None  # Celsius
-    temperature_exhaust: Optional[float] = None  # Celsius
-    temperature_mcu: Optional[
-        float
-    ] = None  # Celsius, `float` but Maybe Float simplifies handling
-    humidity_intake: Optional[float] = None  # %
-    humidity_exhaust: Optional[float] = None  # %
-    pressure_intake: Optional[float] = None  # hPa
-    pressure_exhaust: Optional[float] = None  # hPa
-    gas_intake: Optional[int] = None  # [1, VOC_INDEX_MAX]
-    gas_exhaust: Optional[int] = None  # [1, VOC_INDEX_MAX]
-    gas_raw_intake: Optional[int] = None  # [0, VOC_RAW_MAX]
-    gas_raw_exhaust: Optional[int] = None  # [0, VOC_RAW_MAX]
-
-    def as_dict(self) -> Dict[str, float]:
-        return {
-            f.name: getattr(self, f.name)
-            for f in dataclasses.fields(self)
-            if getattr(self, f.name) is not None
-        }
-
-
-class BleAttrReaderNotEnoughData(Exception):
-    pass
-
-
-class BleAttrReader:
-    def __init__(self, raw: bytearray):
-        self.remaining = raw
-
-    def humidity(self):
-        return self._unsigned(2, 1, -2, 0, not_known=0xFFFF)
-
-    def percentage8(self):
-        return self._unsigned(1, 1, 0, -1, not_known=0xFF)
-
-    def pressure(self):
-        return self._unsigned(4, 1, -1, 0, not_known=0xFFFFFFFF)
-
-    def temperature(self):
-        return self._signed(2, 1, -2, 0, not_known=0x8000)
-
-    def tachometer(self):
-        return int(self._unsigned(2, 1, 0, 0))
-
-    def voc_index(self) -> Optional[int]:  # [1, VOC_INDEX_MAX]
-        return self._as_int(self._unsigned(2, 1, 0, 0, not_known=0))
-
-    def voc_raw(self) -> Optional[int]:  # [0, VOC_RAW_MAX]
-        return self._as_int(self._unsigned(2, 1, 0, 0, not_known=0xFFFF))
-
-    @overload
-    def _signed(self, sz: int, M: int, d: int, e: int) -> float:
-        ...
-
-    @overload
-    def _signed(
-        self, sz: int, M: int, d: int, e: int, *, not_known: int
-    ) -> Optional[float]:
-        ...
-
-    def _signed(
-        self, sz: int, M: int, d: int, e: int, *, not_known: Optional[int] = None
-    ) -> Optional[float]:
-        return self._consume(True, sz, M, d, e, not_known)
-
-    @overload
-    def _unsigned(self, sz: int, M: int, d: int, e: int) -> float:
-        ...
-
-    @overload
-    def _unsigned(
-        self, sz: int, M: int, d: int, e: int, *, not_known: int
-    ) -> Optional[float]:
-        ...
-
-    def _unsigned(
-        self, sz: int, M: int, d: int, e: int, *, not_known: Optional[int] = None
-    ) -> Optional[float]:
-        return self._consume(False, sz, M, d, e, not_known)
-
-    def _consume(
-        self,
-        signed: bool,
-        sz: int,
-        M: int,
-        d: int,
-        e: int,
-        not_known: Optional[int],
-    ) -> Optional[float]:
-        if len(self.remaining) < sz:
-            raise BleAttrReaderNotEnoughData("insufficient data remaining")
-
-        head = self.remaining[0:sz]
-        self.remaining = self.remaining[sz:]
-
-        # the constant is given as a hex literal (i.e. unsigned)
-        if not_known == int.from_bytes(head, "little", signed=False):
-            return None
-
-        return self._raw_to_repr(int.from_bytes(head, "little", signed=signed), M, d, e)
-
-    def _raw_to_repr(self, x: float, M: int, d: int, e: int) -> float:
-        return x * M * (10**d) * (2**e)
-
-    def _as_int(self, x: Optional[float]):
-        return None if x is None else int(x)
-
-
-def parse_agg_env(reader: BleAttrReader) -> Sensors:
-    sensors = Sensors(
-        temperature_intake=reader.temperature(),
-        temperature_exhaust=reader.temperature(),
-        temperature_mcu=reader.temperature(),
-        humidity_intake=reader.humidity(),
-        humidity_exhaust=reader.humidity(),
-        pressure_intake=reader.pressure(),
-        pressure_exhaust=reader.pressure(),
-        gas_intake=reader.voc_index(),
-        gas_exhaust=reader.voc_index(),
-        gas_raw_intake=reader.voc_raw(),
-        gas_raw_exhaust=reader.voc_raw(),
-    )
-    if sensors.pressure_intake is not None:
-        sensors.pressure_intake /= 1000  # in hPA
-    if sensors.pressure_exhaust is not None:
-        sensors.pressure_exhaust /= 1000  # in hPA
-
-    return sensors
-
-
-@dataclass
-class FanState:
-    # key names must match those used by moonraker/klipper status (e.g. `rpm` instead of `tacho`)
-    speed: Optional[float] = None
-    rpm: Optional[float] = None
-
-    def as_dict(self) -> Dict[str, float]:
-        return {
-            f.name: getattr(self, f.name)
-            for f in dataclasses.fields(self)
-            if getattr(self, f.name) is not None
-        }
-
-
-def parse_agg_fan(reader: BleAttrReader) -> FanState:
-    x = FanState(
-        speed=reader.percentage8(),
-        rpm=reader.tachometer(),
-    )
-    if x.speed is not None:
-        x.speed /= 100  # remap [0, 1] to match moonraker's data
-    return x
+    return parts
 
 
 async def _main_bluetooth(log: GraphiteLogger, address: Optional[str]):
@@ -634,19 +311,13 @@ async def _main_bluetooth(log: GraphiteLogger, address: Optional[str]):
         assert char_fan is not None
 
         async def snapshot() -> SystemSnapshot:
-            def key(name: str) -> Tuple[str, Optional[Side]]:
-                for side in Side:
-                    suffix = f"_{side.name}"
-                    if name.endswith(suffix):
-                        name = name[: -len(suffix)]
-                        return (name, side)
-
-                return (name, None)
-
-            env = parse_agg_env(BleAttrReader(await client.read_gatt_char(char_env)))
-            fan = parse_agg_fan(BleAttrReader(await client.read_gatt_char(char_fan)))
-            sensors = {key(k): v for k, v in env.as_dict().items()}
-            sensors.update((key(k), v) for k, v in fan.as_dict().items())
+            intake, exhaust = SensorState.parse(
+                BleAttrReader(await client.read_gatt_char(char_env))
+            )
+            fan = FanState.parse(BleAttrReader(await client.read_gatt_char(char_fan)))
+            sensors = _extract_fields(
+                ControllerState(intake, exhaust, fan.speed or 0, fan.rpm or 0).as_dict()
+            )
 
             return SystemSnapshot(address.replace(":", "-"), {"nevermore": sensors})
 
@@ -681,7 +352,7 @@ class MoonrakerMalformedResponse(Exception):
 
     @override
     def __str__(self) -> str:
-        return f"malformed moonraker response: `{self.response}`"
+        return f"malformed moonraker response: `{self.response:r}`"
 
 
 async def _main_moonraker(
@@ -754,33 +425,11 @@ async def _main_moonraker(
 
             fields: Dict[str, Any]
             for sensor_name, fields in sensor_values.items():
-                if any(
+                if not any(
                     pattern.match(sensor_name.lower())
                     for pattern in MOONRAKER_SENSOR_NAME_BLOCKED
                 ):
-                    continue
-
-                for field, value in fields.items():
-                    if not isinstance(value, (int, float)):
-                        continue
-
-                    field_parts = field.split("_")
-                    if field_parts[-1] in {"min", "max"}:
-                        continue  # skip statistic fields in `nevermore`
-
-                    try:
-                        side = Side(field_parts[0].lower())
-                        field_parts.pop(0)
-                        if not field_parts:
-                            continue  # ignore, malformed
-                    except ValueError:
-                        side = None
-
-                    name = "_".join(field_parts)
-                    if name not in MOONRAKER_SENSOR_FIELDS_ALLOWED:
-                        continue
-
-                    sensors[sensor_name][(name, side)] = value
+                    sensors[sensor_name] = _extract_fields(fields)
 
             return SystemSnapshot(f"{moonraker.addr}:{moonraker.port}", sensors)
 
@@ -844,7 +493,7 @@ class CmdLnArgs(tap.TypedArgs):
 
 
 async def _main(args: CmdLnArgs):
-    if args.bt_address is not None and not _bt_address_validate(args.bt_address):
+    if args.bt_address is not None and not bt_address_validate(args.bt_address):
         logging.error("invalid address for `--bt-address`")
         exit(1)
 
