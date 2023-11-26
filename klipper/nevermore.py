@@ -682,9 +682,10 @@ class CmdWs2812Length(Command):
 @dataclass(frozen=True)
 class CmdConfigFlags(Command):
     flags: int
+    mask: int
 
     def params(self):
-        return self.flags.to_bytes(8, "little")
+        return self.flags.to_bytes(8, "little") + self.mask.to_bytes(8, "little")
 
 
 class CmdFanPolicy(PseudoCommand):
@@ -700,13 +701,16 @@ class CmdFanPolicy(PseudoCommand):
 class CmdConfiguration(PseudoCommand):
     def __init__(self, config: ConfigWrapper) -> None:
         self.flags = 0
+        self.mask = 0
 
-        def cfg_flag(key: str, default: bool, flag_idx: int):
-            if config.getboolean(key, default):
-                self.flags |= 1 << flag_idx
+        def cfg_flag(key: str, flag_idx: int):
+            opt = config.getboolean(key, None)
+            if opt is not None:
+                self.mask |= 1 << flag_idx
+                self.flags |= 1 << flag_idx if opt else 0
 
-        cfg_flag("sensors_fallback", False, 0)
-        cfg_flag("sensors_fallback_exhaust_mcu", False, 1)
+        cfg_flag("sensors_fallback", 0)
+        cfg_flag("sensors_fallback_exhaust_mcu", 1)
 
 
 # Special pseudo command: Due to the very high frequency of these commands, we don't
@@ -783,12 +787,15 @@ class NevermoreBackgroundWorker:
         if cmd is None:  # simplify client control flow
             return
 
+        def send(x: Command):
+            self._command_queue.sync_q.put(x)
+
         def send_maybe(wrapper: Callable[[_A], Command], x: Optional[_A]):
             if x is not None:
-                self._command_queue.sync_q.put(wrapper(x))
+                send(wrapper(x))
 
         if isinstance(cmd, Command):
-            self._command_queue.sync_q.put(cmd)
+            send(cmd)
         elif isinstance(cmd, CmdFanPolicy):
             send_maybe(CmdFanPolicyCooldown, cmd.cooldown)
             send_maybe(CmdFanPolicyVocPassiveMax, cmd.voc_passive_max)
@@ -796,7 +803,7 @@ class NevermoreBackgroundWorker:
         elif isinstance(cmd, CmdWs2812MarkDirty):
             self._led_dirty.set_threadsafe(self._loop)
         elif isinstance(cmd, CmdConfiguration):
-            send_maybe(CmdConfigFlags, cmd.flags)
+            send(CmdConfigFlags(cmd.flags, cmd.mask))
         else:
             raise Exception(f"unhandled pseudo-command {cmd}")
 

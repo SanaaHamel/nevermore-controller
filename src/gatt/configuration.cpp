@@ -76,8 +76,11 @@ optional<int> attr_write(
     }
     case HANDLE_ATTR(CONFIG_FLAGS_01, VALUE): {
         uint64_t const flags = consume;
+        uint64_t const mask = consume.or_default(std::numeric_limits<uint64_t>::max());
         for (size_t i = 0; i < FLAGS.size(); ++i)
-            *FLAGS.at(i) = !!(flags & uint64_t(1) << i);
+            if (auto const bit = uint64_t(1) << i; mask & bit) {
+                *FLAGS.at(i) = !!(flags & bit);
+            }
         return 0;
     }
 

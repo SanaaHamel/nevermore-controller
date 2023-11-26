@@ -70,6 +70,13 @@ struct WriteConsumer {
         return *this;
     }
 
+    template <typename A>
+    A or_default(A default_) {
+        if (remaining() == 0) return default_;
+
+        return *this;
+    }
+
     std::span<uint8_t const> span(size_t length) {
         if (!has_available(sizeof(uint8_t) * length))
             throw AttrWriteException(ATT_ERROR_INVALID_ATTRIBUTE_VALUE_LENGTH);
