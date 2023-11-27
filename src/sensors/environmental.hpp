@@ -84,9 +84,13 @@ private:
     [[nodiscard]] A get_(Sensors const& sensors = g_sensors, Config const& config = g_config) const {
         // NOLINTNEXTLINE(cppcoreguidelines-pro-type-const-cast)
         auto [main, other] = pick(const_cast<Sensors&>(sensors));
+        if constexpr (BLE::has_not_known<A>) {
         if (auto value = std::get<A&>(main); value != BLE::NOT_KNOWN) return value;
         if (auto value = std::get<A&>(other); config.fallback) return value;
         return BLE::NOT_KNOWN;
+        } else {
+            return std::get<A&>(main);
+        }
     }
 
     [[nodiscard]] std::tuple<Side, Side> pick(Sensors& sensors = g_sensors) const {
