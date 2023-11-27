@@ -49,6 +49,8 @@ typedef int32_t fix16_t;
 #define F16(x) \
     ((fix16_t)(((x) >= 0) ? ((x)*65536.0 + 0.5) : ((x)*65536.0 - 0.5)))
 
+int32_t fix16_cast_to_int(fix16_t a);
+
 #ifndef __cplusplus
 
 #if __STDC_VERSION__ >= 199901L
@@ -129,7 +131,7 @@ typedef int32_t fix16_t;
 /**
  * Struct to hold all parameters and states of the gas algorithm.
  */
-typedef struct {
+typedef struct GasIndexAlgorithmParams {
     int32_t mAlgorithm_Type;
     fix16_t mIndex_Offset;
     int32_t mSraw_Minimum;
@@ -170,6 +172,13 @@ typedef struct {
     fix16_t m_Adaptive_Lowpass___X1;
     fix16_t m_Adaptive_Lowpass___X2;
     fix16_t m_Adaptive_Lowpass___X3;
+
+    fix16_t _sigmoid_gamma_mean;
+    fix16_t _sigmoid_gamma_variance;
+    fix16_t _sigmoid_gating_mean;
+    fix16_t _sigmoid_gating_variance;
+    fix16_t _gating_threshold_mean;
+    fix16_t _gating_threshold_variance;
 } GasIndexAlgorithmParams;
 
 
@@ -281,6 +290,9 @@ void GasIndexAlgorithm_get_tuning_parameters(
  */
 void GasIndexAlgorithm_process(GasIndexAlgorithmParams* params, int32_t sraw,
                                int32_t* gas_index);
+
+int32_t GasIndexAlgorithm_sraw_mean(GasIndexAlgorithmParams const*);
+int32_t GasIndexAlgorithm_sraw_std(GasIndexAlgorithmParams const*);
 
 #ifdef __cplusplus
 }

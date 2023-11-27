@@ -146,6 +146,9 @@ struct SGP30Sensor final : SensorPeriodicEnvI2C<Reg, "SGP30", 0xFF> {
         if (!raw) return;
         i2c.log("raw value-     H^2=%6d  ethanol=%6d", raw->co2_eq_ppm, raw->tvoc_ppb);
 
+        side.set(VOCRaw(raw->tvoc_ppb));
+        if (side.was_voc_breakdown_measurement()) return;
+
         auto idx = voc_index(*result);
 
         int32_t gas_index{};
@@ -153,8 +156,8 @@ struct SGP30Sensor final : SensorPeriodicEnvI2C<Reg, "SGP30", 0xFF> {
         assert(0 <= gas_index && gas_index <= 500 && "result out of range?");
         i2c.log("index    -    chip=%6d    sgp40=%6d", int(idx.raw_value), int(gas_index));
 
+        side.set(GIAState(gia));
         side.set(VOCIndex(gas_index));
-        side.set(VOCRaw(raw->tvoc_ppb));
     }
 
     [[nodiscard]] VOCIndex voc_index(Measurement const& result) const {

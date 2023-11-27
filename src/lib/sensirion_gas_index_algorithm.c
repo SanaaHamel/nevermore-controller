@@ -47,7 +47,7 @@ static inline fix16_t fix16_from_int(int32_t a) {
     return a * FIX16_ONE;
 }
 
-static inline int32_t fix16_cast_to_int(fix16_t a) {
+int32_t fix16_cast_to_int(fix16_t a) {
     return (a >= 0) ? (a >> 16) : -((-a) >> 16);
 }
 
@@ -482,18 +482,18 @@ static void  GasIndexAlgorithm__mean_variance_estimator___calculate_gamma(GasInd
         params->m_Mean_Variance_Estimator___Uptime_Gating = (params->m_Mean_Variance_Estimator___Uptime_Gating + F16(GasIndexAlgorithm_SAMPLING_INTERVAL));
     }
     GasIndexAlgorithm__mean_variance_estimator___sigmoid__set_parameters(params, params->mInit_Duration_Mean, F16(GasIndexAlgorithm_INIT_TRANSITION_MEAN));
-    sigmoid_gamma_mean = GasIndexAlgorithm__mean_variance_estimator___sigmoid__process(params, params->m_Mean_Variance_Estimator___Uptime_Gamma);
+    params->_sigmoid_gamma_mean = sigmoid_gamma_mean = GasIndexAlgorithm__mean_variance_estimator___sigmoid__process(params, params->m_Mean_Variance_Estimator___Uptime_Gamma);
     gamma_mean = (params->m_Mean_Variance_Estimator___Gamma_Mean + (fix16_mul((params->m_Mean_Variance_Estimator___Gamma_Initial_Mean - params->m_Mean_Variance_Estimator___Gamma_Mean), sigmoid_gamma_mean)));
-    gating_threshold_mean = (params->mGating_Threshold + (fix16_mul((F16(GasIndexAlgorithm_GATING_THRESHOLD_INITIAL) - params->mGating_Threshold), GasIndexAlgorithm__mean_variance_estimator___sigmoid__process(params, params->m_Mean_Variance_Estimator___Uptime_Gating))));
+    params->_gating_threshold_mean = gating_threshold_mean = (params->mGating_Threshold + (fix16_mul((F16(GasIndexAlgorithm_GATING_THRESHOLD_INITIAL) - params->mGating_Threshold), GasIndexAlgorithm__mean_variance_estimator___sigmoid__process(params, params->m_Mean_Variance_Estimator___Uptime_Gating))));
     GasIndexAlgorithm__mean_variance_estimator___sigmoid__set_parameters(params, gating_threshold_mean, F16(GasIndexAlgorithm_GATING_THRESHOLD_TRANSITION));
-    sigmoid_gating_mean = GasIndexAlgorithm__mean_variance_estimator___sigmoid__process(params, params->mGas_Index);
+    params->_sigmoid_gating_mean = sigmoid_gating_mean = GasIndexAlgorithm__mean_variance_estimator___sigmoid__process(params, params->mGas_Index);
     params->m_Mean_Variance_Estimator__Gamma_Mean = (fix16_mul(sigmoid_gating_mean, gamma_mean));
     GasIndexAlgorithm__mean_variance_estimator___sigmoid__set_parameters(params, params->mInit_Duration_Variance, F16(GasIndexAlgorithm_INIT_TRANSITION_VARIANCE));
-    sigmoid_gamma_variance = GasIndexAlgorithm__mean_variance_estimator___sigmoid__process(params, params->m_Mean_Variance_Estimator___Uptime_Gamma);
+    params->_sigmoid_gamma_variance = sigmoid_gamma_variance = GasIndexAlgorithm__mean_variance_estimator___sigmoid__process(params, params->m_Mean_Variance_Estimator___Uptime_Gamma);
     gamma_variance = (params->m_Mean_Variance_Estimator___Gamma_Variance + (fix16_mul((params->m_Mean_Variance_Estimator___Gamma_Initial_Variance - params->m_Mean_Variance_Estimator___Gamma_Variance), (sigmoid_gamma_variance - sigmoid_gamma_mean))));
-    gating_threshold_variance = (params->mGating_Threshold + (fix16_mul((F16(GasIndexAlgorithm_GATING_THRESHOLD_INITIAL) - params->mGating_Threshold), GasIndexAlgorithm__mean_variance_estimator___sigmoid__process(params, params->m_Mean_Variance_Estimator___Uptime_Gating))));
+    params->_gating_threshold_variance = gating_threshold_variance = (params->mGating_Threshold + (fix16_mul((F16(GasIndexAlgorithm_GATING_THRESHOLD_INITIAL) - params->mGating_Threshold), GasIndexAlgorithm__mean_variance_estimator___sigmoid__process(params, params->m_Mean_Variance_Estimator___Uptime_Gating))));
     GasIndexAlgorithm__mean_variance_estimator___sigmoid__set_parameters(params, gating_threshold_variance, F16(GasIndexAlgorithm_GATING_THRESHOLD_TRANSITION));
-    sigmoid_gating_variance = GasIndexAlgorithm__mean_variance_estimator___sigmoid__process(params, params->mGas_Index);
+    params->_sigmoid_gating_variance = sigmoid_gating_variance = GasIndexAlgorithm__mean_variance_estimator___sigmoid__process(params, params->mGas_Index);
     params->m_Mean_Variance_Estimator__Gamma_Variance = (fix16_mul(sigmoid_gating_variance, gamma_variance));
     params->m_Mean_Variance_Estimator___Gating_Duration_Minutes = (params->m_Mean_Variance_Estimator___Gating_Duration_Minutes + (fix16_mul(F16((GasIndexAlgorithm_SAMPLING_INTERVAL / 60.)), ((fix16_mul((F16(1.) - sigmoid_gating_mean), F16((1. + GasIndexAlgorithm_GATING_MAX_RATIO)))) - F16(GasIndexAlgorithm_GATING_MAX_RATIO)))));
     if ((params->m_Mean_Variance_Estimator___Gating_Duration_Minutes < F16(0.))) {
@@ -643,5 +643,14 @@ static fix16_t  GasIndexAlgorithm__adaptive_lowpass__process(GasIndexAlgorithmPa
     params->m_Adaptive_Lowpass___X3 = ((fix16_mul((F16(1.) - a3), params->m_Adaptive_Lowpass___X3)) + (fix16_mul(a3, sample)));
     return params->m_Adaptive_Lowpass___X3;
 }
+
+int32_t GasIndexAlgorithm_sraw_mean(GasIndexAlgorithmParams const* params) {
+    return fix16_cast_to_int(params->m_Mox_Model__Sraw_Mean) + params->mSraw_Minimum;
+}
+
+int32_t GasIndexAlgorithm_sraw_std(GasIndexAlgorithmParams const* params) {
+    return fix16_cast_to_int(params->m_Mox_Model__Sraw_Std);
+}
+
 // clang-format on
 // NOLINTEND

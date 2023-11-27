@@ -37,17 +37,6 @@ else:
 _A = TypeVar("_A")
 
 
-def _apply2_optional(fn: Callable[[_A, _A], _A]):
-    def go(x: Optional[_A], y: Optional[_A]):
-        if x is None:
-            return y
-        if y is None:
-            return x
-        return fn(x, y)
-
-    return go
-
-
 NEVERMORE_CONTROLLER_NAMES = {"Nevermore", "Nevermore Controller"}
 BOOTLOADER_NAME_PREFIX = "picowota "
 
@@ -307,8 +296,18 @@ class BleAttrReader:
     def voc_index(self) -> Optional[int]:  # [1, VOC_INDEX_MAX]
         return self._as_int(self._unsigned(2, 1, 0, 0, not_known=0))
 
+    def voc_index_threshold(self) -> Optional[int]:  # [0, 2**16-2]
+        return self._as_int(self._unsigned(2, 1, 0, 0, not_known=0xFFFF))
+
     def voc_raw(self) -> Optional[int]:  # [0, VOC_RAW_MAX]
         return self._as_int(self._unsigned(2, 1, 0, 0, not_known=0xFFFF))
+
+    def gia_sigmoid(self) -> Optional[float]:  # [0, 1]
+        # basically fix-16 but only the low 16 bits
+        return self._unsigned(2, 1, 0, -15, not_known=0xFFFF)
+
+    def fix16(self) -> float:  # [-2^15, 2^15-1]
+        return self._unsigned(4, 1, 0, -15)
 
     @overload
     def _signed(self, sz: int, M: int, d: int, e: int) -> float:
@@ -414,6 +413,48 @@ class FanState:
         return x
 
 
+@dataclass
+class GIAState:
+    # key names must match those used by moonraker/klipper status (e.g. `gas` instead of `voc`)
+    # (except for `exhaust` suffix)
+    mean: Optional[int]  # [0, VOC_RAW_MAX]
+    var: Optional[int]  # [0, VOC_RAW_MAX]
+    gamma_mean: Optional[float]  # [0, 1]
+    gamma_var: Optional[float]  # [0, 1]
+    gating_mean: Optional[float]  # [0, 1]
+    gating_var: Optional[float]  # [0, 1]
+    threshold_gating_mean: Optional[int]  # [1, VOC_INDEX_MAX + some extra]
+    threshold_gating_var: Optional[int]  # [1, VOC_INDEX_MAX + some extra]
+
+    @staticmethod
+    def parse(reader: BleAttrReader) -> "GIAState":
+        return GIAState(
+            mean=reader.voc_raw(),
+            var=reader.voc_raw(),
+            gamma_mean=reader.gia_sigmoid(),
+            gamma_var=reader.gia_sigmoid(),
+            gating_mean=reader.gia_sigmoid(),
+            gating_var=reader.gia_sigmoid(),
+            threshold_gating_mean=reader.voc_index_threshold(),
+            threshold_gating_var=reader.voc_index_threshold(),
+        )
+
+
+@dataclass
+class VOCRawBreakdown:
+    humidity: Optional[int]  # [0, VOC_RAW_MAX]
+    temperature: Optional[int]  # [0, VOC_RAW_MAX]
+    uncompensated: Optional[int]  # [0, VOC_RAW_MAX]
+
+    @staticmethod
+    def parse(reader: BleAttrReader) -> "VOCRawBreakdown":
+        return VOCRawBreakdown(
+            humidity=reader.voc_raw(),
+            temperature=reader.voc_raw(),
+            uncompensated=reader.voc_raw(),
+        )
+
+
 @dataclass(frozen=True)
 class SensorState:
     temperature: Optional[float] = None  # Celsius
@@ -423,29 +464,27 @@ class SensorState:
     #       Also happens to be what the bme680 reports.
     gas: Optional[int] = None  # [1, VOC_INDEX_MAX]
     gas_raw: Optional[int] = None  # [0, VOC_RAW_MAX]
+    gas_raw_gia: Optional[GIAState] = None
+    gas_raw_breakdown: Optional[VOCRawBreakdown] = None
 
     def as_dict(self) -> Dict[str, float]:
-        return {
+        d = {
             f.name: getattr(self, f.name)
             for f in dataclasses.fields(self)
-            if getattr(self, f.name) is not None
+            if isinstance(getattr(self, f.name), (int, float))
         }
 
-    def merge(
-        self,
-        rhs: "SensorState",
-        # TFW you need rank-2 polymorphism but python typing doesn't support it
-        fn: Callable[[Optional[float], Optional[float]], Optional[float]],
-    ) -> "SensorState":
-        gas = fn(self.gas, rhs.gas)
-        gas_raw = fn(self.gas_raw, rhs.gas_raw)
-        return SensorState(
-            temperature=fn(self.temperature, rhs.temperature),
-            humidity=fn(self.humidity, rhs.humidity),
-            pressure=fn(self.pressure, rhs.pressure),
-            gas=None if gas is None else int(gas),  # rank-2 poly support pls :(
-            gas_raw=None if gas_raw is None else int(gas_raw),
-        )
+        def add_subfields(prefix: str, x: Any):
+            if x is not None:
+                d.update(
+                    (f"{prefix}{f.name}", getattr(x, f.name))
+                    for f in dataclasses.fields(x)
+                    if getattr(x, f.name) is not None
+                )
+
+        add_subfields("gas_raw_", self.gas_raw_gia)
+        add_subfields("gas_raw_", self.gas_raw_breakdown)
+        return d
 
     @staticmethod
     def parse(reader: BleAttrReader) -> "Tuple[SensorState, SensorState]":
@@ -460,6 +499,10 @@ class SensorState:
         voc_out = reader.voc_index()
         voc_raw_in = reader.voc_raw()
         voc_raw_out = reader.voc_raw()
+        gia_in = GIAState.parse(reader)
+        gia_out = GIAState.parse(reader)
+        breakdown_in = VOCRawBreakdown.parse(reader) if reader.remaining else None
+        breakdown_out = VOCRawBreakdown.parse(reader) if reader.remaining else None
 
         if p_in is not None:
             p_in /= 100  # need it in hPa instead of Pa
@@ -468,8 +511,10 @@ class SensorState:
             p_out /= 100  # need it in hPa instead of Pa
 
         return (
-            SensorState(t_in, h_in, p_in, voc_in, voc_raw_in),
-            SensorState(t_out, h_out, p_out, voc_out, voc_raw_out),
+            SensorState(t_in, h_in, p_in, voc_in, voc_raw_in, gia_in, breakdown_in),
+            SensorState(
+                t_out, h_out, p_out, voc_out, voc_raw_out, gia_out, breakdown_out
+            ),
         )
 
 
@@ -481,22 +526,38 @@ class ControllerState:
     fan_tacho: float = 0
 
     def min(self, rhs: "ControllerState") -> "ControllerState":
-        return self.merge(rhs, _apply2_optional(min))  # type: ignore needs better bounds
+        return self.merge(rhs, min)
 
     def max(self, rhs: "ControllerState") -> "ControllerState":
-        return self.merge(rhs, _apply2_optional(max))  # type: ignore needs better bounds
+        return self.merge(rhs, max)
 
     def merge(
         self,
         rhs: "ControllerState",
-        fn: Callable[[Optional[float], Optional[float]], Optional[float]],
+        fn: Callable[[float, float], float],
     ) -> "ControllerState":
-        return ControllerState(
-            intake=self.intake.merge(rhs.intake, fn),
-            exhaust=self.exhaust.merge(rhs.exhaust, fn),
-            fan_power=fn(self.fan_power, rhs.fan_power) or 0,
-            fan_tacho=fn(self.fan_tacho, rhs.fan_tacho) or 0,
-        )
+        # TODO: figure out how (if possible?) to type bound a dataclass kind
+        # TODO: PRECONDITION: all fields are `<: float` or dataclasses satisfying this precondition
+        def go(
+            x: _A,
+            y: _A,
+        ) -> _A:
+            if x is None:
+                return x
+            if y is None:
+                return y
+
+            if isinstance(x, (int, float)):
+                return fn(x, y)  # type: ignore
+
+            return x.__class__(
+                **{
+                    f.name: go(getattr(x, f.name), getattr(y, f.name))
+                    for f in dataclasses.fields(x)  # type: ignore
+                }
+            )
+
+        return go(self, rhs)
 
     def as_dict(self) -> Dict[str, float]:
         data: Dict[str, float] = {}

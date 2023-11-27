@@ -3,8 +3,10 @@
 #include "lib/sensirion_gas_index_algorithm.h"
 #include "sdk/ble_data_types.hpp"
 #include "sdk/i2c.hpp"
+#include "sensors.hpp"
 #include "sensors/async_sensor.hpp"
 #include "sensors/environmental.hpp"
+#include "sensors/gas_index.hpp"
 #include "utility/numeric_suffixes.hpp"
 #include "utility/packed_tuple.hpp"
 #include <bit>
@@ -93,15 +95,6 @@ struct SGP40 final : SensorPeriodic {
     GasIndexAlgorithmParams gas_index_algorithm{};
     EnvironmentalFilter side;
 
-#if DBG_SGP40_TEMP_HUMIDITY_BREAKDOWN
-    uint8_t state = 0;
-    array<uint16_t, 4> history{};
-
-    [[nodiscard]] chrono::milliseconds update_period() const override {
-        return SENSOR_UPDATE_PERIOD / 4;
-    }
-#endif
-
     SGP40(i2c_inst_t& bus, EnvironmentalFilter side) : bus(bus), side(side) {
         GasIndexAlgorithm_init(&gas_index_algorithm, GasIndexAlgorithm_ALGORITHM_TYPE_VOC);
     }
@@ -110,45 +103,22 @@ struct SGP40 final : SensorPeriodic {
         return "SGP40";
     }
 
-    bool issue() {
-#if DBG_SGP40_TEMP_HUMIDITY_BREAKDOWN
-        switch (state) {
-        case 0: break;
-        case 1: return sgp40_measure_issue(bus, side.get<Temperature>(), NOT_KNOWN);
-        case 2: return sgp40_measure_issue(bus, NOT_KNOWN, side.get<Humidity>());
-        case 3: return sgp40_measure_issue(bus, NOT_KNOWN, NOT_KNOWN);
-        }
-#endif
-        return sgp40_measure_issue(bus, side.compensation_temperature(), side.compensation_humidity());
-    }
-
     void read() override {
-        if (!issue()) return;
+        if (!sgp40_measure_issue(bus, side.compensation_temperature(), side.compensation_humidity())) return;
 
         task_delay(320ms);
 
         auto voc_raw = sgp40_measure_read(bus);
         if (!voc_raw) return;
 
-#if DBG_SGP40_TEMP_HUMIDITY_BREAKDOWN
-        state = (state + 1) % 4;
-        history.at(state) = *voc_raw;
-        if (state == 3) {
-            printf("SGP40 - both=% 7d  temp=% 7d  humid=% 7d  none=% 7d\n", history[0], history[1],
-                    history[2], history[3]);
-            printf("                      temp=% 7d  humid=% 7d  none=% 7d\n", history[1] - history[0],
-                    history[2] - history[0], history[3] - history[0]);
-        }
-#endif
-
-        side.set(VOCRaw(min(*voc_raw, VOCRaw::not_known_value)));
+        side.set(VOCRaw(*voc_raw));
+        if (side.was_voc_breakdown_measurement()) return;
 
         // ~330 us during steady-state, ~30 us during startup blackout
         int32_t gas_index{};
         GasIndexAlgorithm_process(&gas_index_algorithm, *voc_raw, &gas_index);
         assert(0 <= gas_index && gas_index <= 500 && "result out of range?");
-        if (gas_index == 0) return;  // 0 -> index not available
-
+        side.set(GIAState(gas_index_algorithm));
         side.set(VOCIndex(gas_index));
     }
 };

@@ -88,6 +88,46 @@ I suggest the following dashboard snippet (paste it via `Dashboard -> Edit Dashb
 ]
 ```
 
+
+Alternatively, for a VOC/GIA breakdown:
+```
+[
+  {
+    "target": [
+      "seriesByTag(\"name=gas\")",
+      "seriesByTag(\"side=intake\", \"name=~gas_raw_threshold.*\")"
+    ],
+    "vtitle": "VOC Index",
+    "title": "VOC Index",
+    "yMin": "0"
+  },
+  {
+    "target": [
+      "seriesByTag(\"name=gas_raw\")",
+      "alpha(seriesByTag(\"name=gas_raw_uncompensated\"), 0.25)",
+      "alpha(dashed(seriesByTag(\"name=gas_raw_mean\")), 0.75)",
+      "alpha(sumSeries(seriesByTag(\"name=gas_raw_mean\", \"side=intake\"), seriesByTag(\"name=gas_raw_var\", \"side=intake\")), 0.5)",
+      "alpha(sumSeries(seriesByTag(\"name=gas_raw_mean\", \"side=intake\"), scale(seriesByTag(\"name=gas_raw_var\", \"side=intake\"), -1)), 0.5)",
+      "alpha(sumSeries(seriesByTag(\"name=gas_raw_mean\", \"side=exhaust\"), seriesByTag(\"name=gas_raw_var\", \"side=exhaust\")), 0.5)",
+      "alpha(sumSeries(seriesByTag(\"name=gas_raw_mean\", \"side=exhaust\"), scale(seriesByTag(\"name=gas_raw_var\", \"side=exhaust\"), -1)), 0.5)"
+    ],
+    "title": "VOC Raw",
+    "vtitle": "Resistance",
+    "yMin": "",
+    "graphOnly": "false",
+    "hideLegend": "false"
+  },
+  {
+    "target": [
+      "seriesByTag(\"name=~gas_raw_(gamma|gating)_(mean|var)\")"
+    ],
+    "vtitle": "%",
+    "title": "Gating",
+    "yMin": "0"
+  }
+]
+```
+
 """
 
 import asyncio
@@ -137,6 +177,9 @@ MOONRAKER_SENSOR_FIELDS_ALLOWED = {
     "power",  # used by heaters for applied PWM %
     "temperature",
 }
+MOONRAKER_SENSOR_FIELDS_ALLOWED_REGEX = [
+    re.compile("gas_raw_.*"),
+]
 
 MOONRAKER_SENSOR_NAME_BLOCKED = [
     re.compile("temperature_sensor nevermore_.*_voc"),  # ignore common VOC plotters
@@ -282,7 +325,9 @@ def _extract_fields(fields: Dict[str, Any]):
             side = None
 
         name = "_".join(field_parts)
-        if name not in MOONRAKER_SENSOR_FIELDS_ALLOWED:
+        if name not in MOONRAKER_SENSOR_FIELDS_ALLOWED and not any(
+            r.fullmatch(name) for r in MOONRAKER_SENSOR_FIELDS_ALLOWED_REGEX
+        ):
             continue
 
         parts[(name, side)] = value
