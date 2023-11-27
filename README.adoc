@@ -259,7 +259,7 @@ Alternatively, you can flash Klipper to the Pico and use it like any other Klipp
 +
 NOTE: I intend to improve the experience for people using a wired connection instead of wireless (via the Klipper MCU), but have no concrete timeline.
 
-. I'm using the xref:klipper-config-minimal[minimal configuration] and I only see the VOC plot entry in Mainsail, there's no 'Nevermore' item.
+* I'm using the xref:klipper-config-minimal[minimal configuration] and I only see the VOC plot entry in Mainsail, there's no 'Nevermore' item.
 +
 Verify that your Mainsail version is at least 2.7.1 (first release w/ official support).
 If that's fine then double check there isn't any config errors.
