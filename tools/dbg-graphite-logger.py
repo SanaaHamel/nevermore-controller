@@ -265,7 +265,11 @@ def graphite_connection(dst: Ip4Port, sampling_period: float) -> GraphiteLogger:
             side_tag = "" if side is None else f";side={side.value}"
             return f"{field};source={snapshot.name};sensor={sensor_name}{side_tag}"
 
-        timestamp = (snapshot.timestamp or datetime.datetime.now()).strftime("%s")
+        timestamp = (
+            snapshot.timestamp.strftime("%s")
+            if snapshot.timestamp is not None
+            else "-1"
+        )
         metrics: List[Tuple[str, Tuple[str, float]]] = [
             (series_name(sensor_name, field, side), (timestamp, value))
             for sensor_name, values in snapshot.sensors.items()
