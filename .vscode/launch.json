@@ -21,8 +21,11 @@
             // Work around for stopping at main on restart
             "postRestartCommands": [
                 "break main",
-                "continue"
-            ]
+                "continue",
+                "set print pretty",
+                "set print object",
+                "source src/lib/fix16.gdb.py"
+            ],
         },
         {
             "name": "Pico Debug - Combined",
