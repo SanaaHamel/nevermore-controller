@@ -1,8 +1,7 @@
 #include "bme280.hpp"
-#include "hardware/i2c.h"
 #include "lib/bme280.h"
 #include "sdk/ble_data_types.hpp"
-#include "sdk/i2c.hpp"
+#include "sensors/environmental_i2c.hpp"
 #include <chrono>
 #include <cstdint>
 #include <utility>
@@ -16,9 +15,10 @@ static_assert(BME280_POWER_ON_DELAY == chrono::microseconds(BME280_STARTUP_DELAY
 
 namespace {
 
-// LSB can be 0 or 1, depending on whether a pin is shorted on the SMD.
-// Assume LSB of 0 for now.
-constexpr uint8_t BME280_ADDRESS = 0b0111'0110;
+constexpr uint8_t ADDRESSES[] = {
+        0b0111'0110,
+        0b0111'0111,
+};
 
 constexpr bme280_settings BME280_SETTINGS{
         .osr_p = BME280_OVERSAMPLING_1X,
@@ -29,75 +29,55 @@ constexpr bme280_settings BME280_SETTINGS{
         .standby_time = BME280_STANDBY_TIME_250_MS,
 };
 
-BME280_INTF_RET_TYPE i2c_read_(uint8_t reg_addr, uint8_t* reg_data, uint32_t len, void* intf_ptr) {
-    auto* bus = reinterpret_cast<i2c_inst_t*>(intf_ptr);
-    if (!i2c_write("BME280", *bus, BME280_ADDRESS, reg_addr)) return BME280_E_COMM_FAIL;
-    if (!i2c_read("BME280", *bus, BME280_ADDRESS, reg_data, len)) return BME280_E_COMM_FAIL;
+// unused. we want the helpers from `SensorPeriodicEnvI2C`, but the vendor's
+// library is handling everything except I2C calls.
+enum class Reg : uint8_t {};
 
-    return BME280_OK;
-}
-
-BME280_INTF_RET_TYPE i2c_write_(uint8_t reg_addr, const uint8_t* reg_data, uint32_t len, void* intf_ptr) {
-    static_assert(BME280_MAX_LEN * 2 <= 32);
-    assert(len <= BME280_MAX_LEN * 2);  // keep things reasonable
-    auto* bus = reinterpret_cast<i2c_inst_t*>(intf_ptr);
-
-    uint8_t buf[len + 1];
-    buf[0] = reg_addr;
-    memcpy(buf + 1, reg_data, len);  // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
-    if (!i2c_write("BME280", *bus, BME280_ADDRESS, buf, sizeof(buf))) return BME280_E_COMM_FAIL;
-
-    return BME280_OK;
-}
-
-optional<bme280_dev> init(i2c_inst_t& bus) {
+// This could update more/less frequently, based on the update period (see `bme280_cal_meas_delay`).
+// Current update period of 1s should be more than enough to compute results.
+// NOLINTNEXTLINE(cppcoreguidelines-special-member-functions)
+struct BME280 final : SensorPeriodicEnvI2C<Reg, "BME280"> {
+    using SensorPeriodicEnvI2C::SensorPeriodicEnvI2C;
     bme280_dev dev{
             .intf = BME280_I2C_INTF,
-            .intf_ptr = &bus,
+            .intf_ptr = this,
             .read = i2c_read_,
             .write = i2c_write_,
             .delay_us = [](uint32_t delay_us, void*) { busy_wait_us_32(delay_us); },
     };
 
-    if (auto r = bme280_init(&dev); r != BME280_OK) {
-        // suppress error msg & assume this just means there's no one on the bus
-        if (r == BME280_E_COMM_FAIL) return {};
-        if (r == BME280_E_DEV_NOT_FOUND) return {};  // whatever we found wasn't a BME280 (maybe a BME68x?)
+    BME280(BME280 const&) = delete;
+    BME280(BME280&&) = delete;
 
-        printf("ERR - BME280 - failed to initialize the device (code %+d).\n", r);
-        return {};
-    }
+    bool setup() {  // NOLINT(readability-make-member-function-const)
+        if (auto r = bme280_init(&dev); r != BME280_OK) {
+            // suppress error msg & assume this just means there's no one on the bus
+            if (r == BME280_E_COMM_FAIL) return false;
+            // whatever we found wasn't a BME280 (maybe a BME68x?)
+            if (r == BME280_E_DEV_NOT_FOUND) return false;
 
-    if (auto r = bme280_set_sensor_settings(BME280_SEL_ALL_SETTINGS, &BME280_SETTINGS, &dev);
-            r != BME280_OK) {
-        printf("ERR - BME280 - failed to set device settings (code %+d).\n", r);
-        return {};
-    }
+            i2c.log_error("failed to initialize the device (code %+d)", r);
+            return false;
+        }
 
-    if (auto r = bme280_set_sensor_mode(BME280_POWERMODE_NORMAL, &dev); r < 0) {
-        printf("ERR - BME280 - failed to set normal mode (code %+d).\n", r);
-        return {};
-    }
+        if (auto r = bme280_set_sensor_settings(BME280_SEL_ALL_SETTINGS, &BME280_SETTINGS, &dev);
+                r != BME280_OK) {
+            i2c.log_error("failed to set device settings (code %+d)", r);
+            return false;
+        }
 
-    return dev;
-}
+        if (auto r = bme280_set_sensor_mode(BME280_POWERMODE_NORMAL, &dev); r < 0) {
+            i2c.log_error("failed to set normal mode (code %+d)", r);
+            return false;
+        }
 
-// This could update more/less frequently, based on the update period (see `bme280_cal_meas_delay`).
-// Current update period of 1s should be more than enough to compute results.
-struct BME280 final : SensorPeriodic {
-    EnvironmentalFilter side;
-    bme280_dev dev;
-
-    BME280(bme280_dev dev, EnvironmentalFilter side) : side(side), dev(dev) {}
-
-    [[nodiscard]] char const* name() const override {
-        return "BME280";
+        return true;
     }
 
     void read() override {
         bme280_data comp_data{};
         if (auto r = bme280_get_sensor_data(BME280_ALL, &comp_data, &dev); r < 0) {
-            printf("ERR - BME280 - failed read: %d\n", r);
+            i2c.log_error("failed read (code %+d)", r);
             return;
         }
 
@@ -105,15 +85,39 @@ struct BME280 final : SensorPeriodic {
         side.set(BLE::Humidity(comp_data.humidity));
         side.set(BLE::Pressure(comp_data.pressure));
     }
+
+    static BME280_INTF_RET_TYPE i2c_read_(uint8_t reg_addr, uint8_t* reg_data, uint32_t len, void* intf_ptr) {
+        auto* self = reinterpret_cast<BME280*>(intf_ptr);
+        if (!i2c_write(self->name(), self->i2c.bus, self->i2c.address, reg_addr)) return BME280_E_COMM_FAIL;
+        if (!i2c_read(self->name(), self->i2c.bus, self->i2c.address, reg_data, len))
+            return BME280_E_COMM_FAIL;
+
+        return BME280_OK;
+    }
+
+    static BME280_INTF_RET_TYPE i2c_write_(
+            uint8_t reg_addr, uint8_t const* reg_data, uint32_t len, void* intf_ptr) {
+        static_assert(BME280_MAX_LEN * 2 <= 32);
+        assert(len <= BME280_MAX_LEN * 2);  // keep things reasonable
+        auto* self = reinterpret_cast<BME280*>(intf_ptr);
+
+        uint8_t buf[len + 1];
+        buf[0] = reg_addr;
+        memcpy(buf + 1, reg_data, len);  // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+        if (!i2c_write(self->name(), self->i2c.bus, self->i2c.address, buf, sizeof(buf)))
+            return BME280_E_COMM_FAIL;
+
+        return BME280_OK;
+    }
 };
 
 }  // namespace
 
 unique_ptr<SensorPeriodic> bme280(i2c_inst_t& bus, EnvironmentalFilter side) {
-    auto dev = init(bus);
-    if (!dev) return {};  // nothing found
+    for (auto address : ADDRESSES)
+        if (auto p = make_unique<BME280>(bus, address, side); p->setup()) return p;
 
-    return make_unique<BME280>(*dev, side);
+    return {};
 }
 
 }  // namespace nevermore::sensors
