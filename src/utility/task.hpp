@@ -77,6 +77,10 @@ struct Task {
         return task;
     }
 
+    [[nodiscard]] TaskHandle_t handle() {
+        return task;
+    }
+
 private:
     TaskHandle_t task{};
 };

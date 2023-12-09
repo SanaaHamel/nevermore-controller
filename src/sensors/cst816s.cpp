@@ -156,8 +156,15 @@ private:
 };
 array<InstanceMetadata, NUM_I2CS> g_instances;
 
-struct RegisterInterruptCallback {
-    RegisterInterruptCallback() {
+}  // namespace
+
+struct CST816S::ISR {
+    static SemaphoreHandle_t lock;
+
+    ISR() {
+        lock = xSemaphoreCreateBinary();
+        xSemaphoreGive(lock);  // created w/ count 0, set it to 1
+
         // NOT IDEMPOTENT. Will consume a shared interrupt handler each time.
         // This is a horrible foot-gun of an API.
         gpio_set_irq_enabled_with_callback(
@@ -168,28 +175,42 @@ struct RegisterInterruptCallback {
         assert(gpio == PIN_TOUCH_INTERRUPT);
         if (gpio != PIN_TOUCH_INTERRUPT) return;
 
-        /* The actual processing is to be deferred to a task.  Request the
-        vProcessInterface() callback function is executed, passing in the
-        number of the interface that needs processing.  The interface to
-        service is passed in the second parameter.  The first parameter is
-        not used in this case. */
         BaseType_t xHigherPriorityTaskWoken = pdFALSE;
-        xTimerPendFunctionCallFromISR(handle_isr, {}, {}, &xHigherPriorityTaskWoken);
+        if (!xSemaphoreTakeFromISR(lock, &xHigherPriorityTaskWoken)) {
+            portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
+            return;
+        }
 
-        /* If xHigherPriorityTaskWoken is now set to pdTRUE then a context
-        switch should be requested.  The macro used is port specific and will
-        be either portYIELD_FROM_ISR() or portEND_SWITCHING_ISR() - refer to
-        the documentation page for the port being used. */
-        portYIELD_FROM_ISR(xHigherPriorityTaskWoken);  // NOLINT
+        for (auto& instance : g_instances)
+            if (auto* p = reinterpret_cast<CST816S*>(instance.driver.user_data)) {
+                BaseType_t xHigherPriorityTaskWoken2 = pdFALSE;
+                xTaskNotifyFromISR(p->task.handle(), 0, eNoAction, &xHigherPriorityTaskWoken2);
+                xHigherPriorityTaskWoken |= xHigherPriorityTaskWoken2;
+            }
+
+        BaseType_t xHigherPriorityTaskWoken2 = pdFALSE;
+        xSemaphoreGiveFromISR(lock, &xHigherPriorityTaskWoken2);
+        portYIELD_FROM_ISR(xHigherPriorityTaskWoken || xHigherPriorityTaskWoken2);
     }
 
-    static void handle_isr(void*, uint32_t) {
-        for (auto& instance : g_instances)
-            if (auto* p = reinterpret_cast<CST816S*>(instance.driver.user_data)) p->interrupt();
+    // **DO NOT USE THIS FROM WITHIN THE ISR**
+    // **YOU MUST LOCK USING `*FromISR`**
+    // Deliberately defined after ISR w/ `auto` return to prevent accidental use.
+    static auto instances() {
+        xSemaphoreTake(lock, portMAX_DELAY);
+        ScopeGuard guard{[&] { xSemaphoreGive(lock); }};
+        return tuple<decltype(guard), array<InstanceMetadata, NUM_I2CS>&>{std::move(guard), g_instances};
+    }
+
+    template <typename F>
+    static auto first(F&& go) {
+        auto [guard, xs] = instances();
+        auto* it = ranges::find_if(xs, std::forward<F>(go));
+        return tuple<decltype(guard), InstanceMetadata*>{std::move(guard), it};
     }
 } g_register_interrupt_callback;
 
-}  // namespace
+SemaphoreHandle_t CST816S::ISR::lock;
 
 void CST816S::reset_all() {
     gpio_put(PIN_TOUCH_RESET, false);  // trigger on low
@@ -199,8 +220,7 @@ void CST816S::reset_all() {
 }
 
 CST816S::CST816S(i2c_inst_t& bus) : bus(&bus) {
-    if (auto* it = ranges::find_if(g_instances, [](auto& x) { return x.driver.user_data == nullptr; });
-            it != g_instances.end()) {
+    if (auto [_, it] = ISR::first([](auto& x) { return x.driver.user_data == nullptr; }); it) {
         assert(!it->device);
         it->driver.user_data = this;
         it->device = lv_indev_drv_register(&it->driver);
@@ -211,19 +231,17 @@ CST816S::CST816S(i2c_inst_t& bus) : bus(&bus) {
 
 // Ostensibly we'll never be destroyed, but hey, it's cheap to handle.
 CST816S::~CST816S() {
-    if (auto* it = ranges::find_if(g_instances, [&](auto& x) { return x.driver.user_data == this; });
-            it != g_instances.end()) {
+    if (auto [_, it] = ISR::first([&](auto& x) { return x.driver.user_data == this; }); it) {
         if (it->device) lv_indev_delete(it->device);
         it->device = nullptr;
         it->driver.user_data = nullptr;
     }
 }
 
-void CST816S::interrupt() {
-    task.resume();
-}
-
 void CST816S::read() {
+    // wait for interrupt to signal via notify
+    xTaskNotifyWait(0, 0, nullptr, portMAX_DELAY);
+
     struct [[gnu::packed]] Batch {
         // for now we don't care/bother to populate these
         // uint8_t gesture;
@@ -242,7 +260,6 @@ void CST816S::read() {
     state.y = byteswap(read->y) & 0x0FFF;        // read in BE, need it in LE order
     state.touch = Touch((read->x & 0xFF) >> 6);  // hi 2 bits in `x` are the event
     // state.gesture = Gesture(read->gesture);
-    task.suspend();  // wait until next time we're called...
 }
 
 unique_ptr<CST816S> CST816S::mk(i2c_inst_t& bus) {

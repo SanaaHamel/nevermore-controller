@@ -13,6 +13,7 @@ namespace nevermore::sensors {
 // from various sources. (Zephyr, WaveShare samples, etc..)
 
 struct CST816S final : SensorPeriodic {
+    struct ISR;
     static std::unique_ptr<CST816S> mk(i2c_inst_t&);
 
     // Pulse the reset pin. (This device is somewhat finicky.)
@@ -53,8 +54,6 @@ struct CST816S final : SensorPeriodic {
     [[nodiscard]] char const* name() const override {
         return "CST816S";
     }
-
-    void interrupt();
 
     [[nodiscard]] std::chrono::milliseconds update_period() const override {
         return 5ms;
