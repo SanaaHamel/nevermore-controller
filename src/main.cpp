@@ -131,15 +131,6 @@ int main() {
     printf("I2C bus 1 running at %u baud/s (requested %u baud/s)\n", i2c_init(i2c1, I2C_BAUD_RATE),
             unsigned(I2C_BAUD_RATE));
 
-    // I2C devices aren't required to understand/respond to general-call (addr 0) reset (0x06).
-    // But for those that do, hey, might as well tell them to reset in case we just rebooted.
-    // TODO:  Can't do this with the Pico SDK because it asserts/param checks that the address isn't
-    //        reserved, which is a problem since the general-call address *is* a reserved address.
-#if 0
-    i2c_write_blocking(*i2c0, 0x00, 0x06_u8);
-    i2c_write_blocking(*i2c1, 0x00, 0x06_u8);
-#endif
-
     auto* spi = spi_gpio_bus(PINS_DISPLAY_SPI[0]);
     printf("SPI bus %d running at %u baud/s (requested %u baud/s)\n", spi_gpio_bus_num(PINS_DISPLAY_SPI[0]),
             spi_init(spi, SPI_BAUD_RATE_DISPLAY), unsigned(SPI_BAUD_RATE_DISPLAY));
