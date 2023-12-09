@@ -159,17 +159,19 @@ if(CMAKE_BUILD_TYPE STREQUAL "Debug")
   add_compile_definitions(PICO_DEBUG_MALLOC=1)
 endif()
 
-pico_enable_stdio_usb(nevermore-controller 1)
-pico_enable_stdio_uart(nevermore-controller 1)
 pico_btstack_make_gatt_header(nevermore-controller PRIVATE ${SRC_DIR}/nevermore.gatt)
 pico_generate_pio_header(nevermore-controller ${SRC_DIR}/ws2812.pio)
 
 add_executable(nevermore-controller-no-bootloader)
 target_link_libraries(nevermore-controller-no-bootloader PRIVATE nevermore-controller)
+pico_enable_stdio_usb(nevermore-controller-no-bootloader 1)
+pico_enable_stdio_uart(nevermore-controller-no-bootloader 1)
 pico_add_extra_outputs(nevermore-controller-no-bootloader)
 
 add_executable(nevermore-controller-ota)
 target_link_libraries(nevermore-controller-ota PRIVATE nevermore-controller)
+pico_enable_stdio_usb(nevermore-controller-ota 1)
+pico_enable_stdio_uart(nevermore-controller-ota 1)
 pico_add_extra_outputs(nevermore-controller-ota)
 
 picowota_share_cyw43_firmware(nevermore-controller)
