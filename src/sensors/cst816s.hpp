@@ -15,6 +15,9 @@ namespace nevermore::sensors {
 struct CST816S final : SensorPeriodic {
     static std::unique_ptr<CST816S> mk(i2c_inst_t&);
 
+    // Pulse the reset pin. (This device is somewhat finicky.)
+    static void reset_all();
+
     enum class Touch : uint8_t {
         Down = 0,
         Up = 1,

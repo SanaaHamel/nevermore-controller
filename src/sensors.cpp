@@ -115,6 +115,9 @@ bool init() {
     adc_set_temp_sensor_enabled(true);
     g_mcu_temperature_sensor.start();
 
+    // Explicitly reset b/c we may be restarting the program w/o power cycling the device.
+    CST816S::reset_all();
+
     printf("Waiting %u ms for sensor init\n", unsigned(SENSOR_POWER_ON_DELAY / 1ms));
     task_delay(SENSOR_POWER_ON_DELAY);
 

@@ -121,13 +121,6 @@ optional<uint8_t> reg_write(i2c_inst_t& bus, Cmd const cmd, uint8_t value, uint8
     return value;
 }
 
-void reset() {
-    gpio_put(PIN_TOUCH_RESET, false);  // trigger on low
-    task_delay(5ms);
-    gpio_put(PIN_TOUCH_RESET, true);
-    task_delay(50ms);
-}
-
 // FIXME: HACK: This blows on so many levels:
 // 1) The pico-SDK only tracks 1 callback per core.
 // 2) The callback has no parameters.
@@ -198,6 +191,13 @@ struct RegisterInterruptCallback {
 
 }  // namespace
 
+void CST816S::reset_all() {
+    gpio_put(PIN_TOUCH_RESET, false);  // trigger on low
+    task_delay(5ms);
+    gpio_put(PIN_TOUCH_RESET, true);
+    task_delay(50ms);
+}
+
 CST816S::CST816S(i2c_inst_t& bus) : bus(&bus) {
     if (auto* it = ranges::find_if(g_instances, [](auto& x) { return x.driver.user_data == nullptr; });
             it != g_instances.end()) {
@@ -246,10 +246,6 @@ void CST816S::read() {
 }
 
 unique_ptr<CST816S> CST816S::mk(i2c_inst_t& bus) {
-    // This device is somewhat finicky.
-    // Explicitly reset b/c we may be restarting the program w/o power cycling the device.
-    reset();
-
     auto id = reg_read(bus, Cmd::CHIP_ID);
     if (!id) return {};  // nothing on the bus or error
 
