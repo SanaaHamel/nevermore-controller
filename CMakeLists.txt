@@ -156,7 +156,7 @@ if(CMAKE_BUILD_TYPE STREQUAL "Debug")
   # Specify source files explicitly b/c some SDK sources trigger warnings.
   # target_compile_options(nevermore-controller PRIVATE -Werror)
   set_source_files_properties(${SRC_FILES} PROPERTIES COMPILE_FLAGS -Werror)
-  add_compile_definitions(PICO_DEBUG_MALLOC=1)
+  add_compile_definitions(PICO_DEBUG_MALLOC=0)
 endif()
 
 pico_btstack_make_gatt_header(nevermore-controller PRIVATE ${SRC_DIR}/nevermore.gatt)
