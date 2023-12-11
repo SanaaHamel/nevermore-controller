@@ -36,7 +36,8 @@
         "NEOPIXEL",
         "Nevermores",
         "sancheck",
-        "TACHO"
+        "TACHO",
+        "waveshare"
     ],
     "python.autoComplete.extraPaths": [
         "~/klipper/klippy",

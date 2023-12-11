@@ -19,6 +19,7 @@
 #include "ws2812.hpp"
 #include <cstdint>
 #include <cstdio>
+#include <string_view>
 #include <utility>
 
 #ifndef NDEBUG
@@ -136,8 +137,11 @@ int main() {
             spi_init(spi, SPI_BAUD_RATE_DISPLAY), unsigned(SPI_BAUD_RATE_DISPLAY));
 
     mk_task("startup", Priority::Startup, 1024)([]() {
-        if (auto err = cyw43_arch_init()) {
-            panic("ERR - cyw43_arch_init failed = 0x%08x\n", err);
+        if constexpr (std::string_view(PICO_BOARD) == "pico_w") {
+            // need the CYW43 up to access the LED, even if we don't have BT enabled
+            if (auto err = cyw43_arch_init()) {
+                panic("ERR - cyw43_arch_init failed = 0x%08x\n", err);
+            }
         }
 
         ws2812::init();
@@ -149,10 +153,24 @@ int main() {
         mk_timer("led-blink", SENSOR_UPDATE_PERIOD)([](TimerHandle_t) {
             static bool led_on = false;
             led_on = !led_on;
-            cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, led_on);
+            if constexpr (std::string_view(PICO_BOARD) == "pico_w") {
+                // HACK:  `cyw43_arch_gpio_put` w/o having the HCI powered on
+                //        kills the timer task when it enters `cyw43_ensure_up`.
+                //        Root cause unknown. This hack should be benign since
+                //        Pico W is typically built w/ BT enabled.
+                if constexpr (NEVERMORE_PICO_W_BT) {
+                    cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, led_on);
+                }
+            } else {
+                // TODO:  Make this configurable/generalisable to other boards?
+                // constexpr uint8_t PICO_LED_PIN = 25;
+                // gpio_put(PICO_LED_PIN, led_on);
+            }
         });
 
-        mk_task("bluetooth", Priority::Communication, 1024)(btstack_run_loop_execute).release();
+        if constexpr (NEVERMORE_PICO_W_BT) {
+            mk_task("bluetooth", Priority::Communication, 1024)(btstack_run_loop_execute).release();
+        }
 
         vTaskDelete(nullptr);  // we're done, delete ourselves
     }).release();

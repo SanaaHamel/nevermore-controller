@@ -1,10 +1,10 @@
 #include "config.hpp"
+#include "config/pins.hpp"
 #include "sdk/gap.hpp"
 #include "sdk/i2c.hpp"
 #include "sdk/pwm.hpp"
 #include "sdk/spi.hpp"
 #include <array>
-#include <bitset>
 #include <cstdint>
 #include <initializer_list>
 #include <iterator>
@@ -28,8 +28,6 @@ static_assert(
 
 namespace {
 
-// RP2040 has 30 GPIO pins, but the pico doesn't expose all of them.
-constexpr array PINS_RESERVED_PICO_W{23, 24, 25, 29};
 // Don't ever allow these pins to be used.
 constexpr array PINS_RESERVED_UART{0, 1};
 
@@ -81,36 +79,36 @@ constexpr bool pwm_slices_overlap() {
     return last != end;
 }
 
-static_assert(all_pins_valid(), "`config.hpp` uses a GPIO pin outside of range [0, 29].");
-static_assert(all_pins_unique(), "`config.hpp` uses duplicate pins. A pin can be used at most once.");
-static_assert(!pin_exists(contains(PINS_RESERVED_PICO_W)),
-        "`config.hpp` uses a pin not exposed on the Pico W. This is likely a mistake.");
+static_assert(all_pins_valid(), "Pin config uses a GPIO pin outside of range [0, 29].");
+static_assert(all_pins_unique(), "Pin config uses duplicate pins. A pin can be used at most once.");
+static_assert(!pin_exists(contains(PINS_RESERVED_BOARD)),
+        "Pin config uses a pin not exposed on the board. This is likely a mistake.");
 static_assert(!pin_exists(contains(PINS_RESERVED_UART)),
-        "`config.hpp` uses pin 0 or pin 1. These are reserved for UART and cannot be used.");
+        "Pin config uses pin 0 or pin 1. These are reserved for UART and cannot be used.");
 
-static_assert(i2c_bus_pins_defined(0) & 0b01, "`config.hpp` has no pins defined for I2C0 SDA.");
-static_assert(i2c_bus_pins_defined(0) & 0b10, "`config.hpp` has no pins defined for I2C0 SCL.");
-static_assert(i2c_bus_pins_defined(1) & 0b01, "`config.hpp` has no pins defined for I2C1 SDA.");
-static_assert(i2c_bus_pins_defined(1) & 0b10, "`config.hpp` has no pins defined for I2C1 SCL.");
+static_assert(i2c_bus_pins_defined(0) & 0b01, "Pin config has no pins defined for I2C0 SDA.");
+static_assert(i2c_bus_pins_defined(0) & 0b10, "Pin config has no pins defined for I2C0 SCL.");
+static_assert(i2c_bus_pins_defined(1) & 0b01, "Pin config has no pins defined for I2C1 SDA.");
+static_assert(i2c_bus_pins_defined(1) & 0b10, "Pin config has no pins defined for I2C1 SCL.");
 static_assert(size(PINS_I2C) <= 4,
-        "`config.hpp` specifies too many I2C pins. An I2C bus cannot be mapped to multiple pin pairs.");
+        "Pin config specifies too many I2C pins. An I2C bus cannot be mapped to multiple pin pairs.");
 
 // can't use the same slice to both drive a signal and read a signal, and all of thee require
 // drastically different frequencies.
 static_assert(!pwm_slices_overlap(),
-        "`config.hpp` specifies `PIN_FAN_PWM`, `PIN_FAN_TACHOMETER`, or `PIN_DISPLAY_BRIGHTNESS` on "
+        "Pin config specifies `PIN_FAN_PWM`, `PIN_FAN_TACHOMETER`, or `PIN_DISPLAY_BRIGHTNESS` on "
         " the same PWM slice. They must all be on separate slices.");
 // PWM slice can only read from B channel
 static_assert(pwm_gpio_to_channel_(PIN_FAN_TACHOMETER) == PWM_CHAN_B,
-        "`config.hpp` specifies `PIN_FAN_TACHOMETER` on a A channel pin instead of a B channel pin . "
+        "Pin config specifies `PIN_FAN_TACHOMETER` on a A channel pin instead of a B channel pin . "
         "Move `PIN_FAN_TACHOMETER` to an odd # pin to fix this.");
 
 static_assert(
         ranges::all_of(PINS_DISPLAY_SPI,
                 [](auto pin) { return spi_gpio_bus_num(PINS_DISPLAY_SPI[0]) == spi_gpio_bus_num(pin); }),
-        "`config.hpp`'s `PINS_DISPLAY_SPI` aren't all on the same bus");
+        "Pin config's `PINS_DISPLAY_SPI` aren't all on the same bus");
 static_assert(spi_has_at_least(PINS_DISPLAY_SPI, {SPI_Pin::CLOCK, SPI_Pin::SEND}),
-        "`config.hpp`'s `PINS_DISPLAY_SPI` doesn't specify at least a clock and send pin");
+        "Pin config's `PINS_DISPLAY_SPI` doesn't specify at least a clock and send pin");
 }  // namespace
 
 }  // namespace nevermore

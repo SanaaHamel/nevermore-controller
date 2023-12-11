@@ -1,0 +1,36 @@
+buildType:
+  default: debug
+  choices:
+    debug:
+      short: Debug
+      long: Emit debug information
+      buildType: Debug
+    release:
+      short: Release
+      long: Optimize generated code w/ debug information
+      buildType: RelWithDebInfo
+
+board:
+  default: pico_w
+  choices:
+    pico_w:
+      short: Pico W
+      long: Classic Pico W
+      settings:
+        PICO_BOARD: pico_w
+        NEVERMORE_PICO_W_BT: "true"
+        NEVERMORE_CONFIG: config/pins/pico_w.hpp
+    pico_w_custom:
+      short: Pico W (Custom Pins)
+      long: Classic Pico W w/ custom pin assignments
+      settings:
+        PICO_BOARD: pico_w
+        NEVERMORE_PICO_W_BT: "true"
+        NEVERMORE_CONFIG: config/pins/custom.hpp
+    waveshare-touch-lcd-1.28:
+      short: Waveshare Touch LCD-1.28
+      long: Waveshare Touch LCD-1.28 (w/o wireless)
+      settings:
+        PICO_BOARD: bare
+        NEVERMORE_PICO_W_BT: "false"
+        NEVERMORE_CONFIG: config/pins/waveshare-touch-lcd-1.28.hpp

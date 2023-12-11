@@ -43,7 +43,6 @@ set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_EXTENSIONS OFF) # -std=c++ instead of -std=gnu++
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-set(PICO_BOARD pico_w)
 set(PICO_CXX_ENABLE_EXCEPTIONS 1)
 pico_sdk_init()
 
@@ -91,6 +90,8 @@ add_compile_definitions(WANT_HCI_DUMP=1)
 add_compile_definitions(PICO_USE_MALLOC_MUTEX=1)
 add_compile_definitions(CYW43_LWIP=0)
 add_compile_definitions(CYW43_HOST_NAME="Nevermore")
+add_compile_definitions(NEVERMORE_CONFIG="${NEVERMORE_CONFIG}")
+add_compile_definitions(NEVERMORE_PICO_W_BT=${NEVERMORE_PICO_W_BT})
 
 # UGLY: Also defines the value of `nevermore::Priority::Communication`.
 # We want a priority above almost anything else.

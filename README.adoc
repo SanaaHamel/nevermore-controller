@@ -286,8 +286,10 @@ For now you can:
 
 == Controller Customisation
 
-`src/config.hpp` contains all user-customisable options.
+`src/config.hpp` and `src/config/pins/custom.hpp` contains all user-customisable options.
 These options are, for the most part, validated at compile time to prevent mistakes.
+
+For customised pin assignments, build the `Pico W (Custom Pins)` variant, and modify `src/config/pins/custom.hpp` to suit your setup.
 
 
 === Pin Assignments
@@ -298,8 +300,8 @@ WARNING: GPIO 0 and 1 are currently hardcoded for UART. They cannot be used in a
 
 WARNING: The default assignments are tentative and will probably change after we get some feedback as to which layouts work best in practice.
 
-[#default-pin-table]
-.Default Pin Assignments
+[#default-pin-table-pico-w]
+.Default Pin Assignments - Pico W
 [%autowidth]
 |===
 |GPIO | Function
@@ -320,6 +322,18 @@ WARNING: The default assignments are tentative and will probably change after we
 |19 | Exhaust - I2C SCL
 |20 | Intake - I2C SDA
 |21 | Intake - I2C SCL
+|===
+
+[#default-pin-table-waveshare-touch-lcd-1.28]
+.Default Pin Assignments - Waveshare Touch LCD 1.28"
+[%autowidth]
+|===
+|GPIO | Function
+|16   | Intake - I2C SDA
+|17   | Intake - I2C SCL
+|26   | NeoPixel - Data
+|27   | Fan - Tachometer
+|28   | Fan - PWM
 |===
 
 

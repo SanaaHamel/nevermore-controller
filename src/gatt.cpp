@@ -130,29 +130,33 @@ btstack_packet_callback_registration_t g_hci_handler{.callback = &hci_handler};
 }  // namespace
 
 bool init() {
+    if constexpr (NEVERMORE_PICO_W_BT) {
 #ifndef ENABLE_LOG_DEBUG
-    hci_dump_enable_packet_log(false);  // don't spam out packet logs unless we're low level debugging
+        hci_dump_enable_packet_log(false);  // don't spam out packet logs unless we're low level debugging
 #endif
 
-    l2cap_init();
-    sm_init();  // FUTURE WORK: do we even need a security manager? can we ditch this?
+        l2cap_init();
+        sm_init();  // FUTURE WORK: do we even need a security manager? can we ditch this?
+    }
 
     if (!display::init()) return false;
     if (!environmental::init()) return false;
     if (!fan::init()) return false;
     if (!ws2812::init()) return false;
 
-    hci_add_event_handler(&g_hci_handler);
+    if constexpr (NEVERMORE_PICO_W_BT) {
+        hci_add_event_handler(&g_hci_handler);
 
-    att_server_init(profile_data, attr_read, attr_write);
-    att_server_register_packet_handler(hci_handler);
+        att_server_init(profile_data, attr_read, attr_write);
+        att_server_register_packet_handler(hci_handler);
 
-    gap_set_max_number_peripheral_connections(MAX_NR_HCI_CONNECTIONS);
+        gap_set_max_number_peripheral_connections(MAX_NR_HCI_CONNECTIONS);
 
-    // turn on bluetooth
-    if (auto err = hci_power_control(HCI_POWER_ON)) {
-        printf("hci_power_control failed = 0x%08x\n", err);
-        return false;
+        // turn on bluetooth
+        if (auto err = hci_power_control(HCI_POWER_ON)) {
+            printf("hci_power_control failed = 0x%08x\n", err);
+            return false;
+        }
     }
 
     return true;
