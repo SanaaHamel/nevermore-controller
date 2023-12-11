@@ -76,8 +76,8 @@ constexpr uint8_t spi_has_at_least(span<GPIO_Pin const> pins, initializer_list<S
 
 constexpr bool pwm_slices_overlap() {
     array xs{PIN_FAN_PWM, PIN_FAN_TACHOMETER, PIN_DISPLAY_BRIGHTNESS};
-    ranges::sort(xs, {}, pwm_gpio_to_slice_num_);
-    auto [last, end] = ranges::unique(xs);
+    ranges::sort(xs);
+    auto [last, end] = ranges::unique(xs, {}, pwm_gpio_to_slice_num_);
     return last != end;
 }
 
