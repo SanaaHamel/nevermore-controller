@@ -92,6 +92,8 @@ static_assert(i2c_bus_pins_defined(0) & 0b01, "`config.hpp` has no pins defined 
 static_assert(i2c_bus_pins_defined(0) & 0b10, "`config.hpp` has no pins defined for I2C0 SCL.");
 static_assert(i2c_bus_pins_defined(1) & 0b01, "`config.hpp` has no pins defined for I2C1 SDA.");
 static_assert(i2c_bus_pins_defined(1) & 0b10, "`config.hpp` has no pins defined for I2C1 SCL.");
+static_assert(size(PINS_I2C) <= 4,
+        "`config.hpp` specifies too many I2C pins. An I2C bus cannot be mapped to multiple pin pairs.");
 
 // can't use the same slice to both drive a signal and read a signal, and all of thee require
 // drastically different frequencies.
