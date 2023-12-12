@@ -47,8 +47,8 @@ inline bool i2c_write(char const* name, i2c_inst_t& i2c, uint8_t addr, uint8_t c
     auto _ = i2c_guard(i2c);
     int r = i2c_write_timeout_us(&i2c, addr, value, len, nostop, I2C_TIMEOUT_US);
     if (r < 0 || size_t(r) != len) {
-        printf("ERR - I2C%d - %s write failed; device=0x%02x len=%d result=%d\n", i2c_hw_index(&i2c), name,
-                addr, len, r);
+        printf("ERR - %s [I2C%d 0x%02x] - write failed; len=%d result=%d\n", name, i2c_hw_index(&i2c), addr,
+                len, r);
         return false;
     }
 
@@ -60,8 +60,8 @@ inline bool i2c_read(
     auto _ = i2c_guard(i2c);
     int r = i2c_read_timeout_us(&i2c, addr, dest, len, nostop, I2C_TIMEOUT_US);
     if (r < 0 || size_t(r) != len) {
-        printf("ERR - I2C%d - %s read failed; device=0x%02x len=%d result=%d\n", i2c_hw_index(&i2c), name,
-                addr, len, r);
+        printf("ERR - %s [I2C%d 0x%02x] - read failed; len=%d result=%d\n", name, i2c_hw_index(&i2c), addr,
+                len, r);
         return false;
     }
 
@@ -101,8 +101,8 @@ std::optional<PackedTuple<A...>> i2c_read_blocking_crc(
 
     if (!response.verify()) {
         // really should show up in a log if they've noise in their wiring
-        printf("ERR - I2C%d - %s read failed CRC; device=0x%02x crc-reported=0x%02x crc-computed=0x%02x\n",
-                i2c_hw_index(&i2c), name, addr, response.crc, response.data_crc());
+        printf("ERR - %s [I2C%d 0x%02x] - read failed CRC; crc-reported=0x%02x crc-computed=0x%02x\n", name,
+                i2c_hw_index(&i2c), addr, response.crc, response.data_crc());
         return {};
     }
 
