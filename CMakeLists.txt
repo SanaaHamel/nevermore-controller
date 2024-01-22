@@ -161,6 +161,7 @@ if(CMAKE_BUILD_TYPE STREQUAL "Debug")
 endif()
 
 pico_btstack_make_gatt_header(nevermore-controller PRIVATE ${SRC_DIR}/nevermore.gatt)
+pico_generate_pio_header(nevermore-controller ${SRC_DIR}/lib/pio_i2c.pio)
 pico_generate_pio_header(nevermore-controller ${SRC_DIR}/ws2812.pio)
 
 add_executable(nevermore-controller-no-bootloader)

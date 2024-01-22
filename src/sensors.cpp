@@ -1,7 +1,9 @@
 #include "sensors.hpp"
 #include "hardware/adc.h"
+#include "hardware/pio.h"
 #include "sdk/ble_data_types.hpp"
 #include "sdk/i2c_hw.hpp"
+#include "sdk/i2c_pio.hpp"
 #include "sensors/ahtxx.hpp"
 #include "sensors/async_sensor.hpp"
 #include "sensors/bme280.hpp"
@@ -118,10 +120,19 @@ bool init() {
     // Explicitly reset b/c we may be restarting the program w/o power cycling the device.
     CST816S::reset_all();
 
+#if 1
     pair<I2C_Bus&, EnvironmentalFilter::Kind> buses[] = {
             {i2c[0], EnvironmentalFilter::Kind::Intake},
             {i2c[1], EnvironmentalFilter::Kind::Exhaust},
     };
+#else
+    static I2C_PIO dummy0{pio0, 20, 21};
+    // static I2C_PIO dummy1{pio1, 18, 19};
+    pair<I2C_Bus&, EnvironmentalFilter::Kind> buses[] = {
+            {dummy0, EnvironmentalFilter::Kind::Intake},
+            // {dummy1, EnvironmentalFilter::Kind::Exhaust},
+    };
+#endif
 
     printf("Waiting %u ms for sensor init\n", unsigned(SENSOR_POWER_ON_DELAY / 1ms));
     task_delay(SENSOR_POWER_ON_DELAY);
