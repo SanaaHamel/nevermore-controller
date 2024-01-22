@@ -233,7 +233,7 @@ struct SGP30Sensor final : SensorPeriodicEnvI2C<Reg, "SGP30", 0xFF> {
 
 }  // namespace
 
-unique_ptr<SensorPeriodic> sgp30(i2c_inst_t& bus, EnvironmentalFilter side) {
+unique_ptr<SensorPeriodic> sgp30(I2C_Bus& bus, EnvironmentalFilter side) {
     for (auto address : ADDRESSES)
         if (auto p = make_unique<SGP30Sensor>(bus, address, side); p->setup()) return p;
 

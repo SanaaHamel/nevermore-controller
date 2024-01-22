@@ -2,17 +2,20 @@
 
 #include "async_sensor.hpp"
 #include "environmental.hpp"
-#include "hardware/i2c.h"
-#include <chrono>
 #include <memory>
 
-namespace nevermore::sensors {
+namespace nevermore {
+
+struct I2C_Bus;
+
+namespace sensors {
 
 using namespace std::literals::chrono_literals;
 
 // really slow to start up
 constexpr auto HTU21D_POWER_ON_DELAY = 15ms;
 
-std::unique_ptr<SensorPeriodic> htu2xd(i2c_inst_t&, EnvironmentalFilter);
+std::unique_ptr<SensorPeriodic> htu2xd(I2C_Bus&, EnvironmentalFilter);
 
-}  // namespace nevermore::sensors
+}  // namespace sensors
+}  // namespace nevermore

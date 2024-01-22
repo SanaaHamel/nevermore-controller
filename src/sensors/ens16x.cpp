@@ -344,7 +344,7 @@ struct ENS16xSensor final : SensorPeriodicEnvI2C<Reg, "ENS16x"> {
 
 }  // namespace
 
-unique_ptr<SensorPeriodic> ens16x(i2c_inst_t& bus, EnvironmentalFilter side) {
+unique_ptr<SensorPeriodic> ens16x(I2C_Bus& bus, EnvironmentalFilter side) {
     for (auto address : ADDRESSES)
         if (auto p = make_unique<ENS16xSensor>(bus, address, side); p->setup()) return p;
 

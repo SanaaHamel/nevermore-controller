@@ -1,12 +1,15 @@
 #pragma once
 
 #include "async_sensor.hpp"
-#include "hardware/i2c.h"
 #include <chrono>
 #include <cstdint>
 #include <memory>
 
-namespace nevermore::sensors {
+namespace nevermore {
+
+struct I2C_Bus;
+
+namespace sensors {
 
 // Driver for the CST816S capacitive touch sensor.
 // There doesn't seem to be an official SDK for this device, so this was cobbled
@@ -14,7 +17,7 @@ namespace nevermore::sensors {
 
 struct CST816S final : SensorPeriodic {
     struct ISR;
-    static std::unique_ptr<CST816S> mk(i2c_inst_t&);
+    static std::unique_ptr<CST816S> mk(I2C_Bus&);
 
     // Pulse the reset pin. (This device is somewhat finicky.)
     static void reset_all();
@@ -63,9 +66,10 @@ protected:
     void read() override;
 
 private:
-    i2c_inst_t* bus;
+    I2C_Bus* bus;
 
-    CST816S(i2c_inst_t&);
+    CST816S(I2C_Bus&);
 };
 
-}  // namespace nevermore::sensors
+}  // namespace sensors
+}  // namespace nevermore

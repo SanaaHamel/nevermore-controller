@@ -41,27 +41,28 @@ enum class Cmd : uint16_t {
     SGP4x_SERIAL_NUMBER = std::byteswap(0x3682_u16),  // only available when in idle mode
 };
 
-bool sgp4x_heater_off(i2c_inst_t& bus) {
-    return i2c_write("SGP40", bus, SGP40_ADDRESS, Cmd::SGP4x_HEATER_OFF);
+bool sgp4x_heater_off(I2C_Bus& bus) {
+    return bus.write("SGP40", SGP40_ADDRESS, Cmd::SGP4x_HEATER_OFF);
 }
 
 // returns true IIF self-test passed. any error (I2C or self-test) -> false
-bool sgp40_self_test(i2c_inst_t& bus) {
-    if (!i2c_write("SGP40", bus, SGP40_ADDRESS, Cmd::SGP40_SELF_TEST)) return false;
+bool sgp40_self_test(I2C_Bus& bus) {
+    if (!bus.write("SGP40", SGP40_ADDRESS, Cmd::SGP40_SELF_TEST)) return false;
 
     task_delay(320ms);  // spec says max delay of 320ms
 
-    auto response = i2c_read_blocking_crc<0xFF, uint16_t>("SGP40", bus, SGP40_ADDRESS);
+    auto response = bus.read_crc<0xFF, uint16_t>("SGP40", SGP40_ADDRESS);
     if (!response) return false;
 
-    auto code = byteswap(get<0>(*response));
+    auto code = byteswap(*response);
     switch (code) {
     case 0xD400: return true;   // tests passed
     case 0x4B00: return false;  // tests failed
+    default: {
+        bus.log_warn("SGP40", SGP40_ADDRESS, "unexpected response code from self-test: 0x%02x", int(code));
+        return false;
     }
-
-    printf("WARN - SGP40 - unexpected response code from self-test: 0x%02x\n", int(code));
-    return false;
+    }
 }
 
 constexpr uint16_t to_tick(double n, double min, double max) {
@@ -70,32 +71,31 @@ constexpr uint16_t to_tick(double n, double min, double max) {
 static_assert(to_tick(50, 0, 100) == 0x8000 - 1, "humidity check");  // -1 b/c of truncation
 static_assert(to_tick(25, -45, 130) == 0x6666, "temperature check");
 
-bool sgp40_measure_issue(i2c_inst_t& bus, double temperature, double humidity) {
+bool sgp40_measure_issue(I2C_Bus& bus, double temperature, double humidity) {
     uint16_t temperature_tick = byteswap(to_tick(temperature, -45, 130));
     uint16_t humidity_tick = byteswap(to_tick(humidity, 0, 100));
     PackedTuple cmd{Cmd::SGP40_MEASURE, humidity_tick, crc8(humidity_tick, 0xFF), temperature_tick,
             crc8(temperature_tick, 0xFF)};
-    return i2c_write("SGP40", bus, SGP40_ADDRESS, cmd);
+    return bus.write("SGP40", SGP40_ADDRESS, cmd);
 }
 
-optional<uint16_t> sgp40_measure_read(i2c_inst_t& bus) {
-    auto response = i2c_read_blocking_crc<0xFF, uint16_t>("SGP40", bus, SGP40_ADDRESS);
+optional<uint16_t> sgp40_measure_read(I2C_Bus& bus) {
+    auto response = bus.read_crc<0xFF, uint16_t>("SGP40", SGP40_ADDRESS);
     if (!response) return false;
 
-    auto&& [voc_raw] = *response;
-    return byteswap(voc_raw);
+    return byteswap(*response);
 }
 
-bool sgp40_exists(i2c_inst_t& bus) {
+bool sgp40_exists(I2C_Bus& bus) {
     return sgp4x_heater_off(bus);  // FUTURE WORK: better way of doing this?
 }
 
 struct SGP40 final : SensorPeriodic {
-    i2c_inst_t& bus;  // NOLINT(cppcoreguidelines-avoid-const-or-ref-data-members)
+    I2C_Bus& bus;  // NOLINT(cppcoreguidelines-avoid-const-or-ref-data-members)
     GasIndexAlgorithmParams gas_index_algorithm{};
     EnvironmentalFilter side;
 
-    SGP40(i2c_inst_t& bus, EnvironmentalFilter side) : bus(bus), side(side) {
+    SGP40(I2C_Bus& bus, EnvironmentalFilter side) : bus(bus), side(side) {
         GasIndexAlgorithm_init(&gas_index_algorithm, GasIndexAlgorithm_ALGORITHM_TYPE_VOC);
     }
 
@@ -125,10 +125,10 @@ struct SGP40 final : SensorPeriodic {
 
 }  // namespace
 
-unique_ptr<SensorPeriodic> sgp40(i2c_inst_t& bus, EnvironmentalFilter side) {
+unique_ptr<SensorPeriodic> sgp40(I2C_Bus& bus, EnvironmentalFilter side) {
     if (!sgp40_exists(bus)) return {};  // nothing found
     if (!sgp40_self_test(bus)) {
-        printf("ERR - SGP40 - failed self-test\n");
+        bus.log_error("SGP40", SGP40_ADDRESS, "failed self-test");
         return {};
     }
 

@@ -118,7 +118,7 @@ struct AHTxxSensor final : SensorPeriodicEnvI2C<Reg, "AHTxx"> {
 
 }  // namespace
 
-unique_ptr<SensorPeriodic> ahtxx(i2c_inst_t& bus, EnvironmentalFilter side) {
+unique_ptr<SensorPeriodic> ahtxx(I2C_Bus& bus, EnvironmentalFilter side) {
     for (auto address : ADDRESSES)
         if (auto p = make_unique<AHTxxSensor>(bus, address, side); p->setup()) return p;
 

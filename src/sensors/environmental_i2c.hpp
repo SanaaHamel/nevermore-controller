@@ -1,6 +1,7 @@
 #pragma once
 
 #include "async_sensor.hpp"
+#include "sdk/i2c.hpp"
 #include "sensors/environmental.hpp"
 #include "utility/i2c_device.hpp"
 
@@ -28,7 +29,7 @@ struct SensorPeriodicEnvI2C : SensorPeriodic {
     I2CDevice i2c;
     EnvironmentalFilter side;
 
-    SensorPeriodicEnvI2C(i2c_inst_t& bus, uint8_t address, EnvironmentalFilter side)
+    SensorPeriodicEnvI2C(I2C_Bus& bus, uint8_t address, EnvironmentalFilter side)
             : i2c{bus, address}, side(side) {}
 
     [[nodiscard]] char const* name() const final {

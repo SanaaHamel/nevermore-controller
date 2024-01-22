@@ -2,7 +2,6 @@
 #include "FreeRTOS.h"  // IWYU pragma: keep
 #include "config.hpp"
 #include "hardware/gpio.h"
-#include "hardware/i2c.h"
 #include "lvgl.h"  // IWYU pragma: keep
 #include "sdk/i2c.hpp"
 #include "timers.h"  // IWYU pragma: keep [xTimerPend....]
@@ -92,21 +91,21 @@ enum class Cmd : uint8_t {
 }
 
 template <typename A = uint8_t>
-optional<A> reg_read(i2c_inst_t& bus, Cmd const cmd, bool nostop = false) {
-    if (!i2c_write("CST816S", bus, ADDRESS, cmd)) return {};
-    return i2c_read<A>("CST816S", bus, ADDRESS);
+optional<A> reg_read(I2C_Bus& bus, Cmd const cmd, bool nostop = false) {
+    if (!bus.write("CST816S", ADDRESS, cmd)) return {};
+    return bus.read<A>("CST816S", ADDRESS);
 }
 
-bool reg_write(i2c_inst_t& bus, Cmd const cmd, uint8_t value) {
+bool reg_write(I2C_Bus& bus, Cmd const cmd, uint8_t value) {
     uint8_t data[]{uint8_t(cmd), value};
-    return i2c_write("CST816S", bus, ADDRESS, data);
+    return bus.write("CST816S", ADDRESS, data);
 }
 
-optional<uint8_t> reg_write(i2c_inst_t& bus, Cmd const cmd, uint8_t value, uint8_t mask) {
+optional<uint8_t> reg_write(I2C_Bus& bus, Cmd const cmd, uint8_t value, uint8_t mask) {
     if (mask != 0xFF) {
         auto r = reg_read(bus, cmd, true);
         if (!r) {
-            printf("failed to read current\n");
+            bus.log_error("CST816S", ADDRESS, "failed to read current");
             return {};
         }
 
@@ -114,7 +113,7 @@ optional<uint8_t> reg_write(i2c_inst_t& bus, Cmd const cmd, uint8_t value, uint8
     }
 
     if (!reg_write(bus, cmd, value)) {
-        printf("failed to write current\n");
+        bus.log_error("CST816S", ADDRESS, "failed to write current");
         return {};
     }
 
@@ -219,7 +218,7 @@ void CST816S::reset_all() {
     task_delay(50ms);
 }
 
-CST816S::CST816S(i2c_inst_t& bus) : bus(&bus) {
+CST816S::CST816S(I2C_Bus& bus) : bus(&bus) {
     if (auto [_, it] = ISR::first([](auto& x) { return x.driver.user_data == nullptr; }); it) {
         assert(!it->device);
         it->driver.user_data = this;
@@ -252,7 +251,7 @@ void CST816S::read() {
 
     auto read = reg_read<Batch>(*bus, Cmd::XPOS_H);
     if (!read) {
-        printf("ERR - CST816S - failed to read state\n");
+        bus->log_error("CST816S", ADDRESS, "failed to read state");
         return;
     }
 
@@ -262,22 +261,22 @@ void CST816S::read() {
     // state.gesture = Gesture(read->gesture);
 }
 
-unique_ptr<CST816S> CST816S::mk(i2c_inst_t& bus) {
+unique_ptr<CST816S> CST816S::mk(I2C_Bus& bus) {
     auto id = reg_read(bus, Cmd::CHIP_ID);
     if (!id) return {};  // nothing on the bus or error
 
     if (!contains(KNOWN_CHIP_IDS, *id)) {
-        printf("ERR - CST816S - unrecognised chip ID 0x%02x\n", *id);
+        bus.log_error("CST816S", ADDRESS, "unrecognised chip ID 0x%02x", *id);
         return {};
     }
 
     if (auto rev = reg_read(bus, Cmd::FIRMWARE_VERSION))
-        printf("CST816S - revision %u\n", *rev);
+        bus.log("CST816S", ADDRESS, "revision %u", *rev);
     else
-        printf("WARN - CST816S - failed to read FW revision\n");
+        bus.log_warn("CST816S", ADDRESS, "failed to read FW revision");
 
     if (!reg_write(bus, Cmd::IRQ_CTL, IRQ::EN_TOUCH | IRQ::EN_CHANGE, IRQ::EN_TOUCH | IRQ::EN_CHANGE)) {
-        printf("ERR - CST816S - failed to change IRQ mode\n");
+        bus.log_error("CST816S", ADDRESS, "failed to change IRQ mode");
         return {};
     }
 

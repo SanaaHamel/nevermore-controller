@@ -6,7 +6,7 @@
 #include "utility/template_string_literal.hpp"
 #include <cstdarg>
 #include <cstdint>
-#include <cstdio>
+#include <cstring>
 #include <optional>
 #include <type_traits>
 #include <utility>
@@ -21,33 +21,44 @@ struct I2CDevice {
         return crc8(std::forward<A>(x), CRC_Init);
     }
 
-    i2c_inst_t& bus;  // NOLINT(cppcoreguidelines-avoid-const-or-ref-data-members)
+    I2C_Bus& bus;  // NOLINT(cppcoreguidelines-avoid-const-or-ref-data-members)
     uint8_t address;
 
+    [[nodiscard]] bool write(uint8_t reg, uint8_t const* data, size_t len) const {
+        uint8_t cmd[len + 1];
+        cmd[0] = reg;
+        memcpy(cmd + 1, data, len);  // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+        return bus.write(name, address, cmd, sizeof(cmd));
+    }
+
     template <typename A>
-    bool write(Register reg, A value) const {
+    [[nodiscard]] bool write(Register reg, A value) const {
         uint8_t cmd[sizeof(reg) + sizeof(value)];
         memcpy(cmd, &reg, sizeof(reg));
         memcpy(cmd + sizeof(reg), &value, sizeof(value));
-        return i2c_write(name, bus, address, cmd);
+        return bus.write(name, address, cmd);
     }
 
-    bool touch(Register reg) const {
-        return i2c_write(name, bus, address, reg);
+    [[nodiscard]] bool touch(Register reg) const {
+        return bus.write(name, address, reg);
+    }
+
+    [[nodiscard]] bool read(uint8_t reg, uint8_t* dest, size_t len) const {
+        return bus.read(name, address, dest, len);
     }
 
     template <typename A>
     std::optional<A> read() const {
         A value;
-        if (!i2c_read(name, bus, address, value)) return {};
+        if (!bus.read(name, address, value)) return {};
         return value;
     }
 
     template <typename A>
     std::optional<A> read_crc() const {
-        auto result = i2c_read_blocking_crc<CRC_Init, A>(name, bus, address);
+        auto result = bus.read_crc<CRC_Init, A>(name, address);
         if (!result) return {};
-        return get<0>(*result);
+        return *result;
     }
 
     template <typename A>
@@ -78,22 +89,20 @@ struct I2CDevice {
         return read_crc<A>();
     }
 
-#define DEFINE_I2C_DEVICE_LOGGER(fn_name, prefix)                                               \
-    void fn_name(const char* format, ...) const __attribute__((__format__(__printf__, 2, 3))) { \
-        /* HACK: race-y, but whatever, stdio is race-y... */                                    \
-        printf(prefix "%s [I2C%d 0x%02x] - ", (char const*)name, i2c_hw_index(&bus), address);  \
-        va_list arglist;                                                                        \
-        va_start(arglist, format);                                                              \
-        vprintf(format, arglist);                                                               \
-        va_end(arglist);                                                                        \
-        puts(""); /* `puts` implicitly emits a newline after argument */                        \
+#define DEFINE_I2C_DEVICE_LOG(fn_name)            \
+    [[gnu::format(printf, 2, 3)]]                 \
+    void fn_name(const char* format, ...) const { \
+        va_list xs;                               \
+        va_start(xs, format);                     \
+        bus.fn_name(name, address, format, xs);   \
+        va_end(xs);                               \
     }
 
-    DEFINE_I2C_DEVICE_LOGGER(log, "")
-    DEFINE_I2C_DEVICE_LOGGER(log_warn, "WARN - ")
-    DEFINE_I2C_DEVICE_LOGGER(log_error, "INFO - ")
+    DEFINE_I2C_DEVICE_LOG(log)
+    DEFINE_I2C_DEVICE_LOG(log_warn)
+    DEFINE_I2C_DEVICE_LOG(log_error)
 
-#undef DEFINE_I2C_DEVICE_LOGGER
+#undef DEFINE_I2C_DEVICE_LOG
 };
 
 }  // namespace nevermore

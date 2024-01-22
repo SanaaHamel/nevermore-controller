@@ -1,7 +1,7 @@
 #include "sensors.hpp"
 #include "hardware/adc.h"
-#include "hardware/i2c.h"
 #include "sdk/ble_data_types.hpp"
+#include "sdk/i2c_hw.hpp"
 #include "sensors/ahtxx.hpp"
 #include "sensors/async_sensor.hpp"
 #include "sensors/bme280.hpp"
@@ -13,7 +13,6 @@
 #include "sensors/sgp30.hpp"
 #include "sensors/sgp40.hpp"
 #include <algorithm>
-#include <array>
 #include <cstdio>
 #include <vector>
 
@@ -40,8 +39,7 @@ constexpr auto SENSOR_POWER_ON_DELAY = max({
 
 using VecSensors = vector<unique_ptr<Sensor>>;
 
-VecSensors g_sensors_intake;
-VecSensors g_sensors_exhaust;
+VecSensors g_sensor_devices;
 
 struct McuTemperature final : SensorPeriodic {
     [[nodiscard]] char const* name() const override {
@@ -70,7 +68,9 @@ private:
     }
 } g_mcu_temperature_sensor;
 
-VecSensors sensors_init_bus(i2c_inst_t& bus, EnvironmentalFilter state) {
+VecSensors sensors_init_bus(I2C_Bus& bus, EnvironmentalFilter state) {
+    printf("%s - initializing sensors...\n", bus.name());
+
     VecSensors sensors;
     auto probe_for = [&](auto p) {
         if (!p) return;
@@ -118,14 +118,21 @@ bool init() {
     // Explicitly reset b/c we may be restarting the program w/o power cycling the device.
     CST816S::reset_all();
 
+    pair<I2C_Bus&, EnvironmentalFilter::Kind> buses[] = {
+            {i2c[0], EnvironmentalFilter::Kind::Intake},
+            {i2c[1], EnvironmentalFilter::Kind::Exhaust},
+    };
+
     printf("Waiting %u ms for sensor init\n", unsigned(SENSOR_POWER_ON_DELAY / 1ms));
     task_delay(SENSOR_POWER_ON_DELAY);
 
-    printf("I2C0 - initializing sensors...\n");
-    g_sensors_intake = sensors_init_bus(*i2c0, {EnvironmentalFilter::Kind::Intake});
-
-    printf("I2C1 - initializing sensors...\n");
-    g_sensors_exhaust = sensors_init_bus(*i2c1, {EnvironmentalFilter::Kind::Exhaust});
+    for (auto&& [bus, kind] : buses) {
+        auto xs = sensors_init_bus(bus, {kind});
+        std::move(begin(xs), end(xs), back_inserter(g_sensor_devices));
+    }
+    // honestly if we low on space or are getting fragmentation issues we might
+    // as well just reserve a `sizeof(P*) * 32` block and call it a day.
+    g_sensor_devices.shrink_to_fit();
 
     // wait again b/c probing might be implemented by sending a reset command to the sensor
     task_delay(SENSOR_POWER_ON_DELAY);

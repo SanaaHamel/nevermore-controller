@@ -110,9 +110,6 @@ void pins_i2c_reset() {
 }  // namespace
 
 int main() {
-    for (auto& lock : g_i2c_locks)
-        lock = xSemaphoreCreateMutex();
-
     stdio_init_all();
     adc_init();
 

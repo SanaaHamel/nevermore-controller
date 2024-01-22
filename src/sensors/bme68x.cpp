@@ -1,11 +1,10 @@
-#include "lib/bme68x.h"
 #include "bme68x.hpp"
-#include "lib/bme68x_defs.h"
+#include "lib/bme68x.h"
 #include "sdk/ble_data_types.hpp"
+#include "sdk/i2c.hpp"
 #include "sensors/environmental_i2c.hpp"
 #include <chrono>
 #include <cstdint>
-#include <utility>
 
 using namespace std;
 
@@ -102,10 +101,7 @@ struct BME68x final : SensorPeriodicEnvI2C<Reg, "BME68x"> {
 
     static BME68X_INTF_RET_TYPE i2c_read_(uint8_t reg_addr, uint8_t* reg_data, uint32_t len, void* intf_ptr) {
         auto* self = reinterpret_cast<BME68x*>(intf_ptr);
-        if (!i2c_write(self->name(), self->i2c.bus, self->i2c.address, reg_addr)) return BME68X_E_COM_FAIL;
-        if (!i2c_read(self->name(), self->i2c.bus, self->i2c.address, reg_data, len))
-            return BME68X_E_COM_FAIL;
-
+        if (!self->i2c.read(reg_addr, reg_data, len)) return BME68X_E_COM_FAIL;
         return BME68X_OK;
     }
 
@@ -114,20 +110,14 @@ struct BME68x final : SensorPeriodicEnvI2C<Reg, "BME68x"> {
         static_assert(BME68X_LEN_INTERLEAVE_BUFF <= 32);
         assert(len <= BME68X_LEN_INTERLEAVE_BUFF);  // keep things reasonable
         auto* self = reinterpret_cast<BME68x*>(intf_ptr);
-
-        uint8_t buf[len + 1];
-        buf[0] = reg_addr;
-        memcpy(buf + 1, reg_data, len);  // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
-        if (!i2c_write(self->name(), self->i2c.bus, self->i2c.address, buf, sizeof(buf)))
-            return BME68X_E_COM_FAIL;
-
+        if (!self->i2c.write(reg_addr, reg_data, len)) return BME68X_E_COM_FAIL;
         return BME68X_OK;
     }
 };
 
 }  // namespace
 
-unique_ptr<SensorPeriodic> bme68x(i2c_inst_t& bus, EnvironmentalFilter side) {
+unique_ptr<SensorPeriodic> bme68x(I2C_Bus& bus, EnvironmentalFilter side) {
     for (auto address : ADDRESSES)
         if (auto p = make_unique<BME68x>(bus, address, side); p->setup()) return p;
 

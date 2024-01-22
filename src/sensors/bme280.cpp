@@ -1,10 +1,10 @@
 #include "bme280.hpp"
 #include "lib/bme280.h"
 #include "sdk/ble_data_types.hpp"
+#include "sdk/i2c.hpp"
 #include "sensors/environmental_i2c.hpp"
 #include <chrono>
 #include <cstdint>
-#include <utility>
 
 using namespace std;
 
@@ -88,9 +88,7 @@ struct BME280 final : SensorPeriodicEnvI2C<Reg, "BME280"> {
 
     static BME280_INTF_RET_TYPE i2c_read_(uint8_t reg_addr, uint8_t* reg_data, uint32_t len, void* intf_ptr) {
         auto* self = reinterpret_cast<BME280*>(intf_ptr);
-        if (!i2c_write(self->name(), self->i2c.bus, self->i2c.address, reg_addr)) return BME280_E_COMM_FAIL;
-        if (!i2c_read(self->name(), self->i2c.bus, self->i2c.address, reg_data, len))
-            return BME280_E_COMM_FAIL;
+        if (!self->i2c.read(reg_addr, reg_data, len)) return BME280_E_COMM_FAIL;
 
         return BME280_OK;
     }
@@ -100,12 +98,7 @@ struct BME280 final : SensorPeriodicEnvI2C<Reg, "BME280"> {
         static_assert(BME280_MAX_LEN * 2 <= 32);
         assert(len <= BME280_MAX_LEN * 2);  // keep things reasonable
         auto* self = reinterpret_cast<BME280*>(intf_ptr);
-
-        uint8_t buf[len + 1];
-        buf[0] = reg_addr;
-        memcpy(buf + 1, reg_data, len);  // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
-        if (!i2c_write(self->name(), self->i2c.bus, self->i2c.address, buf, sizeof(buf)))
-            return BME280_E_COMM_FAIL;
+        if (!self->i2c.write(reg_addr, reg_data, len)) return BME280_E_COMM_FAIL;
 
         return BME280_OK;
     }
@@ -113,7 +106,7 @@ struct BME280 final : SensorPeriodicEnvI2C<Reg, "BME280"> {
 
 }  // namespace
 
-unique_ptr<SensorPeriodic> bme280(i2c_inst_t& bus, EnvironmentalFilter side) {
+unique_ptr<SensorPeriodic> bme280(I2C_Bus& bus, EnvironmentalFilter side) {
     for (auto address : ADDRESSES)
         if (auto p = make_unique<BME280>(bus, address, side); p->setup()) return p;
 

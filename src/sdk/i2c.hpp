@@ -1,14 +1,16 @@
 #pragma once
 
-#include "FreeRTOS.h"
-#include "hardware/i2c.h"
-#include "semphr.h"  // IWYU pragma: keep [doesn't notice `SemaphoreHandle_t`]
+#include "FreeRTOS.h"  // IWYU pragma: keep
+#include "semphr.h"    // IWYU pragma: keep [doesn't notice `SemaphoreHandle_t`]
 #include "utility/crc.hpp"
-#include "utility/packed_tuple.hpp"
 #include "utility/scope_guard.hpp"
+#include <cassert>
+#include <climits>
+#include <cstdarg>
 #include <cstdio>
 #include <optional>
 #include <type_traits>
+#include <utility>
 
 // NB: These variants are lock guarded to prevent both cores from using the same bus.
 
@@ -26,14 +28,6 @@ constexpr I2C_Pin i2c_gpio_kind(uint8_t pin) {
     return I2C_Pin(pin % 2);
 }
 
-extern SemaphoreHandle_t g_i2c_locks[NUM_I2CS];
-
-inline auto i2c_guard(i2c_inst_t& i2c) {
-    auto& lock = g_i2c_locks[i2c_hw_index(&i2c)];  // NOLINT
-    xSemaphoreTake(lock, portMAX_DELAY);
-    return ScopeGuard{[&] { xSemaphoreGive(lock); }};
-}
-
 // I2C reserves some addresses for special purposes.
 // These are any addresses of the form: 000 0xxx, 111 1xxx
 constexpr bool i2c_address_reserved(uint8_t addr) {
@@ -42,71 +36,111 @@ constexpr bool i2c_address_reserved(uint8_t addr) {
     return masked == 0 || masked == MASK;
 }
 
-inline bool i2c_write(char const* name, i2c_inst_t& i2c, uint8_t addr, uint8_t const* value, size_t len,
-        bool nostop = false) {
-    auto _ = i2c_guard(i2c);
-    int r = i2c_write_timeout_us(&i2c, addr, value, len, nostop, I2C_TIMEOUT_US);
-    if (r < 0 || size_t(r) != len) {
-        printf("ERR - %s [I2C%d 0x%02x] - write failed; len=%d result=%d\n", name, i2c_hw_index(&i2c), addr,
-                len, r);
-        return false;
+struct I2C_Bus {  // NOLINT(cppcoreguidelines-special-member-functions)
+    I2C_Bus(SemaphoreHandle_t lock = xSemaphoreCreateMutex()) : lock(lock){};
+    I2C_Bus(I2C_Bus const&) = delete;
+    virtual ~I2C_Bus() {
+        vSemaphoreDelete(lock);
     }
 
-    return true;
-}
-
-inline bool i2c_read(
-        char const* name, i2c_inst_t& i2c, uint8_t addr, uint8_t* dest, size_t len, bool nostop = false) {
-    auto _ = i2c_guard(i2c);
-    int r = i2c_read_timeout_us(&i2c, addr, dest, len, nostop, I2C_TIMEOUT_US);
-    if (r < 0 || size_t(r) != len) {
-        printf("ERR - %s [I2C%d 0x%02x] - read failed; len=%d result=%d\n", name, i2c_hw_index(&i2c), addr,
-                len, r);
-        return false;
+    [[nodiscard]] auto guard() {  // NOLINT(readability-make-member-function-const)
+        xSemaphoreTake(lock, portMAX_DELAY);
+        return ScopeGuard{[&] { xSemaphoreGive(lock); }};
     }
 
-    return true;
-}
+    [[nodiscard]] bool write(char const* name, uint8_t addr, uint8_t const* src, size_t len) {
+        assert(len <= INT_MAX && "success unrepresentable");
+        auto _ = guard();
+        int r = write(addr, src, len);
+        if (r < 0 || size_t(r) != len) {
+            log_error(name, addr, "write failed; len=%d result=%d", len, r);
+            return false;
+        }
 
-template <typename A, bool report_error = true>
-bool i2c_write(char const* name, i2c_inst_t& i2c, uint8_t addr, A const& blob, bool nostop = false)
-    requires(!std::is_pointer_v<A>)
-{
-    return i2c_write(name, i2c, addr, reinterpret_cast<uint8_t const*>(&blob), sizeof(A), nostop);
-}
-
-template <typename A>
-bool i2c_read(char const* name, i2c_inst_t& i2c, uint8_t addr, A& blob, bool nostop = false)
-    requires(!std::is_pointer_v<A>)
-{
-    return i2c_read(name, i2c, addr, reinterpret_cast<uint8_t*>(&blob), sizeof(A), nostop);
-}
-
-template <typename A>
-std::optional<A> i2c_read(char const* name, i2c_inst_t& i2c, uint8_t addr, bool nostop = false)
-    requires(!std::is_pointer_v<A>)
-{
-    A result;
-    if (!i2c_read(name, i2c, addr, result, nostop)) return {};
-    return {std::move(result)};
-}
-
-template <CRC8_t CRC_INIT, typename... A>
-std::optional<PackedTuple<A...>> i2c_read_blocking_crc(
-        char const* name, i2c_inst_t& i2c, uint8_t addr, bool nostop = false) {
-    static_assert(sizeof(PackedTuple<A...>) == (sizeof(A) + ...));  // sancheck packing
-
-    ResponseCRC<PackedTuple<A...>, CRC_INIT> response;
-    if (!i2c_read(name, i2c, addr, response, nostop)) return {};
-
-    if (!response.verify()) {
-        // really should show up in a log if they've noise in their wiring
-        printf("ERR - %s [I2C%d 0x%02x] - read failed CRC; crc-reported=0x%02x crc-computed=0x%02x\n", name,
-                i2c_hw_index(&i2c), addr, response.crc, response.data_crc());
-        return {};
+        return true;
     }
 
-    return response.data;
-}
+    [[nodiscard]] bool read(char const* name, uint8_t addr, uint8_t* dst, size_t len) {
+        assert(len <= INT_MAX && "success unrepresentable");
+        auto _ = guard();
+        int r = read(addr, dst, len);
+        if (r < 0 || size_t(r) != len) {
+            log_error(name, addr, "read failed; len=%d result=%d", len, r);
+            return false;
+        }
+
+        return true;
+    }
+
+    template <typename A>
+    [[nodiscard]] bool write(char const* name, uint8_t addr, A const& blob)
+        requires(!std::is_pointer_v<A>)
+    {
+        return write(name, addr, reinterpret_cast<uint8_t const*>(&blob), sizeof(A));
+    }
+
+    template <typename A>
+    [[nodiscard]] bool read(char const* name, uint8_t addr, A& blob)
+        requires(!std::is_pointer_v<A>)
+    {
+        return read(name, addr, reinterpret_cast<uint8_t*>(&blob), sizeof(A));
+    }
+
+    template <typename A>
+    [[nodiscard]] std::optional<A> read(char const* name, uint8_t addr)
+        requires(!std::is_pointer_v<A>)
+    {
+        A result;
+        if (!read(name, addr, result)) return {};
+        return {std::move(result)};
+    }
+
+    template <CRC8_t CRC_INIT, typename A>
+    [[nodiscard]] std::optional<A> read_crc(char const* name, uint8_t addr) {
+        ResponseCRC<A, CRC_INIT> response;
+        if (!read(name, addr, response)) return {};
+
+        if (!response.verify()) {
+            // really should show up in a log if they've noise in their wiring
+            log_error(name, addr, "read failed CRC; crc-reported=0x%02x crc-computed=0x%02x", response.crc,
+                    response.data_crc());
+            return {};
+        }
+
+        // HACK: explicit copy to work around packed value ref issue
+        return A(response.data);
+    }
+
+#define DEFINE_I2C_LOG(fn_name, prefix)                                                  \
+    [[gnu::format(printf, 4, 5)]]                                                        \
+    void fn_name(char const* name, uint8_t addr, const char* format, ...) const {        \
+        va_list arglist;                                                                 \
+        va_start(arglist, format);                                                       \
+        fn_name(name, addr, format, arglist);                                            \
+        va_end(arglist);                                                                 \
+    }                                                                                    \
+    void fn_name(char const* name, uint8_t addr, const char* format, va_list xs) const { \
+        /* HACK: race-y, but whatever, stdio is race-y... */                             \
+        printf(prefix "[%s 0x%02x] %s - ", this->name(), addr, (char const*)name);       \
+        vprintf(format, xs);                                                             \
+        puts(""); /* `puts` implicitly emits a newline after argument */                 \
+    }
+
+    DEFINE_I2C_LOG(log, "")
+    DEFINE_I2C_LOG(log_warn, "WARN - ")
+    DEFINE_I2C_LOG(log_error, "ERR - ")
+#undef DEFINE_I2C_LOG
+
+    [[nodiscard]] virtual const char* name() const = 0;
+
+protected:
+    // return # of bytes written, < 0 if error
+    [[nodiscard]] virtual int write(uint8_t addr, uint8_t const* src, size_t len) = 0;
+    // return # of bytes read, < 0 if error
+    [[nodiscard]] virtual int read(uint8_t addr, uint8_t* dst, size_t len) = 0;
+
+private:
+    SemaphoreHandle_t lock;
+};
 
 }  // namespace nevermore
