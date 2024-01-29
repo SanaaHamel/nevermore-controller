@@ -10,6 +10,9 @@ namespace nevermore::sensors {
 using namespace std::literals::chrono_literals;
 
 struct Tachometer final : SensorPeriodic {
+    // DELTA BFB0712H spec sheet says an RPM of 2900 -> ~49 rev/s
+    // Honestly at this low a rate it might be worth just using
+    // an interrupt instead of screwing with a PWM slice...
     constexpr static auto TACHOMETER_READ_PERIOD = SENSOR_UPDATE_PERIOD;
     static_assert(100ms <= TACHOMETER_READ_PERIOD && "need at least 100ms to get a good sampling");
 
@@ -30,7 +33,7 @@ struct Tachometer final : SensorPeriodic {
 protected:
     void read() override {
         pwm_set_counter(slice_num, 0);
-        begin = std::chrono::steady_clock::now();
+        auto begin = std::chrono::steady_clock::now();
         pwm_set_enabled(slice_num, true);
 
         task_delay(TACHOMETER_READ_PERIOD);
@@ -51,7 +54,6 @@ private:
     uint slice_num;
     uint pulses_per_revolution;
     double revolutions_per_second_ = 0;
-    std::chrono::steady_clock::time_point begin{};
 };
 
 }  // namespace nevermore::sensors
