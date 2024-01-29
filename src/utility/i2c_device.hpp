@@ -44,7 +44,7 @@ struct I2CDevice {
     }
 
     [[nodiscard]] bool read(uint8_t reg, uint8_t* dest, size_t len) const {
-        return bus.read(name, address, dest, len);
+        return bus.write(name, address, reg) && bus.read(name, address, dest, len);
     }
 
     template <typename A>
