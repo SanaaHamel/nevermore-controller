@@ -68,11 +68,16 @@ void __isr dma_complete() {
     if (!dma_channel_get_irq0_status(g_dma_channel)) return;
     dma_channel_acknowledge_irq0(g_dma_channel);
 
-    assert(g_update_display_driver);
-
-    LV_DRV_DISP_SPI_CS(true);
-    lv_disp_flush_ready(g_update_display_driver);
-    g_update_display_driver = nullptr;
+    // FIXME: HACK: `g_update_display_driver` can (rarely) be null.
+    //  This precondition should be enforced by `gc9a01_flush_dma`, and no one
+    //  else should be able to touch `g_dma_channel`, which we've claimed via
+    //  `dma_claim_unused_channel`.
+    //  Hypothesis 1: Spurious notifies from SDK/HW bug. (??!)
+    //  Hypothesis 2: We're somehow getting someone else's DMA notifies??
+    if (g_update_display_driver) {
+        lv_disp_flush_ready(g_update_display_driver);
+        g_update_display_driver = nullptr;
+    }
 }
 
 // FUTURE WORK: use 2-data mode + PIO to double tx bandwidth
