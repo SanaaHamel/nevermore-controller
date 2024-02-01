@@ -142,10 +142,10 @@ int main() {
         }
 
         ws2812::init();
+        if (!gatt::init()) return;
         // display must be init before sensors b/c some sensors are display input devices
         if (!display::init_with_ui()) return;
         if (!sensors::init()) return;
-        if (!gatt::init()) return;
 
         mk_timer("led-blink", SENSOR_UPDATE_PERIOD)([](TimerHandle_t) {
             static bool led_on = false;
