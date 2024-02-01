@@ -1,6 +1,5 @@
 #include "sensors.hpp"
 #include "hardware/adc.h"
-#include "hardware/pio.h"
 #include "sdk/ble_data_types.hpp"
 #include "sdk/i2c_hw.hpp"
 #include "sdk/i2c_pio.hpp"
