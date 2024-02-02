@@ -1,22 +1,15 @@
 #include "sgp40.hpp"
 #include "config.hpp"
 #include "lib/sensirion_gas_index_algorithm.h"
-#include "sdk/ble_data_types.hpp"
 #include "sdk/i2c.hpp"
 #include "sensors.hpp"
 #include "sensors/async_sensor.hpp"
 #include "sensors/environmental.hpp"
+#include "sensors/environmental_i2c.hpp"
 #include "utility/numeric_suffixes.hpp"
 #include "utility/packed_tuple.hpp"
 #include <bit>
 #include <cstdint>
-#include <cstdio>
-#include <utility>
-
-#define DBG_SGP40_TEMP_HUMIDITY_BREAKDOWN 0
-#if DBG_SGP40_TEMP_HUMIDITY_BREAKDOWN
-#include <array>
-#endif
 
 using namespace std;
 using namespace BLE;
@@ -29,7 +22,9 @@ static_assert(
 
 namespace {
 
-constexpr uint8_t SGP40_ADDRESS = 0x59;
+constexpr uint8_t ADDRESSES[]{0x59};
+
+constexpr uint16_t SELF_TEST_OK = 0x00D4;  // byte-swapped
 
 // clangd bug: crash if `byteswap` is used w/o `std::` prefix in enum RHS.
 // SGP40 wants its cmds in BE order
@@ -40,98 +35,80 @@ enum class Cmd : uint16_t {
     SGP4x_SERIAL_NUMBER = std::byteswap(0x3682_u16),  // only available when in idle mode
 };
 
-bool sgp4x_heater_off(I2C_Bus& bus) {
-    return bus.write("SGP40", SGP40_ADDRESS, Cmd::SGP4x_HEATER_OFF);
-}
-
-// returns true IIF self-test passed. any error (I2C or self-test) -> false
-bool sgp40_self_test(I2C_Bus& bus) {
-    if (!bus.write("SGP40", SGP40_ADDRESS, Cmd::SGP40_SELF_TEST)) return false;
-
-    task_delay(320ms);  // spec says max delay of 320ms
-
-    auto response = bus.read_crc<0xFF, uint16_t>("SGP40", SGP40_ADDRESS);
-    if (!response) return false;
-
-    auto code = byteswap(*response);
-    switch (code) {
-    case 0xD400: return true;   // tests passed
-    case 0x4B00: return false;  // tests failed
-    default: {
-        bus.log_warn("SGP40", SGP40_ADDRESS, "unexpected response code from self-test: 0x%02x", int(code));
-        return false;
-    }
-    }
-}
-
 constexpr uint16_t to_tick(double n, double min, double max) {
     return uint16_t((clamp(n, min, max) - min) / (max - min) * UINT16_MAX);
 }
 static_assert(to_tick(50, 0, 100) == 0x8000 - 1, "humidity check");  // -1 b/c of truncation
 static_assert(to_tick(25, -45, 130) == 0x6666, "temperature check");
 
-bool sgp40_measure_issue(I2C_Bus& bus, double temperature, double humidity) {
-    uint16_t temperature_tick = byteswap(to_tick(temperature, -45, 130));
-    uint16_t humidity_tick = byteswap(to_tick(humidity, 0, 100));
-    PackedTuple cmd{Cmd::SGP40_MEASURE, humidity_tick, crc8(humidity_tick, 0xFF), temperature_tick,
-            crc8(temperature_tick, 0xFF)};
-    return bus.write("SGP40", SGP40_ADDRESS, cmd);
-}
+struct SGP40 final : SensorPeriodicEnvI2C<Cmd, "SGP40", 0xFF> {
+    using SensorPeriodicEnvI2C::SensorPeriodicEnvI2C;
 
-optional<uint16_t> sgp40_measure_read(I2C_Bus& bus) {
-    auto response = bus.read_crc<0xFF, uint16_t>("SGP40", SGP40_ADDRESS);
-    if (!response) return false;
-
-    return byteswap(*response);
-}
-
-bool sgp40_exists(I2C_Bus& bus) {
-    return sgp4x_heater_off(bus);  // FUTURE WORK: better way of doing this?
-}
-
-struct SGP40 final : SensorPeriodic {
-    I2C_Bus& bus;  // NOLINT(cppcoreguidelines-avoid-const-or-ref-data-members)
     GasIndexAlgorithmParams gas_index_algorithm{};
-    EnvironmentalFilter side;
 
-    SGP40(I2C_Bus& bus, EnvironmentalFilter side) : bus(bus), side(side) {
+    bool setup() {
         GasIndexAlgorithm_init(&gas_index_algorithm, GasIndexAlgorithm_ALGORITHM_TYPE_VOC);
-    }
+        if (!i2c.touch(Cmd::SGP4x_HEATER_OFF)) {
+            // silently fail, likely there's no device on this address...
+            return false;
+        }
 
-    [[nodiscard]] char const* name() const override {
-        return "SGP40";
+        if (self_test() != SELF_TEST_OK) return false;
+
+        return true;
     }
 
     void read() override {
-        if (!sgp40_measure_issue(bus, side.compensation_temperature(), side.compensation_humidity())) return;
+        if (!measure(side.compensation_temperature(), side.compensation_humidity())) return;
 
         task_delay(320ms);
 
-        auto voc_raw = sgp40_measure_read(bus);
-        if (!voc_raw) return;
+        auto response = i2c.read_crc<uint16_t>();
+        if (!response) return;
 
-        side.set(VOCRaw(*voc_raw));
+        auto voc_raw = byteswap(*response);
+        side.set(VOCRaw(voc_raw));
         if (side.was_voc_breakdown_measurement()) return;
 
         // ~330 us during steady-state, ~30 us during startup blackout
         int32_t gas_index{};
-        GasIndexAlgorithm_process(&gas_index_algorithm, *voc_raw, &gas_index);
+        GasIndexAlgorithm_process(&gas_index_algorithm, voc_raw, &gas_index);
         assert(0 <= gas_index && gas_index <= 500 && "result out of range?");
         side.set(GIAState(gas_index_algorithm));
         side.set(VOCIndex(gas_index));
+    }
+
+    [[nodiscard]] bool measure(double temperature, double humidity) const {
+        uint16_t temperature_tick = byteswap(to_tick(temperature, -45, 130));
+        uint16_t humidity_tick = byteswap(to_tick(humidity, 0, 100));
+        PackedTuple params{
+                humidity_tick, crc8(humidity_tick, 0xFF), temperature_tick, crc8(temperature_tick, 0xFF)};
+        if (!i2c.write(Cmd::SGP40_MEASURE, params)) return false;
+
+        task_delay(320ms);
+        return true;
+    }
+
+    [[nodiscard]] optional<uint16_t> self_test() const {
+        // spec says max delay of 320ms
+        auto const result = i2c.read_crc<uint16_t>(Cmd::SGP40_SELF_TEST, 320ms);
+        if (!result) {
+            i2c.log_error("self-test request failed");
+        } else if (*result != SELF_TEST_OK) {
+            i2c.log_error("self-test failed, result 0x%04x (expected 0x%04x)", *result, SELF_TEST_OK);
+        }
+
+        return result;
     }
 };
 
 }  // namespace
 
 unique_ptr<SensorPeriodic> sgp40(I2C_Bus& bus, EnvironmentalFilter side) {
-    if (!sgp40_exists(bus)) return {};  // nothing found
-    if (!sgp40_self_test(bus)) {
-        bus.log_error("SGP40", SGP40_ADDRESS, "failed self-test");
-        return {};
-    }
+    for (auto address : ADDRESSES)
+        if (auto p = make_unique<SGP40>(bus, address, side); p->setup()) return p;
 
-    return make_unique<SGP40>(bus, side);
+    return {};
 }
 
 }  // namespace nevermore::sensors
