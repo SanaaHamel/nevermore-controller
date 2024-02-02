@@ -3,10 +3,13 @@
 #include "sdk/ble_data_types.hpp"
 #include "sensors.hpp"
 #include "sensors/gas_index_ble.hpp"
-#include <cstdio>
 #include <tuple>
 #include <type_traits>
 #include <utility>
+
+#if DBG_MEASURE_VOC_TEMPERATURE_HUMIDITY_EFFECT
+#include <cstdio>
+#endif
 
 namespace nevermore::sensors {
 
@@ -85,9 +88,9 @@ private:
         // NOLINTNEXTLINE(cppcoreguidelines-pro-type-const-cast)
         auto [main, other] = pick(const_cast<Sensors&>(sensors));
         if constexpr (BLE::has_not_known<A>) {
-        if (auto value = std::get<A&>(main); value != BLE::NOT_KNOWN) return value;
-        if (auto value = std::get<A&>(other); config.fallback) return value;
-        return BLE::NOT_KNOWN;
+            if (auto value = std::get<A&>(main); value != BLE::NOT_KNOWN) return value;
+            if (auto value = std::get<A&>(other); config.fallback) return value;
+            return BLE::NOT_KNOWN;
         } else {
             return std::get<A&>(main);
         }
