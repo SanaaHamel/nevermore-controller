@@ -15,6 +15,7 @@ enum class Priority : UBaseType_t {
     Communication = CYW43_TASK_PRIORITY,  // higher priority
     Startup,
 };
+static_assert(UBaseType_t(Priority::Startup) < configMAX_PRIORITIES);
 
 struct Task {
     Task() = default;
