@@ -6,7 +6,6 @@
 #include "sensors.hpp"
 #include "sensors/async_sensor.hpp"
 #include "sensors/environmental.hpp"
-#include "sensors/gas_index.hpp"
 #include "utility/numeric_suffixes.hpp"
 #include "utility/packed_tuple.hpp"
 #include <bit>

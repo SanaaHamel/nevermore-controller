@@ -2,7 +2,7 @@
 
 #include "sdk/ble_data_types.hpp"
 #include "sensors.hpp"
-#include "sensors/gas_index.hpp"
+#include "sensors/gas_index_ble.hpp"
 #include <cstdio>
 #include <tuple>
 #include <type_traits>

@@ -1,14 +1,10 @@
 #pragma once
 
 #include "sdk/ble_data_types.hpp"
-#include "sensors/gas_index.hpp"
+#include "sensors/gas_index_ble.hpp"
 #include <cstdint>
 
 #define DBG_MEASURE_VOC_TEMPERATURE_HUMIDITY_EFFECT 0
-
-extern "C" {
-struct GasIndexAlgorithmParams;
-}
 
 namespace nevermore::sensors {
 

@@ -1,4 +1,4 @@
-#include "gas_index.hpp"
+#include "gas_index_ble.hpp"
 #include "lib/sensirion_gas_index_algorithm.h"
 
 namespace nevermore::sensors {
