@@ -50,7 +50,7 @@ I suggest the following dashboard snippet (paste it via `Dashboard -> Edit Dashb
   },
   {
     "target": [
-      "scale(seriesByTag(\"name=gas_raw\"),0.00001525902)"
+      "seriesByTag(\"name=gas_raw\")"
     ],
     "title": "VOC Raw"
   },
