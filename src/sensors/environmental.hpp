@@ -3,6 +3,7 @@
 #include "sdk/ble_data_types.hpp"
 #include "sensors.hpp"
 #include "sensors/gas_index_ble.hpp"
+#include "settings.hpp"
 #include <tuple>
 #include <type_traits>
 #include <utility>
@@ -62,6 +63,12 @@ struct EnvironmentalFilter {
 #else
         return false;
 #endif
+    }
+
+    // GIVE ME "DEDUCING THIS" FFS. >:( GCC 14+ required
+    [[nodiscard]] auto& voc_calibration_blob(settings::Settings& settings = settings::g_active) const {
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-constant-array-index)
+        return settings.voc_calibration[kind == EnvironmentalFilter::Kind::Intake ? 0 : 1];
     }
 
 private:

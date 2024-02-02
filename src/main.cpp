@@ -12,6 +12,7 @@
 #include "sdk/i2c.hpp"
 #include "sdk/spi.hpp"
 #include "sensors.hpp"
+#include "settings.hpp"
 #include "task.h"  // IWYU pragma: keep
 #include "utility/i2c.hpp"
 #include "utility/task.hpp"
@@ -112,6 +113,8 @@ void pins_i2c_reset() {
 int main() {
     stdio_init_all();
     adc_init();
+
+    nevermore::settings::init();
 
     pins_clear_except_uart();
     pins_i2c_reset();          // bit-bang out a reset for the I2C buses

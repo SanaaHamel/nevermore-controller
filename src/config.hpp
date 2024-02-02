@@ -5,6 +5,10 @@
 
 using namespace std::literals::chrono_literals;
 
+// period between setting changes getting persisted
+// special value: 0 to disable
+constexpr auto SETTINGS_PERSIST_PERIOD = 10s;
+
 // period between sensor polls (in sec)
 // SGP40's VOC Index algo is calibrated for 1s and 10s update rates,
 // and has a minimum update rate of 0.5s.

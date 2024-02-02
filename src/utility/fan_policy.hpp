@@ -15,6 +15,12 @@ struct FanPolicyEnvironmental {
     VOCIndex voc_passive_max = 125;  // <= max(intake, exhaust)  -> filthy in here; get scrubbin'
     VOCIndex voc_improve_min = 25;   // <= (intake - exhaust)    -> things are improving, keep filtering
 
+    // for now there's nothing to do; no additional constraints on any fields
+    // NOLINTNEXTLINE(readability-convert-member-functions-to-static)
+    [[nodiscard]] bool validate() const {
+        return true;
+    }
+
     struct Instance {
         using Clock = std::chrono::steady_clock;
 

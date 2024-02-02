@@ -8,6 +8,7 @@
 #include "sdk/pwm.hpp"
 #include "sdk/spi.hpp"
 #include "sdk/task.hpp"
+#include "settings.hpp"
 #include "ui.hpp"
 #include <algorithm>
 #include <cassert>
@@ -23,8 +24,6 @@ namespace {
 
 constexpr auto DISPLAY_BACKLIGHT_FREQ = 1'000;
 
-float g_display_brightness = 1;
-
 lv_color_t g_draw_scratch_buffers[2][RESOLUTION.width * RESOLUTION.height / 2];
 lv_disp_draw_buf_t g_draw_buffer;
 lv_disp_drv_t g_driver;
@@ -33,12 +32,12 @@ lv_disp_t* g_display;
 }  // namespace
 
 void brightness(float power) {
-    g_display_brightness = clamp(power, 0.f, 1.f);
-    pwm_set_gpio_duty(PIN_DISPLAY_BRIGHTNESS, UINT16_MAX * g_display_brightness);
+    settings::g_active.display_brightness = clamp(power, 0.f, 1.f);
+    pwm_set_gpio_duty(PIN_DISPLAY_BRIGHTNESS, UINT16_MAX * settings::g_active.display_brightness);
 }
 
 float brightness() {
-    return g_display_brightness;
+    return settings::g_active.display_brightness;
 }
 
 // Initialises the UI. Everything else should be hands off after that.
@@ -48,19 +47,28 @@ bool init_with_ui() {
     auto cfg_display_brightness = pwm_get_default_config();
     pwm_config_set_freq_hz(cfg_display_brightness, DISPLAY_BACKLIGHT_FREQ);
     pwm_init(pwm_gpio_to_slice_num_(PIN_DISPLAY_BRIGHTNESS), &cfg_display_brightness, true);
-    brightness(1);
+    brightness(settings::g_active.display_brightness);
 
     lv_init();
     lv_disp_draw_buf_init(&g_draw_buffer, g_draw_scratch_buffers[0], g_draw_scratch_buffers[1],
             size(g_draw_scratch_buffers[0]));
 
-    auto driver = gc9a01();
-    if (!driver) return false;
+    switch (settings::g_active.display_hw) {
+    case settings::DisplayHW::GC9A01_240_240: {
+        auto driver = gc9a01();
+        if (!driver) return false;
 
-    g_driver = *driver;
-    g_driver.hor_res = RESOLUTION.width;
-    g_driver.ver_res = RESOLUTION.height;
-    g_driver.draw_buf = &g_draw_buffer;
+        g_driver = *driver;
+        g_driver.hor_res = RESOLUTION.width;
+        g_driver.ver_res = RESOLUTION.height;
+        g_driver.draw_buf = &g_draw_buffer;
+    } break;
+
+    default: {
+        printf("ERR - init_with_ui - unsupported display HW %u\n", (unsigned)settings::g_active.display_hw);
+        return false;
+    } break;
+    }
 
     if (g_display = lv_disp_drv_register(&g_driver); !g_display) {
         printf("ERR - init_with_ui - lv_disp_drv_register returned null\n");

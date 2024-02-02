@@ -7,7 +7,9 @@
 #include "sdk/pwm.hpp"
 #include "sensors.hpp"
 #include "sensors/tachometer.hpp"
+#include "settings.hpp"
 #include "utility/fan_policy.hpp"
+#include "utility/fan_policy_thermal.hpp"
 #include "utility/timer.hpp"
 #include <cstdint>
 #include <limits>
@@ -44,33 +46,9 @@ constexpr auto SLICE_PWM = pwm_gpio_to_slice_num_(PIN_FAN_PWM);
 constexpr auto SLICE_TACHOMETER = pwm_gpio_to_slice_num_(PIN_FAN_TACHOMETER);
 static_assert(pwm_gpio_to_channel_(PIN_FAN_TACHOMETER) == PWM_CHAN_B, "can only read from B channel");
 
-// not included in the fan aggregation - technically a separate service
-FanPolicyEnvironmental g_fan_policy;
-
 BLE::Percentage8 g_fan_power = 0;
-BLE::Percentage8 g_fan_power_override;           // not-known -> automatic control
-BLE::Percentage8 g_fan_power_passive = 0;        // not-known -> disallowed
-BLE::Percentage8 g_fan_power_automatic = 100;    // not-known -> disallowed
-BLE::Percentage8 g_fan_power_coefficient = 100;  // not-known -> disallowed
+BLE::Percentage8 g_fan_power_override;  // not-known -> automatic control
 nevermore::sensors::Tachometer g_tachometer{PIN_FAN_TACHOMETER, TACHOMETER_PULSE_PER_REVOLUTION};
-
-struct [[gnu::packed]] ThermalLimit {
-    BLE::Temperature min = 50;             // not-known -> disallowed
-    BLE::Temperature max = 60;             // not-known -> disallowed
-    BLE::Percentage16_10 coefficient = 0;  // not-known -> disabled (equiv to 100%)
-
-    //  [0, 1] or None
-    [[nodiscard]] std::optional<double> percent(BLE::Temperature current) const {
-        if (current == BLE::NOT_KNOWN) return {};
-        if (max <= current) return 1;  // trivially 0, also handles case where max <= min
-        if (current < min) return 0;   // trivially 1, below limiter kicks in
-
-        auto range = max.value_or(0) - min.value_or(0);
-        auto x = current.value_or(0) - min.value_or(0);
-        assert(0 < max && "`0 < range` due to above checks");
-        return x / range;
-    }
-} g_fan_power_thermal_limit;
 
 struct [[gnu::packed]] FanPowerTachoAggregate {
     BLE::Percentage8 power = g_fan_power;
@@ -80,9 +58,9 @@ struct [[gnu::packed]] FanPowerTachoAggregate {
 struct [[gnu::packed]] Aggregate {
     BLE::Percentage8 power = g_fan_power;
     BLE::Percentage8 power_override = g_fan_power_override;
-    BLE::Percentage8 power_passive = g_fan_power_passive;
-    BLE::Percentage8 power_automatic = g_fan_power_automatic;
-    BLE::Percentage8 power_coefficient = g_fan_power_coefficient;
+    BLE::Percentage8 power_passive = settings::g_active.fan_power_passive;
+    BLE::Percentage8 power_automatic = settings::g_active.fan_power_automatic;
+    BLE::Percentage8 power_coefficient = settings::g_active.fan_power_coefficient;
     RPM16 tachometer = FanPowerTachoAggregate{}.tachometer;
 };
 
@@ -90,19 +68,17 @@ auto g_notify_fan_power_tacho_aggregate = NotifyState<[](hci_con_handle_t conn) 
     att_server_notify(conn, HANDLE_ATTR(FAN_POWER_TACHO_AGGREGATE, VALUE), FanPowerTachoAggregate{});
 }>();
 
+// false positive:  indirect dependency on global `settings::g_active` only
+//                  happens after global initialisation completes.
+// NOLINTNEXTLINE(cppcoreguidelines-interfaces-global-init)
 auto g_notify_aggregate = NotifyState<[](hci_con_handle_t conn) {
     att_server_notify(conn, HANDLE_ATTR(FAN_AGGREGATE, VALUE), Aggregate{});
 }>();
 
-void fan_power_set(BLE::Percentage8 power) {
-    auto thermal_scaler = 1.;
-    if (auto coeff = g_fan_power_thermal_limit.coefficient.value_or(100); coeff < 100) {
-        auto temp = max(nevermore::sensors::g_sensors.temperature_intake,
-                nevermore::sensors::g_sensors.temperature_exhaust);
-        if (auto perc = g_fan_power_thermal_limit.percent(temp)) {
-            thermal_scaler = lerp(1, coeff / 100, *perc);
-        }
-    }
+void fan_power_set(BLE::Percentage8 power, sensors::Sensors const& sensors = sensors::g_sensors,
+        settings::Settings const& settings = settings::g_active) {
+    auto temperature = max(sensors.temperature_intake, sensors.temperature_exhaust);
+    auto thermal_scaler = settings.fan_policy_thermal(temperature);
 
     power = power.value_or(0) * thermal_scaler;
 
@@ -112,7 +88,7 @@ void fan_power_set(BLE::Percentage8 power) {
         g_notify_aggregate.notify();                  // `g_fan_power` changed
     }
 
-    auto scale = (power.value_or(0) / 100.) * (g_fan_power_coefficient.value_or(0) / 100.);
+    auto scale = (power.value_or(0) / 100.) * (settings.fan_power_coefficient.value_or(0) / 100.);
     auto duty = uint16_t(numeric_limits<uint16_t>::max() * scale);
     pwm_set_gpio_duty(PIN_FAN_PWM, duty);
 }
@@ -165,14 +141,14 @@ bool init() {
     });
 
     mk_timer("fan-policy", 1.s / FAN_POLICY_UPDATE_RATE_HZ)([](auto*) {
-        static auto g_instance = g_fan_policy.instance();
+        static auto g_instance = settings::g_active.fan_policy_env.instance();
         // keep updating even w/ `g_fan_power_override` set b/c we need to
         // refresh to account for thermal throttling policy
         if (g_fan_power_override == BLE::NOT_KNOWN) {
-            if (auto perc = g_instance(nevermore::sensors::g_sensors); 0 < perc)
-                fan_power_set(perc * g_fan_power_automatic.value_or(0));
+            if (auto perc = g_instance(sensors::g_sensors); 0 < perc)
+                fan_power_set(perc * settings::g_active.fan_power_automatic.value_or(0));
             else
-                fan_power_set(g_fan_power_passive.value_or(0));
+                fan_power_set(settings::g_active.fan_power_passive.value_or(0));
         } else {
             fan_power_set(g_fan_power_override);
         }
@@ -205,17 +181,17 @@ optional<uint16_t> attr_read(
 
         READ_VALUE(FAN_POWER, g_fan_power)
         READ_VALUE(FAN_POWER_OVERRIDE, g_fan_power_override)
-        READ_VALUE(FAN_POWER_PASSIVE, g_fan_power_passive)
-        READ_VALUE(FAN_POWER_AUTOMATIC, g_fan_power_automatic)
-        READ_VALUE(FAN_POWER_COEFFICIENT, g_fan_power_coefficient)
+        READ_VALUE(FAN_POWER_PASSIVE, settings::g_active.fan_power_passive)
+        READ_VALUE(FAN_POWER_AUTOMATIC, settings::g_active.fan_power_automatic)
+        READ_VALUE(FAN_POWER_COEFFICIENT, settings::g_active.fan_power_coefficient)
         READ_VALUE(TACHOMETER, FanPowerTachoAggregate{}.tachometer)
         READ_VALUE(FAN_POWER_TACHO_AGGREGATE, FanPowerTachoAggregate{})
         READ_VALUE(FAN_AGGREGATE, Aggregate{});  // default init populate from global state
 
-        READ_VALUE(FAN_POLICY_COOLDOWN, g_fan_policy.cooldown)
-        READ_VALUE(FAN_POLICY_VOC_PASSIVE_MAX, g_fan_policy.voc_passive_max)
-        READ_VALUE(FAN_POLICY_VOC_IMPROVE_MIN, g_fan_policy.voc_improve_min)
-        READ_VALUE(FAN_POWER_THERMAL_LIMIT, g_fan_power_thermal_limit)
+        READ_VALUE(FAN_POLICY_COOLDOWN, settings::g_active.fan_policy_env.cooldown)
+        READ_VALUE(FAN_POLICY_VOC_PASSIVE_MAX, settings::g_active.fan_policy_env.voc_passive_max)
+        READ_VALUE(FAN_POLICY_VOC_IMPROVE_MIN, settings::g_active.fan_policy_env.voc_improve_min)
+        READ_VALUE(FAN_POWER_THERMAL_LIMIT, settings::g_active.fan_policy_thermal)
 
         READ_CLIENT_CFG(FAN_POWER_TACHO_AGGREGATE, g_notify_fan_power_tacho_aggregate)
         READ_CLIENT_CFG(FAN_AGGREGATE, g_notify_aggregate)
@@ -230,9 +206,9 @@ optional<int> attr_write(hci_con_handle_t conn, uint16_t att_handle, uint16_t of
     WriteConsumer consume{offset, buffer, buffer_size};
 
     switch (att_handle) {
-        WRITE_VALUE(FAN_POLICY_COOLDOWN, g_fan_policy.cooldown)
-        WRITE_VALUE(FAN_POLICY_VOC_PASSIVE_MAX, g_fan_policy.voc_passive_max)
-        WRITE_VALUE(FAN_POLICY_VOC_IMPROVE_MIN, g_fan_policy.voc_improve_min)
+        WRITE_VALUE(FAN_POLICY_COOLDOWN, settings::g_active.fan_policy_env.cooldown)
+        WRITE_VALUE(FAN_POLICY_VOC_PASSIVE_MAX, settings::g_active.fan_policy_env.voc_passive_max)
+        WRITE_VALUE(FAN_POLICY_VOC_IMPROVE_MIN, settings::g_active.fan_policy_env.voc_improve_min)
 
         WRITE_CLIENT_CFG(FAN_POWER_TACHO_AGGREGATE, g_notify_fan_power_tacho_aggregate)
         WRITE_CLIENT_CFG(FAN_AGGREGATE, g_notify_aggregate)
@@ -246,7 +222,7 @@ optional<int> attr_write(hci_con_handle_t conn, uint16_t att_handle, uint16_t of
         BLE::Percentage8 value = consume;
         if (value == BLE::NOT_KNOWN) throw AttrWriteException(ATT_ERROR_VALUE_NOT_ALLOWED);
 
-        g_fan_power_passive = value;
+        settings::g_active.fan_power_passive = value;
         return 0;
     }
 
@@ -254,7 +230,7 @@ optional<int> attr_write(hci_con_handle_t conn, uint16_t att_handle, uint16_t of
         BLE::Percentage8 value = consume;
         if (value == BLE::NOT_KNOWN) throw AttrWriteException(ATT_ERROR_VALUE_NOT_ALLOWED);
 
-        g_fan_power_automatic = value;
+        settings::g_active.fan_power_automatic = value;
         return 0;
     }
 
@@ -262,17 +238,15 @@ optional<int> attr_write(hci_con_handle_t conn, uint16_t att_handle, uint16_t of
         BLE::Percentage8 value = consume;
         if (value == BLE::NOT_KNOWN) throw AttrWriteException(ATT_ERROR_VALUE_NOT_ALLOWED);
 
-        g_fan_power_coefficient = value;
+        settings::g_active.fan_power_coefficient = value;
         return 0;
     }
 
     case HANDLE_ATTR(FAN_POWER_THERMAL_LIMIT, VALUE): {
-        ThermalLimit value = consume;
-        if (value.min == BLE::NOT_KNOWN) throw AttrWriteException(ATT_ERROR_VALUE_NOT_ALLOWED);
-        if (value.max == BLE::NOT_KNOWN) throw AttrWriteException(ATT_ERROR_VALUE_NOT_ALLOWED);
-        if (value.max < value.min) throw AttrWriteException(ATT_ERROR_VALUE_NOT_ALLOWED);
+        FanPolicyThermal value = consume;
+        if (!value.validate()) throw AttrWriteException(ATT_ERROR_VALUE_NOT_ALLOWED);
 
-        g_fan_power_thermal_limit = value;
+        settings::g_active.fan_policy_thermal = value;
         fan_power_set(g_fan_power);  // apply updated thermal coefficient
         return 0;
     }

@@ -48,6 +48,7 @@ pico_sdk_init()
 
 set(PICOWOTA_TCP 0)
 set(PICOWOTA_BT_SPP 1)
+set(PICOWOTA_APP_STORE_SIZE "4")
 add_subdirectory(picowota)
 
 set(SRC_DIR ${CMAKE_SOURCE_DIR}/src)
@@ -124,6 +125,7 @@ target_link_libraries(nevermore-controller
 
   # Pico SDK
   hardware_adc
+  hardware_flash
   hardware_i2c
   hardware_pio
   hardware_pwm
@@ -164,12 +166,14 @@ endif()
 pico_btstack_make_gatt_header(nevermore-controller PRIVATE ${SRC_DIR}/nevermore.gatt)
 pico_generate_pio_header(nevermore-controller ${SRC_DIR}/lib/pio_i2c.pio)
 pico_generate_pio_header(nevermore-controller ${SRC_DIR}/ws2812.pio)
+picowota_app_store_declare(nevermore-controller)
 
 add_executable(nevermore-controller-no-bootloader)
 target_link_libraries(nevermore-controller-no-bootloader PRIVATE nevermore-controller)
 pico_enable_stdio_usb(nevermore-controller-no-bootloader 1)
 pico_enable_stdio_uart(nevermore-controller-no-bootloader 1)
 pico_add_extra_outputs(nevermore-controller-no-bootloader)
+picowota_build_no_bootloader_with_app_store(nevermore-controller-no-bootloader)
 
 add_executable(nevermore-controller-ota)
 target_link_libraries(nevermore-controller-ota PRIVATE nevermore-controller)

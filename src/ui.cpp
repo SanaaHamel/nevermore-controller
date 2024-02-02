@@ -6,6 +6,7 @@
 #include "sdk/ble_data_types.hpp"
 #include "semphr.h"
 #include "sensors.hpp"
+#include "settings.hpp"
 #include "ui/ui.h"
 #include "utility/task.hpp"
 #include <algorithm>
@@ -353,6 +354,18 @@ auto using_semaphore(SemaphoreHandle_t& lock, TickType_t ticks_to_wait = portMAX
 
 bool init() {
     g_ui_lock = xSemaphoreCreateMutex();  // we panic on alloc failures, no need to handle null
+
+    using enum settings::DisplayUI;
+    switch (settings::g_active.display_ui) {
+    case ROUND_240_CLASSIC: {
+        // FUTURE WORK: extract code and put it in it's own setup func
+    } break;
+
+    default: {
+        printf("ERR - ui::init - unsupported display UI %u\n", (unsigned)settings::g_active.display_ui);
+        return false;
+    } break;
+    }
 
     ui_init();  // invoke generated code setup
 
