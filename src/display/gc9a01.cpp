@@ -1,11 +1,13 @@
 #include "gc9a01.hpp"
-#include "config.hpp"
+#include "FreeRTOS.h"  // IWYU pragma: keep
+#include "config.hpp"  // IWYU pragma: keep, don't want to include board specific file
 #include "display/GC9A01.h"
 #include "hardware/dma.h"
 #include "hardware/irq.h"
 #include "hardware/regs/intctrl.h"
 #include "hardware/spi.h"
 #include "sdk/spi.hpp"
+#include "task.h"
 #include <cassert>
 #include <cstdint>
 
@@ -125,6 +127,7 @@ optional<lv_disp_drv_t> gc9a01() {
     lv_disp_drv_t driver{};
     lv_disp_drv_init(&driver);
     driver.flush_cb = gc9a01_flush_dma;
+    driver.wait_cb = [](lv_disp_drv_t*) { taskYIELD(); };
     return driver;
 }
 
