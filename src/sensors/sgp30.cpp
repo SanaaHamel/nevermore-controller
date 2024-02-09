@@ -126,9 +126,12 @@ struct SGP30Sensor final : SensorPeriodicEnvI2C<Reg, "SGP30", 0xFF> {
     }
 
     void read() override {
+        // NB: clamp to a minimum rel humidity b/c 0% disables humidity compensation
+        constexpr float MIN_REL_HUMIDITY = 0.25f;  // 0.25% is all we need for a lower bound.
         // compute abs humidity in float, double could get pointlessly expensive...
-        auto abs_humidity_g_m3 = humidity::absolute_fast(
-                (float)side.compensation_humidity(), (float)side.compensation_temperature());
+        auto abs_humidity_g_m3 =
+                humidity::absolute_fast(max(MIN_REL_HUMIDITY, (float)side.compensation_humidity()),
+                        (float)side.compensation_temperature());
         if (!humidity_absolute_set(uint32_t(abs_humidity_g_m3 * 1000))) {
             i2c.log_error("failed to set humidity compensation");
             return;
