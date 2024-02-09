@@ -7,7 +7,7 @@
 #include "semphr.h"
 #include "sensors.hpp"
 #include "settings.hpp"
-#include "ui/ui.h"
+#include "ui/circle_240_classic/ui.hpp"
 #include "utility/task.hpp"
 #include <algorithm>
 #include <chrono>
@@ -64,6 +64,7 @@ Series ui_chart_voc_intake;
 Series ui_chart_voc_exhaust;
 Series ui_chart_temp_intake;
 Series ui_chart_temp_exhaust;
+NevermoreDisplayUI ui;
 
 lv_point_t top_left(lv_area_t const& coord) {
     return {.x = coord.x1, .y = coord.y1};
@@ -93,6 +94,8 @@ auto pretty_print_time(std::chrono::duration<A, Ratio> const& dur, char const* s
 
 template <typename A>
 auto label_set(lv_obj_t* obj, char const* unk, char const* fmt, A&& value, double scale = 1) {
+    if (!obj) return;
+
     if (value == BLE::NOT_KNOWN) {
         lv_label_set_text(obj, unk);
         return;
@@ -136,7 +139,9 @@ auto chart_pos_for_value(
 };
 
 void fan_power_arc_colour_update() {
-    lv_obj_set_style_arc_color(ui_FanPowerArc,
+    if (!ui.fan_power_arc) return;
+
+    lv_obj_set_style_arc_color(ui.fan_power_arc,
             lv_color_hex(gatt::fan::fan_power_override() == BLE::NOT_KNOWN ? 0x00FFFF : 0xFFFF00),
             LV_PART_INDICATOR | int(LV_STATE_DEFAULT));
 }
@@ -144,38 +149,45 @@ void fan_power_arc_colour_update() {
 void display_update_labels() {
     auto const& state = nevermore::sensors::g_sensors.with_fallbacks();
 
-    label_set(ui_PressureIn, "??? kPa", "%.1f kPa", state.pressure_intake, 1e3);
-    label_set(ui_PressureOut, "??? kPa", "%.1f kPa", state.pressure_exhaust, 1e3);
-    label_set(ui_HumidityIn, "??%", "%2.1f%%", state.humidity_intake);
-    label_set(ui_HumidityOut, "??%", "%2.1f%%", state.humidity_exhaust);
+    label_set(ui.pressure_in, "??? kPa", "%.1f kPa", state.pressure_intake, 1e3);
+    label_set(ui.pressure_out, "??? kkPa", "%.1f kPa", state.pressure_exhaust, 1e3);
+    label_set(ui.humidity_in, "??%", "%2.1f%%", state.humidity_intake);
+    label_set(ui.humidity_out, "??%", "%2.1f%%", state.humidity_exhaust);
 
-    label_set(ui_VocIn, "??? VOC", "%.0f VOC", state.voc_index_intake);
-    label_set(ui_VocOut, "??? VOC", "%.0f VOC", state.voc_index_exhaust);
-    label_set(ui_TempIn, "?.?c", "%.1fc", state.temperature_intake);
-    label_set(ui_TempOut, "?.?c", "%.1fc", state.temperature_exhaust);
+    label_set(ui.voc_in, "??? VOC", "%.0f VOC", state.voc_index_intake);
+    label_set(ui.voc_out, "??? VOC", "%.0f VOC", state.voc_index_exhaust);
+    label_set(ui.temp_in, "?.?c", "%.1fc", state.temperature_intake);
+    label_set(ui.temp_out, "?.?c", "%.1fc", state.temperature_exhaust);
 
-    label_set(ui_FanPower, "", "%.0f%%", BLE::Percentage8(ceil(gatt::fan::fan_power())));
+    label_set(ui.fan_power, "", "%.0f%%", BLE::Percentage8(ceil(gatt::fan::fan_power())));
 
-    lv_arc_set_percent(ui_FanPowerArc, gatt::fan::fan_power() / 100);
-    fan_power_arc_colour_update();
+    if (ui.fan_power_arc) {
+        lv_arc_set_percent(ui.fan_power_arc, gatt::fan::fan_power() / 100);
+        fan_power_arc_colour_update();
+    }
 }
 
 void display_update_plot() {
+    if (!ui.chart) return;
+
     auto const& state = nevermore::sensors::g_sensors.with_fallbacks();
 
-    if (lv_chart_get_point_count(ui_Chart) < CHART_SERIES_ENTIRES_MAX) {
+    if (lv_chart_get_point_count(ui.chart) < CHART_SERIES_ENTIRES_MAX) {
         // extend # of points until maximum
-        auto n = lv_chart_get_point_count(ui_Chart) + 1;
+        auto n = lv_chart_get_point_count(ui.chart) + 1;
         // HACK:  Directly set the point count w/o using `lv_chart_set_point_count`
         //        because that function resets the next-point for each series to 0.
         //        (Sane if the # of points goes down, but not so much for our case.)
-        reinterpret_cast<lv_chart_t*>(ui_Chart)->point_cnt = n;
+        reinterpret_cast<lv_chart_t*>(ui.chart)->point_cnt = n;
 
-        lv_label_set_text(ui_XAxisScale, pretty_print_time(n * DISPLAY_TIMER_PLOT_INTERVAL).c_str());
+        if (ui.chart_x_axis_scale) {
+            lv_label_set_text(
+                    ui.chart_x_axis_scale, pretty_print_time(n * DISPLAY_TIMER_PLOT_INTERVAL).c_str());
+        }
     }
 
     auto set_next_value = [&](auto* series, auto&& value) {
-        lv_chart_set_next_value(ui_Chart, series, value.value_or(LV_CHART_POINT_NONE));
+        lv_chart_set_next_value(ui.chart, series, value.value_or(LV_CHART_POINT_NONE));
     };
 
     set_next_value(ui_chart_voc_intake.ui, state.voc_index_intake);
@@ -195,7 +207,7 @@ void display_update_plot() {
 
         auto lines = max<uint>(div.min, 1 + (top + div.value_per - 1) / div.value_per);
         auto coord = lv_coord_t(lines * div.value_per);
-        lv_chart_set_range(ui_Chart, axis, 0, coord);
+        lv_chart_set_range(ui.chart, axis, 0, coord);
         return tuple{lines, coord};
     };
 
@@ -204,11 +216,13 @@ void display_update_plot() {
     auto [_, max_temp] = scale_axis(
             LV_CHART_AXIS_SECONDARY_Y, CHART_DIV_TEMP, {ui_chart_temp_intake, ui_chart_temp_exhaust});
 
-    lv_chart_set_div_line_count(ui_Chart, lines_voc + 1, 10);
+    lv_chart_set_div_line_count(ui.chart, lines_voc + 1, 10);
 
-    char buffer[256];
-    sprintf(buffer, "%u VOC\n%uc", max_voc, max_temp);
-    lv_label_set_text(ui_ChartMax, buffer);
+    if (ui.chart_max) {
+        char buffer[256];
+        sprintf(buffer, "%u VOC\n%uc", max_voc, max_temp);
+        lv_label_set_text(ui.chart_max, buffer);
+    }
 }
 
 // Code more or less ripped from LVGL's `lv_chart.c`.
@@ -357,8 +371,8 @@ bool init() {
 
     using enum settings::DisplayUI;
     switch (settings::g_active.display_ui) {
-    case ROUND_240_CLASSIC: {
-        // FUTURE WORK: extract code and put it in it's own setup func
+    case CIRCLE_240_CLASSIC: {
+        ui = circle_240_classic::create();
     } break;
 
     default: {
@@ -367,48 +381,54 @@ bool init() {
     } break;
     }
 
-    ui_init();  // invoke generated code setup
-
     // HACK: Need at least 2 points to draw the 100-VOC line.
-    lv_chart_set_point_count(ui_Chart, 2);
-    ui_chart_voc_intake.setup(ui_Chart, LV_CHART_AXIS_PRIMARY_Y, 0xFFFF00);
-    ui_chart_voc_exhaust.setup(ui_Chart, LV_CHART_AXIS_PRIMARY_Y, 0x00FFFF);
-    ui_chart_temp_intake.setup(ui_Chart, LV_CHART_AXIS_SECONDARY_Y, 0x808000);
-    ui_chart_temp_exhaust.setup(ui_Chart, LV_CHART_AXIS_SECONDARY_Y, 0x008080);
+    if (ui.chart) {
+        lv_chart_set_point_count(ui.chart, 2);
+        ui_chart_voc_intake.setup(ui.chart, LV_CHART_AXIS_PRIMARY_Y, 0xFFFF00);
+        ui_chart_voc_exhaust.setup(ui.chart, LV_CHART_AXIS_PRIMARY_Y, 0x00FFFF);
+        ui_chart_temp_intake.setup(ui.chart, LV_CHART_AXIS_SECONDARY_Y, 0x808000);
+        ui_chart_temp_exhaust.setup(ui.chart, LV_CHART_AXIS_SECONDARY_Y, 0x008080);
 
-    lv_obj_add_event_cb(ui_Chart, [](auto* e) { on_chart_draw(true, e); }, LV_EVENT_DRAW_PART_BEGIN, {});
-    lv_obj_add_event_cb(ui_Chart, [](auto* e) { on_chart_draw(false, e); }, LV_EVENT_DRAW_PART_END, {});
+        lv_obj_add_event_cb(ui.chart, [](auto* e) { on_chart_draw(true, e); }, LV_EVENT_DRAW_PART_BEGIN, {});
+        lv_obj_add_event_cb(ui.chart, [](auto* e) { on_chart_draw(false, e); }, LV_EVENT_DRAW_PART_END, {});
 
-    lv_obj_add_event_cb(ui_Chart,
-            [](auto*) {
-                gatt::fan::fan_power_override(gatt::fan::fan_power_override() == BLE::NOT_KNOWN
-                                                      ? BLE::Percentage8(100)
-                                                      : BLE::NOT_KNOWN);
-            },
-            LV_EVENT_LONG_PRESSED, {});
+        lv_obj_add_event_cb(ui.chart,
+                [](auto*) {
+                    gatt::fan::fan_power_override(gatt::fan::fan_power_override() == BLE::NOT_KNOWN
+                                                          ? BLE::Percentage8(100)
+                                                          : BLE::NOT_KNOWN);
+                },
+                LV_EVENT_LONG_PRESSED, {});
+    }
 
-    lv_obj_add_event_cb(ui_FanPowerArc,
-            [](lv_event_t* e) {
-                auto state = lv_obj_get_state(ui_FanPowerArc);
-                if (!(state & LV_STATE_PRESSED)) return;
+    if (ui.fan_power_arc) {
+        lv_obj_add_event_cb(ui.fan_power_arc,
+                [](lv_event_t* e) {
+                    auto state = lv_obj_get_state(ui.fan_power_arc);
+                    if (!(state & LV_STATE_PRESSED)) return;
 
-                BLE::Percentage8 power = lv_arc_get_percent(ui_FanPowerArc) * 100;
-                if (power == 0) {
-                    power = BLE::NOT_KNOWN;  // clear override if dragged to zero
-                }
+                    BLE::Percentage8 power = lv_arc_get_percent(ui.fan_power_arc) * 100;
+                    if (power == 0) {
+                        power = BLE::NOT_KNOWN;  // clear override if dragged to zero
+                    }
 
-                gatt::fan::fan_power_override(power);
-                fan_power_arc_colour_update();
-            },
-            LV_EVENT_VALUE_CHANGED, {});
+                    gatt::fan::fan_power_override(power);
+                    fan_power_arc_colour_update();
+                },
+                LV_EVENT_VALUE_CHANGED, {});
+    }
 
 #if 0  // DEBUG HELPER - pre-populate chart with some data to test rendering
-    lv_chart_set_point_count(ui_Chart, CHART_SERIES_ENTIRES_MAX);
-    lv_label_set_text(ui_XAxisScale,
-            pretty_print_time(CHART_SERIES_ENTIRES_MAX * DISPLAY_TIMER_CHART_INTERVAL).c_str());
-    for (uint i = 0; i < CHART_SERIES_ENTIRES_MAX; ++i) {
-        auto p = double(i) / (CHART_SERIES_ENTIRES_MAX - 1);
-        lv_chart_set_next_value(ui_Chart, ui_chart_voc_intake.ui, p * 250);
+    if (ui.chart) {
+        lv_chart_set_point_count(ui.chart, CHART_SERIES_ENTIRES_MAX);
+        if (ui.chart_x_axis_scale) {
+            lv_label_set_text(ui.chart_x_axis_scale,
+                    pretty_print_time(CHART_SERIES_ENTIRES_MAX * DISPLAY_TIMER_PLOT_INTERVAL).c_str());
+        }
+        for (uint i = 0; i < CHART_SERIES_ENTIRES_MAX; ++i) {
+            auto p = double(i) / (CHART_SERIES_ENTIRES_MAX - 1);
+            lv_chart_set_next_value(ui.chart, ui_chart_voc_intake.ui, p * 250);
+        }
     }
 #endif
 

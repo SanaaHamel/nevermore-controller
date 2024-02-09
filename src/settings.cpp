@@ -232,8 +232,8 @@ void SettingsV0::merge_valid_fields(SettingsV0 const& x) {
     }
 
     switch (x.display_ui) {
-    case DisplayUI::ROUND_240_CLASSIC: display_ui = x.display_ui;
-    default: display_ui = DisplayUI::ROUND_240_CLASSIC;
+    case DisplayUI::CIRCLE_240_CLASSIC: display_ui = x.display_ui;
+    default: display_ui = DisplayUI::CIRCLE_240_CLASSIC;
     }
 }
 

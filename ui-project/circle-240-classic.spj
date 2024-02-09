@@ -7942,6 +7942,12 @@
             "strtype": "SCREEN/Style_scrollbar",
             "strval": "lv.PART.SCROLLBAR, Rectangle, Pad",
             "InheritedType": 11
+          },
+          {
+            "nid": -1790414740,
+            "strtype": "SCREEN/Don't export screen",
+            "strval": "False",
+            "InheritedType": 2
           }
         ],
         "saved_objtypeKey": "SCREEN"
@@ -7960,7 +7966,7 @@
   },
   "animations": [],
   "info": {
-    "name": "nevermore.spj",
+    "name": "circle-240-classic.spj",
     "depth": 2,
     "width": 240,
     "height": 240,
@@ -7972,22 +7978,23 @@
     "description": "",
     "board": "Arduino with TFT_eSPI",
     "board_version": "v1.1.0",
-    "editor_version": "1.3.1",
+    "editor_version": "1.3.4",
     "image": "",
     "force_export_images": false,
+    "flat_export": true,
     "pointfilter": false,
     "theme_simplified": false,
     "theme_dark": true,
     "theme_color1": 5,
     "theme_color2": 0,
-    "exportFolderPath": "",
+    "uiExportFolderPath": "/home/sanaa/pico/nevermore-controller/src/ui/circle_240_classic",
     "projectExportFolderPath": "",
-    "backup_cnt": 133,
+    "backup_cnt": 139,
     "autosave_cnt": 0,
     "lvgl_version": "8.3.6",
     "callfuncsexport": "CPP_FILE",
     "lvgl_include_path": "",
     "BitDepth": 16,
-    "Name": "nevermore"
+    "Name": "circle-240-classic"
   }
 }

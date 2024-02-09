@@ -34,7 +34,7 @@ enum class DisplayHW : uint8_t {
 };
 
 enum class DisplayUI : uint8_t {
-    ROUND_240_CLASSIC = 0,
+    CIRCLE_240_CLASSIC = 0,
 };
 
 // Layout **cannot** change. This would break back-compatibility.
@@ -49,7 +49,7 @@ struct SettingsV0 {
     SensorCalibrationBlob voc_calibration[2]{};
     VOCIndex voc_gating = 340;  // not-known -> disallowed, TODO: lower defaults to 240?
     DisplayHW display_hw = DisplayHW::GC9A01_240_240;
-    DisplayUI display_ui = DisplayUI::ROUND_240_CLASSIC;
+    DisplayUI display_ui = DisplayUI::CIRCLE_240_CLASSIC;
     float display_brightness = 1.f;  // range: [0, 1]; don't edit directly, use `display::brightness`
 
     // replaces valid fields from RHS into self
