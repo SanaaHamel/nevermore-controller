@@ -13,6 +13,7 @@ using namespace std;
 
 #define CONFIG_REBOOT_01 f48a18bb_e03c_4583_8006_5b54422e2045_01
 #define CONFIG_FLAGS_01 d4b66bf4_3d8f_4746_b6a2_8a59d2eac3ce_01
+#define CONFIG_RESET_SENSOR_CALIBRATION 75bf055c_02be_466f_8c7d_6ebc72078048_01
 
 namespace nevermore::gatt::configuration {
 
@@ -51,6 +52,7 @@ optional<uint16_t> attr_read(
     switch (att_handle) {
         USER_DESCRIBE(CONFIG_REBOOT_01, "Reboot")
         USER_DESCRIBE(CONFIG_FLAGS_01, "Configuration Flags (bitset)")
+        USER_DESCRIBE(CONFIG_RESET_SENSOR_CALIBRATION, "Reset sensor calibration")
 
         READ_VALUE(CONFIG_FLAGS_01, ([]() -> uint16_t {
             uint64_t flags = 0;
@@ -83,6 +85,14 @@ optional<int> attr_write(
             if (auto const bit = uint64_t(1) << i; mask & bit) {
                 *FLAGS.at(i) = !!(flags & bit);
             }
+        return 0;
+    }
+    case HANDLE_ATTR(CONFIG_RESET_SENSOR_CALIBRATION, VALUE): {
+        // only accept zero data write for now.
+        // maybe add an API for resetting specific sensors later.
+        if (consume.remaining()) return ATT_ERROR_VALUE_NOT_ALLOWED;
+
+        sensors::reset_calibrations();
         return 0;
     }
 

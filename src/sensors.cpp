@@ -150,4 +150,15 @@ bool init() {
     return true;
 }
 
+void reset_calibrations() {
+    vTaskSuspendAll();
+    {
+        printf("resetting sensor calibrations\n");
+
+        for (auto& device : g_sensor_devices)
+            device->reset_calibration();
+    }
+    xTaskResumeAll();
+}
+
 }  // namespace nevermore::sensors
