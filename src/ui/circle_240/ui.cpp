@@ -13,20 +13,38 @@
 #endif
 
 extern "C" {
-NevermoreDisplayUI nevermore_ui_circle_240_create_screen();
+NevermoreDisplayUI nevermore_ui_screen_circle_240_classic();
+NevermoreDisplayUI nevermore_ui_screen_circle_240_no_plot();
+NevermoreDisplayUI nevermore_ui_screen_circle_240_small_plot();
 }
 
-namespace nevermore::ui::circle_240_classic {
+namespace nevermore::ui::circle_240 {
 
-NevermoreDisplayUI create() {
+namespace {
+
+NevermoreDisplayUI mk(NevermoreDisplayUI (*fn)()) {
     auto* dispp = lv_disp_get_default();
     auto* theme = lv_theme_default_init(
             dispp, lv_palette_main(LV_PALETTE_BLUE), lv_palette_main(LV_PALETTE_RED), true, LV_FONT_DEFAULT);
     lv_disp_set_theme(dispp, theme);
 
-    auto ui = nevermore_ui_circle_240_create_screen();
+    auto ui = fn();
     lv_disp_load_scr(ui.screen);
     return ui;
 }
 
-}  // namespace nevermore::ui::circle_240_classic
+}  // namespace
+
+NevermoreDisplayUI classic() {
+    return mk(nevermore_ui_screen_circle_240_classic);
+}
+
+NevermoreDisplayUI small_plot() {
+    return mk(nevermore_ui_screen_circle_240_small_plot);
+}
+
+NevermoreDisplayUI no_plot() {
+    return mk(nevermore_ui_screen_circle_240_no_plot);
+}
+
+}  // namespace nevermore::ui::circle_240

@@ -227,14 +227,12 @@ void SettingsV0::merge_valid_fields(SettingsV0 const& x) {
     if (0 <= x.display_brightness && x.display_brightness <= 1) display_brightness = x.display_brightness;
 
     switch (x.display_hw) {
-    case DisplayHW::GC9A01_240_240: display_hw = x.display_hw;
-    default: display_hw = DisplayHW::GC9A01_240_240;
+    case DisplayHW::GC9A01_240_240: display_hw = x.display_hw; break;
+    default: display_hw = DisplayHW::GC9A01_240_240; break;
     }
 
-    switch (x.display_ui) {
-    case DisplayUI::CIRCLE_240_CLASSIC: display_ui = x.display_ui;
-    default: display_ui = DisplayUI::CIRCLE_240_CLASSIC;
-    }
+    display_hw = validate(x.display_hw) ? x.display_hw : DisplayHW::GC9A01_240_240;
+    display_ui = validate(x.display_hw, x.display_ui) ? x.display_ui : DisplayUI::CIRCLE_240_CLASSIC;
 }
 
 }  // namespace nevermore::settings

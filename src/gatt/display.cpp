@@ -4,13 +4,14 @@
 #include "handler_helpers.hpp"
 #include "nevermore.h"
 #include "sdk/ble_data_types.hpp"
+#include "settings.hpp"
 #include <cstdint>
-#include <limits>
 
 using namespace std;
 using namespace BLE;
 
 #define DISPLAY_BRIGHTNESS 2B04_06
+#define DISPLAY_UI 86a25d55_1893_4d01_8ea8_8970f622c243_01
 
 namespace nevermore::gatt::display {
 
@@ -24,7 +25,9 @@ optional<uint16_t> attr_read(
         hci_con_handle_t conn, uint16_t att_handle, uint16_t offset, uint8_t* buffer, uint16_t buffer_size) {
     switch (att_handle) {
         USER_DESCRIBE(DISPLAY_BRIGHTNESS, "Display Brightness %")
+        USER_DESCRIBE(DISPLAY_UI, "Display UI")
         READ_VALUE(DISPLAY_BRIGHTNESS, Percentage8(nevermore::display::brightness() * 100));
+        READ_VALUE(DISPLAY_UI, settings::g_active.display_ui);
 
     default: return {};
     }
@@ -41,6 +44,16 @@ optional<int> attr_write(hci_con_handle_t conn, uint16_t att_handle, uint16_t of
         if (power == BLE::NOT_KNOWN) throw AttrWriteException(ATT_ERROR_VALUE_NOT_ALLOWED);
 
         nevermore::display::brightness(float(power.value_or(0) / 100.f));
+        return 0;
+    }
+
+    case HANDLE_ATTR(DISPLAY_UI, VALUE): {
+        settings::DisplayUI const ui = consume;
+        if (!settings::validate(settings::g_active.display_hw, ui))
+            throw AttrWriteException(ATT_ERROR_VALUE_NOT_ALLOWED);
+
+        // FUTURE WORK: support UI switch w/o reboot
+        settings::g_active.display_ui = ui;
         return 0;
     }
 

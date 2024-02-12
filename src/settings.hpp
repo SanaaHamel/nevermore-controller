@@ -35,6 +35,8 @@ enum class DisplayHW : uint8_t {
 
 enum class DisplayUI : uint8_t {
     CIRCLE_240_CLASSIC = 0,
+    CIRCLE_240_SMALL_PLOT = 1,
+    CIRCLE_240_NO_PLOT = 2,
 };
 
 // Layout **cannot** change. This would break back-compatibility.
@@ -67,5 +69,32 @@ void init();
 // HACK: by ref b/c `Settings` can get pretty big
 // HACK: mutates `header::crc`
 void save(Settings&);
+
+constexpr bool validate(DisplayHW ui) {
+    using enum DisplayHW;
+    switch (ui) {
+    default: return false;
+    case GC9A01_240_240: return true;
+    }
+}
+
+constexpr bool validate(DisplayHW hw, DisplayUI ui) {
+    if (!validate(hw)) return false;
+
+    using enum DisplayHW;
+    using enum DisplayUI;
+    switch (hw) {
+    default: return false;  // unreachable due to `validate(hw)` unless cases are missing
+
+    case GC9A01_240_240: {
+        switch (ui) {
+        default: return false;
+        case CIRCLE_240_CLASSIC:     // FALL THRU
+        case CIRCLE_240_SMALL_PLOT:  // FALL THRU
+        case CIRCLE_240_NO_PLOT: return true;
+        }
+    } break;
+    }
+}
 
 }  // namespace nevermore::settings

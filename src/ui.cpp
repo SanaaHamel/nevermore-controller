@@ -7,7 +7,7 @@
 #include "semphr.h"
 #include "sensors.hpp"
 #include "settings.hpp"
-#include "ui/circle_240_classic/ui.hpp"
+#include "ui/circle_240/ui.hpp"
 #include "utility/task.hpp"
 #include <algorithm>
 #include <chrono>
@@ -149,17 +149,18 @@ void fan_power_arc_colour_update() {
 void display_update_labels() {
     auto const& state = nevermore::sensors::g_sensors.with_fallbacks();
 
-    label_set(ui.pressure_in, "??? kPa", "%.1f kPa", state.pressure_intake, 1e3);
-    label_set(ui.pressure_out, "??? kkPa", "%.1f kPa", state.pressure_exhaust, 1e3);
-    label_set(ui.humidity_in, "??%", "%2.1f%%", state.humidity_intake);
-    label_set(ui.humidity_out, "??%", "%2.1f%%", state.humidity_exhaust);
+    label_set(ui.pressure_in, "--- hPa", "%.1f hPa", state.pressure_intake, 1e2);
+    label_set(ui.pressure_out, "--- hPa", "%.1f hPa", state.pressure_exhaust, 1e2);
+    label_set(ui.humidity_in, "--- %", "%2.1f%%", state.humidity_intake);
+    label_set(ui.humidity_out, "--- %", "%2.1f%%", state.humidity_exhaust);
 
-    label_set(ui.voc_in, "??? VOC", "%.0f VOC", state.voc_index_intake);
-    label_set(ui.voc_out, "??? VOC", "%.0f VOC", state.voc_index_exhaust);
-    label_set(ui.temp_in, "?.?c", "%.1fc", state.temperature_intake);
-    label_set(ui.temp_out, "?.?c", "%.1fc", state.temperature_exhaust);
+    label_set(ui.voc_in, "---", "%.0f", state.voc_index_intake);
+    label_set(ui.voc_out, "---", "%.0f", state.voc_index_exhaust);
+    label_set(ui.temp_in, "--- c", "%.1fc", state.temperature_intake);
+    label_set(ui.temp_out, "--- c", "%.1fc", state.temperature_exhaust);
 
     label_set(ui.fan_power, "", "%.0f%%", BLE::Percentage8(ceil(gatt::fan::fan_power())));
+    label_set(ui.fan_rpm, "", "%.0f", BLE::Percentage8(ceil(gatt::fan::fan_rpm())));
 
     if (ui.fan_power_arc) {
         lv_arc_set_percent(ui.fan_power_arc, gatt::fan::fan_power() / 100);
@@ -372,7 +373,13 @@ bool init() {
     using enum settings::DisplayUI;
     switch (settings::g_active.display_ui) {
     case CIRCLE_240_CLASSIC: {
-        ui = circle_240_classic::create();
+        ui = circle_240::classic();
+    } break;
+    case CIRCLE_240_SMALL_PLOT: {
+        ui = circle_240::small_plot();
+    } break;
+    case CIRCLE_240_NO_PLOT: {
+        ui = circle_240::no_plot();
     } break;
 
     default: {
@@ -391,8 +398,10 @@ bool init() {
 
         lv_obj_add_event_cb(ui.chart, [](auto* e) { on_chart_draw(true, e); }, LV_EVENT_DRAW_PART_BEGIN, {});
         lv_obj_add_event_cb(ui.chart, [](auto* e) { on_chart_draw(false, e); }, LV_EVENT_DRAW_PART_END, {});
+    }
 
-        lv_obj_add_event_cb(ui.chart,
+    if (ui.touch_overlay) {
+        lv_obj_add_event_cb(ui.touch_overlay,
                 [](auto*) {
                     gatt::fan::fan_power_override(gatt::fan::fan_power_override() == BLE::NOT_KNOWN
                                                           ? BLE::Percentage8(100)

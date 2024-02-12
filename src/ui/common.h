@@ -31,7 +31,9 @@ typedef struct NevermoreDisplayUI {
     /* lv_label_t */ lv_obj_t* chart_max;
     /* lv_label_t */ lv_obj_t* chart_x_axis_scale;
     /* lv_label_t */ lv_obj_t* fan_power;
+    /* lv_label_t */ lv_obj_t* fan_rpm;
     /* lv_arc_t */ lv_obj_t* fan_power_arc;
+    /* lv_obj_t */ lv_obj_t* touch_overlay;
 } NevermoreDisplayUI;
 
 #ifdef __cplusplus

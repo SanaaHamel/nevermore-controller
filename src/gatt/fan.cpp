@@ -52,7 +52,7 @@ nevermore::sensors::Tachometer g_tachometer{PIN_FAN_TACHOMETER, TACHOMETER_PULSE
 
 struct [[gnu::packed]] FanPowerTachoAggregate {
     BLE::Percentage8 power = g_fan_power;
-    RPM16 tachometer = g_tachometer.revolutions_per_second() * 60;
+    RPM16 tachometer = fan_rpm();
 };
 
 struct [[gnu::packed]] Aggregate {
@@ -94,6 +94,10 @@ void fan_power_set(BLE::Percentage8 power, sensors::Sensors const& sensors = sen
 }
 
 }  // namespace
+
+double fan_rpm() {
+    return g_tachometer.revolutions_per_second() * 60;
+}
 
 double fan_power() {
     return g_fan_power.value_or(0);
