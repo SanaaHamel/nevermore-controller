@@ -2,8 +2,8 @@
 #include "handler_helpers.hpp"
 #include "nevermore.h"
 #include "picowota/reboot.h"
-#include "sdk/btstack.hpp"
 #include "sensors.hpp"
+#include "settings.hpp"
 #include "utility/timer.hpp"
 #include <array>
 #include <cstdint>
@@ -28,6 +28,8 @@ constexpr array FLAGS{
 void reboot_delayed(bool to_bootloader) {
     // if they want to race these, who cares, we're rebooting anyways
     printf("!! GATT - Reboot Requested; OTA=%d\n", int(to_bootloader));
+    // flush/save settings before we reboot
+    settings::save(settings::g_active);
 
     auto go = mk_timer("gatt-configuration-reboot", REBOOT_DELAY);
     if (to_bootloader)
