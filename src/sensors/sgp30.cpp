@@ -1,9 +1,7 @@
 #include "sgp30.hpp"
 #include "config.hpp"
 #include "environmental_i2c.hpp"
-#include "lib/sensirion_gas_index_algorithm.h"
-#include "sdk/ble_data_types.hpp"
-#include "sdk/task.hpp"
+#include "sensors/gas_index.hpp"
 #include "utility/crc.hpp"
 #include "utility/humidity.hpp"
 #include "utility/numeric_suffixes.hpp"
@@ -80,14 +78,11 @@ struct SGP30Sensor final : SensorPeriodicEnvI2C<Reg, "SGP30", 0xFF> {
 
     using SensorPeriodicEnvI2C::SensorPeriodicEnvI2C;
 
-    GasIndexAlgorithmParams gia{};
+    GasIndex index;
     Clock::time_point start = {};
     Version version = 0;
 
     bool setup() {
-        GasIndexAlgorithm_init(&gia, GasIndexAlgorithm_ALGORITHM_TYPE_VOC);
-        gia.mSraw_Minimum = 10'000;  // default VOC is 20'000, which is lower than how this sensor reacts
-
         auto features = feature_set();
         if (!features) return false;
 
@@ -114,13 +109,10 @@ struct SGP30Sensor final : SensorPeriodicEnvI2C<Reg, "SGP30", 0xFF> {
         task_delay(10ms);  // spec says 10ms for IAQ init
         start = Clock::now();
 
-        // NOTE:  Once set the baseline seems fixed. Won't work for drift.
-        // TODO:  Implement baseline persistance. Will require BLE API extension
-        //        or persistent flash storage.
-        // if (!baseline_set({.co2_eq_ppm = 215, .tvoc_ppb = 4040})) {
-        //     i2c.log_error("failed to set baseline");
-        //     return false;
-        // }
+        index = {GasIndexAlgorithm_ALGORITHM_TYPE_VOC};
+        // default VOC is 20'000, which is lower than how this sensor reacts
+        index.gia.mSraw_Minimum = 10'000;
+        index.restore(side.voc_calibration_blob(), i2c);
 
         return true;
     }
@@ -143,12 +135,9 @@ struct SGP30Sensor final : SensorPeriodicEnvI2C<Reg, "SGP30", 0xFF> {
         side.set(VOCRaw(raw->tvoc_ppb));
         if (side.was_voc_breakdown_measurement()) return;
 
-        int32_t gas_index{};
-        GasIndexAlgorithm_process(&gia, raw->tvoc_ppb, &gas_index);
-        assert(0 <= gas_index && gas_index <= 500 && "result out of range?");
-
-        side.set(GIAState(gia));
-        side.set(VOCIndex(gas_index));
+        side.set(GIAState(index.gia));
+        side.set(index.process(raw->tvoc_ppb));
+        index.checkpoint(side.voc_calibration_blob(), i2c);
 
         /*
         auto baseline = measure(Reg::IAQ_Baseline, 10ms);  // spec says 10ms
@@ -163,6 +152,7 @@ struct SGP30Sensor final : SensorPeriodicEnvI2C<Reg, "SGP30", 0xFF> {
         */
     }
 
+    // not used. we're using the software VOC index library instead.
     [[nodiscard]] VOCIndex voc_index(Measurement const& result) const {
         if (Clock::now() - start < IAQ_STARTUP_DURATION) return VOCIndex::not_known_value;
 

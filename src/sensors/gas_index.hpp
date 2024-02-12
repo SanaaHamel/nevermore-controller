@@ -28,6 +28,7 @@ struct GasIndex {
         }
     }
 
+    // ~330 us during steady-state, ~30 us during startup blackout
     VOCIndex process(int32_t raw) {
         int32_t voc_index{};
         GasIndexAlgorithm_process(&gia, raw, &voc_index);
@@ -60,6 +61,26 @@ struct GasIndex {
 
         next_checkpoint = now + CHECKPOINT_PERIOD;
         save(blob);
+        return true;
+    }
+
+    template <typename A>
+    bool restore(settings::SensorCalibrationBlob const& blob, A& log) {
+        if (!restore(blob)) return false;
+
+        Blob blob2;
+        memcpy(&blob2, &blob, sizeof(blob2));
+        log.log("restored {0x%08x, 0x%08x}", (int)blob2[0], (int)blob2[1]);
+        return true;
+    }
+
+    template <typename A>
+    bool checkpoint(settings::SensorCalibrationBlob& blob, A& log) {
+        if (!checkpoint(blob)) return false;
+
+        Blob blob2;
+        memcpy(&blob2, &blob, sizeof(blob2));
+        log.log("checkpointed {0x%08x, 0x%08x}", (int)blob2[0], (int)blob2[1]);
         return true;
     }
 

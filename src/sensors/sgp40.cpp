@@ -1,11 +1,8 @@
 #include "sgp40.hpp"
 #include "config.hpp"
-#include "lib/sensirion_gas_index_algorithm.h"
-#include "sdk/i2c.hpp"
 #include "sensors.hpp"
-#include "sensors/async_sensor.hpp"
-#include "sensors/environmental.hpp"
 #include "sensors/environmental_i2c.hpp"
+#include "sensors/gas_index.hpp"
 #include "utility/numeric_suffixes.hpp"
 #include "utility/packed_tuple.hpp"
 #include <bit>
@@ -44,16 +41,18 @@ static_assert(to_tick(25, -45, 130) == 0x6666, "temperature check");
 struct SGP40 final : SensorPeriodicEnvI2C<Cmd, "SGP40", 0xFF> {
     using SensorPeriodicEnvI2C::SensorPeriodicEnvI2C;
 
-    GasIndexAlgorithmParams gas_index_algorithm{};
+    GasIndex index;
 
     bool setup() {
-        GasIndexAlgorithm_init(&gas_index_algorithm, GasIndexAlgorithm_ALGORITHM_TYPE_VOC);
         if (!i2c.touch(Cmd::SGP4x_HEATER_OFF)) {
             // silently fail, likely there's no device on this address...
             return false;
         }
 
         if (self_test() != SELF_TEST_OK) return false;
+
+        index = {GasIndexAlgorithm_ALGORITHM_TYPE_VOC};
+        index.restore(side.voc_calibration_blob(), i2c);
 
         return true;
     }
@@ -70,12 +69,9 @@ struct SGP40 final : SensorPeriodicEnvI2C<Cmd, "SGP40", 0xFF> {
         side.set(VOCRaw(voc_raw));
         if (side.was_voc_breakdown_measurement()) return;
 
-        // ~330 us during steady-state, ~30 us during startup blackout
-        int32_t gas_index{};
-        GasIndexAlgorithm_process(&gas_index_algorithm, voc_raw, &gas_index);
-        assert(0 <= gas_index && gas_index <= 500 && "result out of range?");
-        side.set(GIAState(gas_index_algorithm));
-        side.set(VOCIndex(gas_index));
+        side.set(index.process(voc_raw));
+        side.set(GIAState(index.gia));
+        index.checkpoint(side.voc_calibration_blob(), i2c);
     }
 
     [[nodiscard]] bool measure(double temperature, double humidity) const {
