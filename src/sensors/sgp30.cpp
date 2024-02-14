@@ -217,7 +217,7 @@ struct SGP30Sensor final : SensorPeriodicEnvI2C<Reg, "SGP30", 0xFF> {
     }
 
     optional<Measurement> measure(Reg reg, std::chrono::milliseconds delay) {
-        auto result = i2c.read<Measurement>(reg, delay);  // spec says 12ms max wait
+        auto result = i2c.read<Measurement>(reg, delay);
         if (!result) return {};
         if (!crc(result->co2_eq_ppm, result->co2_crc)) return {};
         if (!crc(result->tvoc_ppb, result->tvoc_crc)) return {};
