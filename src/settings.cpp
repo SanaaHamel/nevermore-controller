@@ -222,7 +222,7 @@ void SettingsV0::merge_valid_fields(SettingsV0 const& x) {
     if (x.fan_power_automatic != BLE::NOT_KNOWN) fan_power_automatic = x.fan_power_automatic;
     if (x.fan_power_coefficient != BLE::NOT_KNOWN) fan_power_coefficient = x.fan_power_coefficient;
     // nothing to do for voc_calibration b/c that's sensor specific
-    memcpy(voc_calibration, x.voc_calibration, sizeof(voc_calibration));
+    voc_calibration = x.voc_calibration;
     if (x.voc_gating != BLE::NOT_KNOWN) voc_gating = x.voc_gating;
     if (0 <= x.display_brightness && x.display_brightness <= 1) display_brightness = x.display_brightness;
 

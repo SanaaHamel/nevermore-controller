@@ -1,10 +1,9 @@
 #pragma once
 
-#include "hardware/flash.h"
 #include "utility/crc.hpp"
 #include "utility/fan_policy.hpp"
 #include "utility/fan_policy_thermal.hpp"
-#include <algorithm>
+#include <array>
 
 namespace nevermore::settings {
 
@@ -26,7 +25,7 @@ struct Header {
 
 // 16 octets should be more than enough.
 // Will be initialised to all-zeros by default.
-using SensorCalibrationBlob = uint8_t[16];
+using SensorCalibrationBlob = std::array<uint8_t, 16>;
 using VOCIndex = nevermore::sensors::VOCIndex;
 
 enum class DisplayHW : uint8_t {
@@ -48,7 +47,7 @@ struct SettingsV0 {
     BLE::Percentage8 fan_power_passive = 0;        // not-known -> disallowed
     BLE::Percentage8 fan_power_automatic = 100;    // not-known -> disallowed
     BLE::Percentage8 fan_power_coefficient = 100;  // not-known -> disallowed
-    SensorCalibrationBlob voc_calibration[2]{};
+    std::array<SensorCalibrationBlob, 2> voc_calibration{};
     VOCIndex voc_gating = 340;  // not-known -> disallowed, TODO: lower defaults to 240?
     DisplayHW display_hw = DisplayHW::GC9A01_240_240;
     DisplayUI display_ui = DisplayUI::CIRCLE_240_CLASSIC;

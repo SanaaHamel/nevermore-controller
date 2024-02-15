@@ -8,16 +8,28 @@
 #include <array>
 #include <cstdint>
 #include <cstdio>
+#include <utility>
 
 using namespace std;
 
 #define CONFIG_REBOOT_01 f48a18bb_e03c_4583_8006_5b54422e2045_01
 #define CONFIG_FLAGS_01 d4b66bf4_3d8f_4746_b6a2_8a59d2eac3ce_01
 #define CONFIG_RESET_SENSOR_CALIBRATION 75bf055c_02be_466f_8c7d_6ebc72078048_01
+#define CONFIG_RESET_SETTINGS f2810b13_8cd7_4d6f_bb1b_e276db7fadbf_01
 
 namespace nevermore::gatt::configuration {
 
 namespace {
+
+enum class ResetFlags : uint8_t {
+    sensor_calibration = 1 << 0,
+    policies = 1 << 1,  // basically everything except hardware & calibration
+    hardware = 1 << 2,
+};
+
+constexpr bool operator&(ResetFlags lhs, ResetFlags rhs) {
+    return to_underlying(lhs) & to_underlying(rhs);
+}
 
 constexpr auto REBOOT_DELAY = 200ms;
 
@@ -53,6 +65,7 @@ optional<uint16_t> attr_read(
         USER_DESCRIBE(CONFIG_REBOOT_01, "Reboot")
         USER_DESCRIBE(CONFIG_FLAGS_01, "Configuration Flags (bitset)")
         USER_DESCRIBE(CONFIG_RESET_SENSOR_CALIBRATION, "Reset sensor calibration")
+        USER_DESCRIBE(CONFIG_RESET_SETTINGS, "Reset settings (bitset)")
 
         READ_VALUE(CONFIG_FLAGS_01, ([]() -> uint16_t {
             uint64_t flags = 0;
@@ -93,6 +106,32 @@ optional<int> attr_write(
         if (consume.remaining()) return ATT_ERROR_VALUE_NOT_ALLOWED;
 
         sensors::reset_calibrations();
+        return 0;
+    }
+    case HANDLE_ATTR(CONFIG_RESET_SETTINGS, VALUE): {
+        ResetFlags const flags = consume;
+        if (consume.remaining()) return ATT_ERROR_VALUE_NOT_ALLOWED;
+
+        using enum ResetFlags;
+        if (flags & sensor_calibration) {
+            sensors::reset_calibrations();
+            settings::g_active.voc_calibration = settings::Settings{}.voc_calibration;
+        }
+        if (flags & policies) {
+            // FIXME: This is a maintence nightmare. There must be a better way of doing things.
+            auto header = settings::g_active.header;
+            auto voc_calibration = settings::g_active.voc_calibration;
+            auto display_hw = settings::g_active.display_hw;
+            settings::g_active = {};
+            settings::g_active.header = header;
+            settings::g_active.voc_calibration = voc_calibration;
+            settings::g_active.display_hw = display_hw;
+        }
+        if (flags & hardware) {
+            // FIXME: This is a maintence nightmare. There must be a better way of doing things.
+            settings::g_active.display_hw = settings::Settings{}.display_hw;
+        }
+
         return 0;
     }
 
