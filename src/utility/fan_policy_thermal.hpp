@@ -12,6 +12,14 @@ struct [[gnu::packed]] FanPolicyThermal {
     BLE::Temperature max = 60;             // not-known -> disallowed
     BLE::Percentage16_10 coefficient = 0;  // not-known -> disabled (equiv to 100%)
 
+    [[nodiscard]] FanPolicyThermal or_(FanPolicyThermal const& rhs) const {
+        FanPolicyThermal x = *this;
+        if (x.min == BLE::NOT_KNOWN) x.min = rhs.min;
+        if (x.max == BLE::NOT_KNOWN) x.max = rhs.max;
+        if (x.coefficient == BLE::NOT_KNOWN) x.coefficient = rhs.coefficient;
+        return x;
+    }
+
     [[nodiscard]] bool validate() const {
         if (min == BLE::NOT_KNOWN) return false;
         if (max == BLE::NOT_KNOWN) return false;

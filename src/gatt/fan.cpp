@@ -248,6 +248,7 @@ optional<int> attr_write(hci_con_handle_t conn, uint16_t att_handle, uint16_t of
 
     case HANDLE_ATTR(FAN_POWER_THERMAL_LIMIT, VALUE): {
         FanPolicyThermal value = consume;
+        value = value.or_(settings::g_active.fan_policy_thermal);
         if (!value.validate()) throw AttrWriteException(ATT_ERROR_VALUE_NOT_ALLOWED);
 
         settings::g_active.fan_policy_thermal = value;

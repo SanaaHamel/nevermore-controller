@@ -285,15 +285,15 @@ class CmdFanPolicyVocImproveMin(Command):
 
 @dataclass(frozen=True)
 class CmdFanPolicyThermalLimit(Command):
-    temp_min: float
-    temp_max: float
+    min: Optional[float]
+    max: Optional[float]
     percent: Optional[float]
 
     def params(self):
         return (
             BleAttrWriter()
-            .temperature(self.temp_min)
-            .temperature(self.temp_max)
+            .temperature(self.min)
+            .temperature(self.max)
             .percentage16_10(None if self.percent is None else self.percent * 100)
             .value
         )
@@ -832,35 +832,22 @@ class Nevermore:
         self._fan_power_auto = cfg_fan_power(CmdFanPowerAuto, "fan_power_automatic")
         self._fan_power_coeff = cfg_fan_power(CmdFanPowerCoeff, "fan_power_coefficient")
 
-        fan_thermal_min: Optional[float] = config.getfloat(
-            "fan_thermal_limit_temperature_min", default=None
+        self._fan_thermal_limit = CmdFanPolicyThermalLimit(
+            config.getfloat("fan_thermal_limit_temperature_min", default=None),
+            config.getfloat("fan_thermal_limit_temperature_max", default=None),
+            config.getfloat(
+                "fan_thermal_limit_coefficient", default=None, minval=0, maxval=1
+            ),
         )
-        fan_thermal_max: Optional[float] = config.getfloat(
-            "fan_thermal_limit_temperature_max", default=None
-        )
-        fan_thermal_coeff: Optional[float] = config.getfloat(
-            "fan_thermal_limit_coefficient", default=None, minval=0, maxval=1
-        )
-        if (
-            fan_thermal_min is None
-            and fan_thermal_max is None
-            and fan_thermal_coeff is None
-        ):
-            self._fan_thermal_limit = None  # use the controller's defaults
-        else:
-            # TODO: unspecified values should be queried from the controller
-            #       (better user-visible behaviour if defaults change)
-            fan_thermal_min = 50 if fan_thermal_min is None else fan_thermal_min
-            fan_thermal_max = 60 if fan_thermal_max is None else fan_thermal_max
-            fan_thermal_coeff = 0 if fan_thermal_coeff is None else fan_thermal_coeff
 
-            if fan_thermal_max < fan_thermal_min:
-                raise config.error(
-                    "`fan_thermal_limit_temperature_min` must <= `fan_thermal_limit_temperature_max`"
-                )
+        if self._fan_thermal_limit.min is None != self._fan_thermal_limit.max is None:
+            raise config.error(
+                "`fan_thermal_limit_temperature_{min, max}` must either both be specified or neither specified"
+            )
 
-            self._fan_thermal_limit = CmdFanPolicyThermalLimit(
-                fan_thermal_min, fan_thermal_max, fan_thermal_coeff
+        if (self._fan_thermal_limit.max or 0) < (self._fan_thermal_limit.min or 0):
+            raise config.error(
+                "`fan_thermal_limit_temperature_min` must <= `fan_thermal_limit_temperature_max`"
             )
 
         self._interface: Optional[NevermoreBackgroundWorker] = None
