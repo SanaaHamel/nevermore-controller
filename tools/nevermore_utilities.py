@@ -310,14 +310,12 @@ class BleAttrReader:
         return self._unsigned(4, 1, 0, -15)
 
     @overload
-    def _signed(self, sz: int, M: int, d: int, e: int) -> float:
-        ...
+    def _signed(self, sz: int, M: int, d: int, e: int) -> float: ...
 
     @overload
     def _signed(
         self, sz: int, M: int, d: int, e: int, *, not_known: int
-    ) -> Optional[float]:
-        ...
+    ) -> Optional[float]: ...
 
     def _signed(
         self, sz: int, M: int, d: int, e: int, *, not_known: Optional[int] = None
@@ -325,14 +323,12 @@ class BleAttrReader:
         return self._consume(True, sz, M, d, e, not_known)
 
     @overload
-    def _unsigned(self, sz: int, M: int, d: int, e: int) -> float:
-        ...
+    def _unsigned(self, sz: int, M: int, d: int, e: int) -> float: ...
 
     @overload
     def _unsigned(
         self, sz: int, M: int, d: int, e: int, *, not_known: int
-    ) -> Optional[float]:
-        ...
+    ) -> Optional[float]: ...
 
     def _unsigned(
         self, sz: int, M: int, d: int, e: int, *, not_known: Optional[int] = None
