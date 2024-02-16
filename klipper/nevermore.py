@@ -317,6 +317,18 @@ class CmdConfigFlags(Command):
         return self.flags.to_bytes(8, "little") + self.mask.to_bytes(8, "little")
 
 
+@dataclass(frozen=True)
+class CmdConfigReboot(Command):
+    def params(self):
+        return (0).to_bytes(1, "little")
+
+
+@dataclass(frozen=True)
+class CmdConfigResetSensorCalibration(Command):
+    def params(self):
+        return b""
+
+
 class CmdFanPolicy(PseudoCommand):
     def __init__(self, config: ConfigWrapper) -> None:
         def cfg_int(key: str, min: int, max: int) -> Optional[int]:
@@ -364,6 +376,23 @@ class CmdConfigVocCalibrateEnabled(Command):
 
     def params(self):
         return int(self.value).to_bytes(1, "little")
+
+
+@dataclass(frozen=True)
+class CmdDisplayBrightness(Command):
+    percent: float
+
+    def params(self):
+        p = _clamp(self.percent, 0, 1) * 100
+        return int(p * 2).to_bytes(1, "little")
+
+
+@dataclass(frozen=True)
+class CmdDisplayUI(Command):
+    value: int
+
+    def params(self):
+        return self.value.to_bytes(1, "little")
 
 
 # Special pseudo command: Due to the very high frequency of these commands, we don't
@@ -626,6 +655,7 @@ class NevermoreBackgroundWorker:
         service_fan = require(UUID_SERVICE_FAN)
         service_fan_policy = require(UUID_SERVICE_FAN_POLICY)
         service_ws2812 = require(UUID_SERVICE_WS2812)
+        service_display = require(UUID_SERVICE_DISPLAY)
 
         P = CharacteristicProperty
         aggregate_env = require_char(service_env, UUID_CHAR_DATA_AGGREGATE, {P.NOTIFY})
@@ -651,12 +681,20 @@ class NevermoreBackgroundWorker:
             service_fan_policy, UUID_CHAR_FAN_THERMAL, {P.WRITE}
         )
         config_flags = require_char(service_config, UUID_CHAR_CONFIG_FLAGS64, {P.WRITE})
+        config_reboot = require_char(service_config, UUID_CHAR_CONFIG_REBOOT, {P.WRITE})
+        config_reset_sensor_calibration = require_char(
+            service_config, UUID_CHAR_CONFIG_RESET_SENSOR_CALIBRATION, {P.WRITE}
+        )
         config_voc_threshold, config_voc_threshold_override = require_chars(
             service_config, UUID_CHAR_VOC_INDEX, 2, {P.WRITE}
         )
         config_voc_calibrate_enabled = require_char(
             service_config, UUID_CHAR_CONFIG_VOC_CALIBRATE_ENABLED, {P.WRITE}
         )
+        display_brightness = require_char(
+            service_display, UUID_CHAR_PERCENT8, {P.WRITE}
+        )
+        display_ui = require_char(service_display, UUID_CHAR_DISPLAY_UI, {P.WRITE})
 
         self._connected.set()
 
@@ -723,12 +761,20 @@ class NevermoreBackgroundWorker:
                 char = ws2812_length
             elif isinstance(cmd, CmdConfigFlags):
                 char = config_flags
+            elif isinstance(cmd, CmdConfigReboot):
+                char = config_reboot
+            elif isinstance(cmd, CmdConfigResetSensorCalibration):
+                char = config_reset_sensor_calibration
             elif isinstance(cmd, CmdConfigVocThreshold):
                 char = config_voc_threshold
             elif isinstance(cmd, CmdConfigVocThresholdOverride):
                 char = config_voc_threshold_override
             elif isinstance(cmd, CmdConfigVocCalibrateEnabled):
                 char = config_voc_calibrate_enabled
+            elif isinstance(cmd, CmdDisplayBrightness):
+                char = display_brightness
+            elif isinstance(cmd, CmdDisplayUI):
+                char = display_ui
             else:
                 raise Exception(f"unhandled command {cmd}")
 
@@ -797,6 +843,9 @@ class NevermoreBackgroundWorker:
 class Nevermore:
     cmd_NEVERMORE_VOC_GATING_THRESHOLD_OVERRIDE_help = "Set/clear the VOC gating threshold override (omit `THRESHOLD` to clear override)"
     cmd_NEVERMORE_VOC_CALIBRATION_help = "Set the automatic VOC calibration process"
+    cmd_NEVERMORE_REBOOT_help = "Reboots the controller"
+    cmd_NEVERMORE_STATUS_help = "Report controller status to console"
+    cmd_NEVERMORE_SENSOR_CALIBRATION_RESET_help = "Reset sensor calibration"
 
     def __init__(self, config: ConfigWrapper) -> None:
         self.name = config.get_name().split()[-1]
@@ -904,6 +953,21 @@ class Nevermore:
                 "`fan_thermal_limit_temperature_min` must <= `fan_thermal_limit_temperature_max`"
             )
 
+        self._display_brightness = opt(
+            CmdDisplayBrightness,
+            config.getfloat("display_brightness", minval=0, maxval=1),
+        )
+
+        try:
+            self._display_ui = opt(
+                lambda x: CmdDisplayUI(DisplayUI[x.upper()].value),
+                config.get("display_ui"),
+            )
+        except KeyError:
+            raise config.error(
+                f"`display_ui` isn't one of: {', '.join(x.name for x in DisplayUI)}"
+            )
+
         self._interface: Optional[NevermoreBackgroundWorker] = None
         self._handle_request_restart(None)
 
@@ -928,6 +992,27 @@ class Nevermore:
             self.name,
             self.cmd_NEVERMORE_VOC_CALIBRATION,
             desc=self.cmd_NEVERMORE_VOC_CALIBRATION_help,
+        )
+        gcode.register_mux_command(
+            "NEVERMORE_REBOOT",
+            "NEVERMORE",
+            self.name,
+            self.cmd_NEVERMORE_REBOOT,
+            desc=self.cmd_NEVERMORE_REBOOT_help,
+        )
+        gcode.register_mux_command(
+            "NEVERMORE_STATUS",
+            "NEVERMORE",
+            self.name,
+            self.cmd_NEVERMORE_STATUS,
+            desc=self.cmd_NEVERMORE_STATUS_help,
+        )
+        gcode.register_mux_command(
+            "NEVERMORE_SENSOR_CALIBRATION_RESET",
+            "NEVERMORE",
+            self.name,
+            self.cmd_NEVERMORE_SENSOR_CALIBRATION_RESET,
+            desc=self.cmd_NEVERMORE_SENSOR_CALIBRATION_RESET_help,
         )
 
     def set_fan_power(self, percent: Optional[float]):
@@ -975,6 +1060,8 @@ class Nevermore:
         self._interface.send_command(self._fan_power_auto)
         self._interface.send_command(self._fan_power_coeff)
         self._interface.send_command(self._fan_thermal_limit)
+        self._interface.send_command(self._display_brightness)
+        self._interface.send_command(self._display_ui)
         self._interface.send_command(CmdWs2812Length(len(self.led_colour_idxs)))
         self._interface.send_command(CmdWs2812MarkDirty())
 
@@ -1014,6 +1101,22 @@ class Nevermore:
         )
         if self._interface is not None:
             self._interface.send_command(self._voc_calibrate_enabled)
+
+    def cmd_NEVERMORE_REBOOT(self, gcmd: GCodeCommand) -> None:
+        if self._interface is not None and self._interface.wait_for_connection(0):
+            self._interface.send_command(CmdConfigReboot())
+        else:
+            gcmd.respond_info("not yet connected")
+
+    def cmd_NEVERMORE_STATUS(self, gcmd: GCodeCommand) -> None:
+        if self._interface is not None and self._interface.wait_for_connection(0):
+            gcmd.respond_info("connected")
+        else:
+            gcmd.respond_info("not yet connected")
+
+    def cmd_NEVERMORE_SENSOR_CALIBRATION_RESET(self, gcmd: GCodeCommand) -> None:
+        if self._interface is not None:
+            self._interface.send_command(CmdConfigResetSensorCalibration())
 
 
 # basically ripped from `extras/fan_generic.py`

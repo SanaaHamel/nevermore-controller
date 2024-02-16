@@ -500,6 +500,23 @@ fan_thermal_limit_coefficient: 0
 # voc index \in [175, 500]
 voc_gating_threshold: 240
 
+
+# Display Options
+
+# float \in [0, 1] - display backlight PWM %
+display_brightness: 1
+
+# enum - display UI
+# Valid enums:
+#   GC9A01_CLASSIC      - full sized VOC plot
+#   GC9A01_SMALL_PLOT   - smaller plot w/ explicit labels
+#   GC9A01_NO_PLOT      - no plot, largest text size
+#
+# NB: Changing will take effect when the controller reboots.
+#     You can reboot the controller using `NEVERMORE_REBOOT`. See G-Code Commands section.
+display_ui: GC9A01_CLASSIC
+
+
 # Misc. Sensor Options
 
 # If temperature, humidity, etc, is unavailable on one side of the filter then
@@ -545,6 +562,33 @@ plot_voc: false
 
 The following command can be used to influence behaviour at runtime.
 
+These typically require a `NEVERMORE=` parameter to specify which Nevermore to interact with.
+At this time, there can only be one Nevermore controller, which is named `nevermore`.
+
+
+==== NEVERMORE_STATUS
+
+Command:
+```
+NEVERMORE_STATUS NEVERMORE=<name>
+```
+
+Prints the Nevermore's current status to the console.
+Not terribly useful for most things, but helpful if you're not sure it's connected
+yet. (e.g. when used with `connection_initial_timeout: 0`)
+
+==== NEVERMORE_REBOOT
+
+Command:
+```
+NEVERMORE_REBOOT NEVERMORE=<name>
+```
+
+Reboots the Nevermore, if connected. Persistent settings will be saved.
+
+Probably easier than power cycling your whole printer.
+
+
 ==== NEVERMORE_VOC_CALIBRATION
 
 Command:
@@ -577,6 +621,18 @@ Overrides the VOC gating threshold (see `voc_gating_threshold` in the klipper co
 This is intended for setups where the slicer specifies the filament type using a user-defined G-Code macro (e.g. `SET_MATERIAL ABS`), and you would like to temporarily set the VOC gating threshold for a specific material/filament.
 
 Unlike the `voc_gating_threshold`, this is setting is *not* persisted and will be lost when the controller restarts.
+
+
+==== NEVERMORE_SENSOR_CALIBRATION_RESET
+
+Command:
+```
+NEVERMORE_SENSOR_CALIBRATION_RESET NEVERMORE=<name>
+```
+
+Resets the sensor calibrations. Does not immediately persist this reset calibration, but it will eventually be applied when the checkpoint process triggers.
+
+Useful when moving the printer to a new environment.
 
 
 === Finding The BT Address
