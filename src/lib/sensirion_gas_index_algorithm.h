@@ -179,6 +179,7 @@ typedef struct GasIndexAlgorithmParams {
     fix16_t _sigmoid_gating_variance;
     fix16_t _gating_threshold_mean;
     fix16_t _gating_threshold_variance;
+    bool _gating_force;
 } GasIndexAlgorithmParams;
 
 

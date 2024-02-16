@@ -358,6 +358,14 @@ class CmdConfigVocThresholdOverride(Command):
         return _clamp(self.value, 0, VOC_INDEX_MAX).to_bytes(2, "little")
 
 
+@dataclass(frozen=True)
+class CmdConfigVocCalibrateEnabled(Command):
+    value: bool
+
+    def params(self):
+        return int(self.value).to_bytes(1, "little")
+
+
 # Special pseudo command: Due to the very high frequency of these commands, we don't
 # queue them, but rather mark the pixel buffer as dirty to fold consecutive writes.
 # We still technically need this command because a single pixel buffer update
@@ -646,6 +654,9 @@ class NevermoreBackgroundWorker:
         config_voc_threshold, config_voc_threshold_override = require_chars(
             service_config, UUID_CHAR_VOC_INDEX, 2, {P.WRITE}
         )
+        config_voc_calibrate_enabled = require_char(
+            service_config, UUID_CHAR_CONFIG_VOC_CALIBRATE_ENABLED, {P.WRITE}
+        )
 
         self._connected.set()
 
@@ -716,6 +727,8 @@ class NevermoreBackgroundWorker:
                 char = config_voc_threshold
             elif isinstance(cmd, CmdConfigVocThresholdOverride):
                 char = config_voc_threshold_override
+            elif isinstance(cmd, CmdConfigVocCalibrateEnabled):
+                char = config_voc_calibrate_enabled
             else:
                 raise Exception(f"unhandled command {cmd}")
 
@@ -783,6 +796,7 @@ class NevermoreBackgroundWorker:
 
 class Nevermore:
     cmd_NEVERMORE_VOC_GATING_THRESHOLD_OVERRIDE_help = "Set/clear the VOC gating threshold override (omit `THRESHOLD` to clear override)"
+    cmd_NEVERMORE_VOC_CALIBRATION_help = "Set the automatic VOC calibration process"
 
     def __init__(self, config: ConfigWrapper) -> None:
         self.name = config.get_name().split()[-1]
@@ -863,6 +877,9 @@ class Nevermore:
         self._voc_gating_threshold_override: Optional[CmdConfigVocThresholdOverride] = (
             None
         )
+        # always send this command b/c I don't want to deal with support for people
+        # who end up in a strange state due to a klipper reset
+        self._voc_calibrate_enabled = CmdConfigVocCalibrateEnabled(True)
         self._configuration = CmdConfiguration(config)
         self._fan_policy = CmdFanPolicy(config)
         self._fan_power_passive = cfg_fan_power(CmdFanPowerPassive, "fan_power_passive")
@@ -905,6 +922,13 @@ class Nevermore:
             self.cmd_NEVERMORE_VOC_GATING_THRESHOLD_OVERRIDE,
             desc=self.cmd_NEVERMORE_VOC_GATING_THRESHOLD_OVERRIDE_help,
         )
+        gcode.register_mux_command(
+            "NEVERMORE_VOC_CALIBRATION",
+            "NEVERMORE",
+            self.name,
+            self.cmd_NEVERMORE_VOC_CALIBRATION,
+            desc=self.cmd_NEVERMORE_VOC_CALIBRATION_help,
+        )
 
     def set_fan_power(self, percent: Optional[float]):
         if self._interface is not None:
@@ -945,6 +969,7 @@ class Nevermore:
         self._interface.send_command(self._configuration)
         self._interface.send_command(self._voc_gating_threshold)
         self._interface.send_command(self._voc_gating_threshold_override)
+        self._interface.send_command(self._voc_calibrate_enabled)
         self._interface.send_command(self._fan_policy)
         self._interface.send_command(self._fan_power_passive)
         self._interface.send_command(self._fan_power_auto)
@@ -982,6 +1007,13 @@ class Nevermore:
         )
         if self._interface is not None:
             self._interface.send_command(self._voc_gating_threshold_override)
+
+    def cmd_NEVERMORE_VOC_CALIBRATION(self, gcmd: GCodeCommand) -> None:
+        self._voc_calibrate_enabled = CmdConfigVocCalibrateEnabled(
+            gcmd.get_int("ENABLED", minval=0, maxval=1) == 1
+        )
+        if self._interface is not None:
+            self._interface.send_command(self._voc_calibrate_enabled)
 
 
 # basically ripped from `extras/fan_generic.py`

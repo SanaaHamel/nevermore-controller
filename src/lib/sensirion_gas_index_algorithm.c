@@ -301,7 +301,7 @@ static void GasIndexAlgorithm__adaptive_lowpass__set_parameters(GasIndexAlgorith
 static fix16_t GasIndexAlgorithm__adaptive_lowpass__process(GasIndexAlgorithmParams *params, fix16_t sample);
 
 void  GasIndexAlgorithm_init(GasIndexAlgorithmParams *params, int32_t algorithm_type) {
-
+    params->_gating_force = false;
     params->mAlgorithm_Type = algorithm_type;
     if ((algorithm_type == GasIndexAlgorithm_ALGORITHM_TYPE_NOX)) {
         params->mIndex_Offset = F16(GasIndexAlgorithm_NOX_INDEX_OFFSET_DEFAULT);
@@ -545,6 +545,10 @@ static void  GasIndexAlgorithm__mean_variance_estimator___sigmoid__set_parameter
 }
 
 static fix16_t  GasIndexAlgorithm__mean_variance_estimator___sigmoid__process(GasIndexAlgorithmParams *params, fix16_t sample) {
+    // HACK: easiest way to disable all gating and freeze the MVE
+    if (params->_gating_force) {
+        return F16(0.);
+    }
 
     fix16_t x;
 

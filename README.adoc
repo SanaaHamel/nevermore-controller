@@ -109,7 +109,7 @@ xref:klipper-config-full[See here for complete documentation.]
 
 . Update your printer macros.
 
-.. Add `SET_FAN_SPEED FAN=nevermore_fan SPEED=1` to your `print_start` macro.footnote:[I suggest adding gcode rather than a macro wrapper because you want the filter to start when the extruder/bed heats up, and your `print_start` probably does a lot of things (homing, QGL, purge, etc).]
+.. Add `SET_FAN_SPEED FAN=nevermore_fan SPEED=1` and `NEVERMORE_VOC_CALIBRATION NEVERMORE=nevermore ENABLED=0` to your `print_start` macro.footnote:[I suggest adding gcode rather than a macro wrapper because you want the filter to start when the extruder/bed heats up, and your `print_start` probably does a lot of things (homing, QGL, purge, etc).]
 +
 This'll let you kick-start the filter before the chamber gets detectably filthy. Example:
 +
@@ -123,11 +123,13 @@ gcode:
     # Override automatic control.
     # Start filtering before sensors can detect VOCs.
     SET_FAN_SPEED FAN=nevermore_fan SPEED=1
+    # Disable VOC sensor drift calibration during a print
+    NEVERMORE_VOC_CALIBRATION NEVERMORE=nevermore ENABLED=0
 
     ... <SNIP YOUR CURRENT GCODE> ...
 ```
 
-.. Add `SET_FAN_SPEED FAN=nevermore_fan` to your `TURN_OFF_HEATERS` macro.
+.. Add `SET_FAN_SPEED FAN=nevermore_fan` and `NEVERMORE_VOC_CALIBRATION NEVERMORE=nevermore ENABLED=1` to your `TURN_OFF_HEATERS` macro.
 +
 WARNING: This assumes your `print_end` macro calls `TURN_OFF_HEATERS`. If it doesn't you'll want to put `SET_FAN_SPEED FAN=nevermore_fan` in your `print_end` macro to turn off the fan override.
 +
@@ -144,6 +146,8 @@ gcode:
     #     It instead forces the speed to 0.
     #     Omit `SPEED` argument entirely to clear override.
     SET_FAN_SPEED FAN=nevermore_fan
+    # Re-enable VOC sensor drift calibration
+    NEVERMORE_VOC_CALIBRATION NEVERMORE=nevermore ENABLED=1
 ```
 
 . Check your printer's log file. If everything went well you should see something like:
@@ -540,6 +544,25 @@ plot_voc: false
 === G-Code Commands
 
 The following command can be used to influence behaviour at runtime.
+
+==== NEVERMORE_VOC_CALIBRATION
+
+Command:
+```
+NEVERMORE_VOC_CALIBRATION NEVERMORE=<name> ENABLED={0, 1}
+```
+
+Enables/disables the VOC sensor calibration.
+*Sensor calibration should be enabled whenever the printer isn't printing.*
+
+Sensor calibration should *only* be disabled when the printer is printing. Doing
+this prevents the VOC sensor from mistaking low VOC emissions for sensor drift
+and implicitly compensating for it.
+
+This should be used in conjunction with `NEVERMORE_VOC_GATING_THRESHOLD_OVERRIDE`
+to automatically enable/disable VOC calibration if the air is still dirty post-print.
+
+VOC sensor calibration is always enabled when the controller powers on.
 
 
 ==== NEVERMORE_VOC_GATING_THRESHOLD_OVERRIDE

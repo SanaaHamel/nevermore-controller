@@ -105,6 +105,7 @@ UUID_CHAR_VOC_INDEX = UUID("216aa791-97d0-46ac-8752-60bbc00611e1")
 UUID_CHAR_WS2812_UPDATE = UUID("5d91b6ce-7db1-4e06-b8cb-d75e7dd49aae")
 UUID_CHAR_CONFIG_FLAGS64 = UUID("d4b66bf4-3d8f-4746-b6a2-8a59d2eac3ce")
 UUID_CHAR_CONFIG_REBOOT = UUID("f48a18bb-e03c-4583-8006-5b54422e2045")
+UUID_CHAR_CONFIG_VOC_CALIBRATE_ENABLED = UUID("ee786ac0-7700-47dd-b7de-9958f96303f2")
 
 
 # must be of the form `xx:xx:xx:xx:xx:xx`, where `x` is a hex digit (uppercase)

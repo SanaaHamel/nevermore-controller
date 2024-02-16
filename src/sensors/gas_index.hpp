@@ -30,6 +30,8 @@ struct GasIndex {
             gia.mGating_Threshold = F16(threshold.value_or(0));
         }
 
+        gia._gating_force = !settings.voc_calibration_enabled;
+
         int32_t voc_index{};
         GasIndexAlgorithm_process(&gia, raw, &voc_index);
         assert(0 <= voc_index && voc_index <= 500);

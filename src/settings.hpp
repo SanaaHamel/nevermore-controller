@@ -69,6 +69,7 @@ static_assert(sizeof(SettingsPersisted) <= MAX_SIZE);
 // persisted across reboots.
 struct SettingsNonPersistent {
     VOCIndex voc_gating_threshold_override = BLE::NOT_KNOWN;
+    bool voc_calibration_enabled = true;
 };
 
 struct Settings : SettingsPersisted, SettingsNonPersistent {};
