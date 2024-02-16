@@ -342,6 +342,21 @@ WARNING: The default assignments are tentative and will probably change after we
 |===
 
 
+[#persistence]
+== Persistent Settings
+
+The controller will save most settings and calibrations to built-in flash
+periodically.
+To minimise wear & tear, settings are written every 10 minutes (if they've changed),
+and sensor calibrations are checkpointed every 24h.
+Settings are also immediately written (if changed) before any reboot requests.
+
+The current implementation doesn't distinguish between user customised values
+and default ones. Consequently, if default settings change they won't be updated
+automatically unless your settings are reset.
+This can be done using xref:NEVERMORE_RESET[`NEVERMORE_RESET`], if you are connected via Klipper.
+
+
 [#klipper]
 == Klipper
 
@@ -587,6 +602,21 @@ NEVERMORE_REBOOT NEVERMORE=<name>
 Reboots the Nevermore, if connected. Persistent settings will be saved.
 
 Probably easier than power cycling your whole printer.
+
+
+==== NEVERMORE_RESET
+
+WARNING: *This command should not be used unless directed by Someone Who Knows What They're Doing.*
+
+Command:
+```
+NEVERMORE_RESET NEVERMORE=<name> FLAGS=<int>
+```
+
+Resets persistent settings to defaults.
+It is deliberately under-documented to dissuade causal use.
+
+Policy settings can can be reset to default using `FLAGS=2`.
 
 
 ==== NEVERMORE_VOC_CALIBRATION

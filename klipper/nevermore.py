@@ -324,6 +324,14 @@ class CmdConfigReboot(Command):
 
 
 @dataclass(frozen=True)
+class CmdConfigReset(Command):
+    flags: int
+
+    def params(self):
+        return self.flags.to_bytes(1, "little")
+
+
+@dataclass(frozen=True)
 class CmdConfigResetSensorCalibration(Command):
     def params(self):
         return b""
@@ -682,6 +690,7 @@ class NevermoreBackgroundWorker:
         )
         config_flags = require_char(service_config, UUID_CHAR_CONFIG_FLAGS64, {P.WRITE})
         config_reboot = require_char(service_config, UUID_CHAR_CONFIG_REBOOT, {P.WRITE})
+        config_reset = require_char(service_config, UUID_CHAR_CONFIG_RESET, {P.WRITE})
         config_reset_sensor_calibration = require_char(
             service_config, UUID_CHAR_CONFIG_RESET_SENSOR_CALIBRATION, {P.WRITE}
         )
@@ -763,6 +772,8 @@ class NevermoreBackgroundWorker:
                 char = config_flags
             elif isinstance(cmd, CmdConfigReboot):
                 char = config_reboot
+            elif isinstance(cmd, CmdConfigReset):
+                char = config_reset
             elif isinstance(cmd, CmdConfigResetSensorCalibration):
                 char = config_reset_sensor_calibration
             elif isinstance(cmd, CmdConfigVocThreshold):
@@ -846,6 +857,7 @@ class Nevermore:
     cmd_NEVERMORE_REBOOT_help = "Reboots the controller"
     cmd_NEVERMORE_STATUS_help = "Report controller status to console"
     cmd_NEVERMORE_SENSOR_CALIBRATION_RESET_help = "Reset sensor calibration"
+    cmd_NEVERMORE_RESET_help = "Reset settings. Do not use unless directed."
 
     def __init__(self, config: ConfigWrapper) -> None:
         self.name = config.get_name().split()[-1]
@@ -1001,6 +1013,13 @@ class Nevermore:
             desc=self.cmd_NEVERMORE_REBOOT_help,
         )
         gcode.register_mux_command(
+            "NEVERMORE_RESET",
+            "NEVERMORE",
+            self.name,
+            self.cmd_NEVERMORE_RESET,
+            desc=self.cmd_NEVERMORE_RESET_help,
+        )
+        gcode.register_mux_command(
             "NEVERMORE_STATUS",
             "NEVERMORE",
             self.name,
@@ -1107,6 +1126,12 @@ class Nevermore:
             self._interface.send_command(CmdConfigReboot())
         else:
             gcmd.respond_info("not yet connected")
+
+    def cmd_NEVERMORE_RESET(self, gcmd: GCodeCommand) -> None:
+        if self._interface is not None:
+            self._interface.send_command(
+                CmdConfigReset(gcmd.get_int("FLAGS", minval=1, maxval=0xFF))
+            )
 
     def cmd_NEVERMORE_STATUS(self, gcmd: GCodeCommand) -> None:
         if self._interface is not None and self._interface.wait_for_connection(0):
