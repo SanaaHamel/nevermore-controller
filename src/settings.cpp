@@ -223,7 +223,8 @@ void SettingsV0::merge_valid_fields(SettingsV0 const& x) {
     if (x.fan_power_coefficient != BLE::NOT_KNOWN) fan_power_coefficient = x.fan_power_coefficient;
     // nothing to do for voc_calibration b/c that's sensor specific
     voc_calibration = x.voc_calibration;
-    if (x.voc_gating != BLE::NOT_KNOWN) voc_gating = x.voc_gating;
+    if (x.voc_gating_threshold != BLE::NOT_KNOWN && VOC_GATING_THRESHOLD_MIN <= x.voc_gating_threshold)
+        voc_gating_threshold = x.voc_gating_threshold;
     if (0 <= x.display_brightness && x.display_brightness <= 1) display_brightness = x.display_brightness;
 
     switch (x.display_hw) {

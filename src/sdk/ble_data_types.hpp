@@ -205,6 +205,12 @@ struct [[gnu::packed]] Scalar {
         return raw_value * scale;
     }
 
+    [[nodiscard]] constexpr Scalar or_(Scalar x) const
+        requires(has_not_known<Scalar>)
+    {
+        return *this == NOT_KNOWN ? x : *this;
+    }
+
     [[nodiscard]] constexpr double value_or(double x) const
         requires(has_not_known<Scalar>)
     {
@@ -281,6 +287,17 @@ template <typename T>
 struct [[gnu::packed]] ValidRange {
     T min = {};   // minimum valid value, inclusive
     T max = min;  // maximum valid value, inclusive
+
+    constexpr bool in_range(T const& x) const {
+        assert(min <= max);
+        return min <= x && x <= max;
+    }
+
+    constexpr bool in_range_or_not_known(T const& x) const
+        requires(has_not_known<T>)
+    {
+        return x == NOT_KNOWN || in_range(x);
+    }
 };
 
 //////////////////////////////////////////////

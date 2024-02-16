@@ -17,19 +17,19 @@ struct GasIndex {
     GasIndexAlgorithmParams gia{};
     Clock::time_point next_checkpoint = Clock::now() + CHECKPOINT_PERIOD;
 
-    GasIndex(int32_t type = GasIndexAlgorithm_ALGORITHM_TYPE_VOC,
-            settings::Settings const& settings = settings::g_active) {
+    GasIndex(int32_t type = GasIndexAlgorithm_ALGORITHM_TYPE_VOC) {
         assert(type == GasIndexAlgorithm_ALGORITHM_TYPE_VOC || type == GasIndexAlgorithm_ALGORITHM_TYPE_NOX);
         GasIndexAlgorithm_init(&gia, type);
-
-        if (settings.voc_gating != BLE::NOT_KNOWN) {
-            assert(1 <= settings.voc_gating && settings.voc_gating <= 500);
-            gia.mGating_Threshold = F16(settings.voc_gating.value_or(0));
-        }
     }
 
     // ~330 us during steady-state, ~30 us during startup blackout
-    VOCIndex process(int32_t raw) {
+    VOCIndex process(int32_t raw, settings::Settings const& settings = settings::g_active) {
+        if (auto threshold = settings.voc_gating_threshold_override.or_(settings.voc_gating_threshold);
+                threshold != BLE::NOT_KNOWN) {
+            assert(1 <= threshold && threshold <= 500);
+            gia.mGating_Threshold = F16(threshold.value_or(0));
+        }
+
         int32_t voc_index{};
         GasIndexAlgorithm_process(&gia, raw, &voc_index);
         assert(0 <= voc_index && voc_index <= 500);

@@ -16,6 +16,8 @@ using namespace std;
 #define CONFIG_FLAGS_01 d4b66bf4_3d8f_4746_b6a2_8a59d2eac3ce_01
 #define CONFIG_RESET_SENSOR_CALIBRATION 75bf055c_02be_466f_8c7d_6ebc72078048_01
 #define CONFIG_RESET_SETTINGS f2810b13_8cd7_4d6f_bb1b_e276db7fadbf_01
+#define CONFIG_VOC_GATING_THRESHOLD 216aa791_97d0_46ac_8752_60bbc00611e1_05
+#define CONFIG_VOC_GATING_THRESHOLD_OVERRIDE 216aa791_97d0_46ac_8752_60bbc00611e1_06
 
 namespace nevermore::gatt::configuration {
 
@@ -51,6 +53,9 @@ void reboot_delayed(bool to_bootloader) {
         go([](auto* p) { picowota_reboot(false); });
 }
 
+constexpr BLE::ValidRange VOC_GATING_THRESHOLD_RANGE{.min = settings::VOC_GATING_THRESHOLD_MIN,
+        .max = sensors::VOCIndex(500)};
+
 }  // namespace
 
 bool init() {
@@ -66,6 +71,12 @@ optional<uint16_t> attr_read(
         USER_DESCRIBE(CONFIG_FLAGS_01, "Configuration Flags (bitset)")
         USER_DESCRIBE(CONFIG_RESET_SENSOR_CALIBRATION, "Reset sensor calibration")
         USER_DESCRIBE(CONFIG_RESET_SETTINGS, "Reset settings (bitset)")
+        USER_DESCRIBE(CONFIG_VOC_GATING_THRESHOLD, "VOC Gating Threshold")
+        USER_DESCRIBE(CONFIG_VOC_GATING_THRESHOLD_OVERRIDE, "VOC Gating Threshold Override")
+
+        // NOLINTNEXTLINE(bugprone-branch-clone)
+        HANDLE_READ_BLOB(CONFIG_VOC_GATING_THRESHOLD, VALID_RANGE, VOC_GATING_THRESHOLD_RANGE)
+        HANDLE_READ_BLOB(CONFIG_VOC_GATING_THRESHOLD_OVERRIDE, VALID_RANGE, VOC_GATING_THRESHOLD_RANGE)
 
         READ_VALUE(CONFIG_FLAGS_01, ([]() -> uint16_t {
             uint64_t flags = 0;
@@ -73,6 +84,9 @@ optional<uint16_t> attr_read(
                 flags |= uint64_t(*FLAGS.at(i)) << i;
             return flags;
         })())
+
+        READ_VALUE(CONFIG_VOC_GATING_THRESHOLD, settings::g_active.voc_gating_threshold)
+        READ_VALUE(CONFIG_VOC_GATING_THRESHOLD_OVERRIDE, settings::g_active.voc_gating_threshold_override)
 
     default: return {};
     }
@@ -132,6 +146,20 @@ optional<int> attr_write(
             settings::g_active.display_hw = settings::Settings{}.display_hw;
         }
 
+        return 0;
+    }
+    case HANDLE_ATTR(CONFIG_VOC_GATING_THRESHOLD, VALUE): {
+        sensors::VOCIndex threshold = consume;
+        if (!VOC_GATING_THRESHOLD_RANGE.in_range(threshold)) return ATT_ERROR_VALUE_NOT_ALLOWED;
+
+        settings::g_active.voc_gating_threshold = threshold;
+        return 0;
+    }
+    case HANDLE_ATTR(CONFIG_VOC_GATING_THRESHOLD_OVERRIDE, VALUE): {
+        sensors::VOCIndex threshold = consume;
+        if (!VOC_GATING_THRESHOLD_RANGE.in_range_or_not_known(threshold)) return ATT_ERROR_VALUE_NOT_ALLOWED;
+
+        settings::g_active.voc_gating_threshold_override = threshold;
         return 0;
     }
 

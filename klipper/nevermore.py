@@ -79,6 +79,7 @@ CONTROLLER_CONNECTION_RETRY_DELAY_INITIAL = 1
 CONTROLLER_CONNECTION_RETRY_DELAY_POST_CONNECT = 60
 
 _A = TypeVar("_A")
+_B = TypeVar("_B")
 _Float = TypeVar("_Float", bound=float)
 
 RGBW = Tuple[float, float, float, float]
@@ -339,6 +340,22 @@ class CmdConfiguration(PseudoCommand):
 
         cfg_flag("sensors_fallback", 0)
         cfg_flag("sensors_fallback_exhaust_mcu", 1)
+
+
+@dataclass(frozen=True)
+class CmdConfigVocThreshold(Command):
+    value: int
+
+    def params(self):
+        return _clamp(self.value, 0, VOC_INDEX_MAX).to_bytes(2, "little")
+
+
+@dataclass(frozen=True)
+class CmdConfigVocThresholdOverride(Command):
+    value: int
+
+    def params(self):
+        return _clamp(self.value, 0, VOC_INDEX_MAX).to_bytes(2, "little")
 
 
 # Special pseudo command: Due to the very high frequency of these commands, we don't
@@ -626,6 +643,9 @@ class NevermoreBackgroundWorker:
             service_fan_policy, UUID_CHAR_FAN_THERMAL, {P.WRITE}
         )
         config_flags = require_char(service_config, UUID_CHAR_CONFIG_FLAGS64, {P.WRITE})
+        config_voc_threshold, config_voc_threshold_override = require_chars(
+            service_config, UUID_CHAR_VOC_INDEX, 2, {P.WRITE}
+        )
 
         self._connected.set()
 
@@ -692,6 +712,10 @@ class NevermoreBackgroundWorker:
                 char = ws2812_length
             elif isinstance(cmd, CmdConfigFlags):
                 char = config_flags
+            elif isinstance(cmd, CmdConfigVocThreshold):
+                char = config_voc_threshold
+            elif isinstance(cmd, CmdConfigVocThresholdOverride):
+                char = config_voc_threshold_override
             else:
                 raise Exception(f"unhandled command {cmd}")
 
@@ -758,6 +782,8 @@ class NevermoreBackgroundWorker:
 
 
 class Nevermore:
+    cmd_NEVERMORE_VOC_GATING_THRESHOLD_OVERRIDE_help = "Set/clear the VOC gating threshold override (omit `THRESHOLD` to clear override)"
+
     def __init__(self, config: ConfigWrapper) -> None:
         self.name = config.get_name().split()[-1]
         self.printer: Printer = config.get_printer()
@@ -822,10 +848,21 @@ class Nevermore:
             config, "led"
         ).setup_helper(config, self._led_update, led_chain_count)
 
-        def cfg_fan_power(mk: Callable[[float], CmdFanPowerAbstract], name: str):
-            x = config.getfloat(name, default=None, minval=0, maxval=1)
+        def opt(mk: Callable[[_A], _B], x: Optional[_A]):
             return mk(x) if x is not None else None
 
+        def cfg_fan_power(mk: Callable[[float], CmdFanPowerAbstract], name: str):
+            return opt(mk, config.getfloat(name, default=None, minval=0, maxval=1))
+
+        self._voc_gating_threshold = opt(
+            CmdConfigVocThreshold,
+            config.getint(
+                "voc_gating_threshold", None, VOC_GATING_THRESHOLD_MIN, VOC_INDEX_MAX
+            ),
+        )
+        self._voc_gating_threshold_override: Optional[CmdConfigVocThresholdOverride] = (
+            None
+        )
         self._configuration = CmdConfiguration(config)
         self._fan_policy = CmdFanPolicy(config)
         self._fan_power_passive = cfg_fan_power(CmdFanPowerPassive, "fan_power_passive")
@@ -858,6 +895,15 @@ class Nevermore:
         self.printer.register_event_handler("klippy:shutdown", self._handle_shutdown)
         self.printer.register_event_handler(
             "gcode:request_restart", self._handle_request_restart
+        )
+
+        gcode: GCodeDispatch = self.printer.lookup_object("gcode")
+        gcode.register_mux_command(
+            "NEVERMORE_VOC_GATING_THRESHOLD_OVERRIDE",
+            "NEVERMORE",
+            self.name,
+            self.cmd_NEVERMORE_VOC_GATING_THRESHOLD_OVERRIDE,
+            desc=self.cmd_NEVERMORE_VOC_GATING_THRESHOLD_OVERRIDE_help,
         )
 
     def set_fan_power(self, percent: Optional[float]):
@@ -897,6 +943,8 @@ class Nevermore:
             return  # defensive: potential race between shutdown notice and connection
 
         self._interface.send_command(self._configuration)
+        self._interface.send_command(self._voc_gating_threshold)
+        self._interface.send_command(self._voc_gating_threshold_override)
         self._interface.send_command(self._fan_policy)
         self._interface.send_command(self._fan_power_passive)
         self._interface.send_command(self._fan_power_auto)
@@ -921,6 +969,19 @@ class Nevermore:
         data.update((f"{k}_min", v) for k, v in self._state_min.as_dict().items())
         data.update((f"{k}_max", v) for k, v in self._state_max.as_dict().items())
         return data
+
+    def cmd_NEVERMORE_VOC_GATING_THRESHOLD_OVERRIDE(self, gcmd: GCodeCommand) -> None:
+        # `None` to allow explicitly clearing override by not specifying a `SPEED` arg
+        self._voc_gating_threshold_override = CmdConfigVocThresholdOverride(
+            gcmd.get_int(
+                "THRESHOLD",
+                VOC_INDEX_NOT_KNOWN,
+                VOC_GATING_THRESHOLD_MIN,
+                VOC_INDEX_MAX,
+            )
+        )
+        if self._interface is not None:
+            self._interface.send_command(self._voc_gating_threshold_override)
 
 
 # basically ripped from `extras/fan_generic.py`

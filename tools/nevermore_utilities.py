@@ -42,7 +42,10 @@ BOOTLOADER_NAME_PREFIX = "picowota "
 
 TIMESEC16_MAX = 2**16 - 2
 VOC_INDEX_MAX = 500
+VOC_INDEX_NOT_KNOWN = 0
 VOC_RAW_MAX = 2**16 - 2
+
+VOC_GATING_THRESHOLD_MIN = 175
 
 
 # Non-configurable constants

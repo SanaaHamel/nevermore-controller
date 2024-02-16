@@ -7,7 +7,13 @@
 
 namespace nevermore::settings {
 
+using VOCIndex = sensors::VOCIndex;
+
 constexpr size_t MAX_SIZE = PICOWOTA_APP_STORE_SIZE;
+
+// Below this limit will prevent the GIA from updating the MVE in reasonable
+// conditions.
+constexpr VOCIndex VOC_GATING_THRESHOLD_MIN = 175;
 
 // TODO: Is there a library for doing this kind of lightweight versioning?
 // This structure **may not** change.
@@ -26,7 +32,6 @@ struct Header {
 // 16 octets should be more than enough.
 // Will be initialised to all-zeros by default.
 using SensorCalibrationBlob = std::array<uint8_t, 16>;
-using VOCIndex = nevermore::sensors::VOCIndex;
 
 enum class DisplayHW : uint8_t {
     GC9A01_240_240 = 0,
@@ -48,7 +53,7 @@ struct SettingsV0 {
     BLE::Percentage8 fan_power_automatic = 100;    // not-known -> disallowed
     BLE::Percentage8 fan_power_coefficient = 100;  // not-known -> disallowed
     std::array<SensorCalibrationBlob, 2> voc_calibration{};
-    VOCIndex voc_gating = 340;  // not-known -> disallowed, TODO: lower defaults to 240?
+    VOCIndex voc_gating_threshold = 240;  // not-known -> disallowed
     DisplayHW display_hw = DisplayHW::GC9A01_240_240;
     DisplayUI display_ui = DisplayUI::CIRCLE_240_CLASSIC;
     float display_brightness = 1.f;  // range: [0, 1]; don't edit directly, use `display::brightness`
@@ -60,7 +65,13 @@ struct SettingsV0 {
 using SettingsPersisted = SettingsV0;
 static_assert(sizeof(SettingsPersisted) <= MAX_SIZE);
 
-using Settings = SettingsPersisted;  // This will be removed/replaced by a future commit.
+// The following not part of the settings structure because they are not to be
+// persisted across reboots.
+struct SettingsNonPersistent {
+    VOCIndex voc_gating_threshold_override = BLE::NOT_KNOWN;
+};
+
+struct Settings : SettingsPersisted, SettingsNonPersistent {};
 extern Settings g_active;
 
 void init();

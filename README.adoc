@@ -480,6 +480,22 @@ fan_thermal_limit_temperature_max: 60
 # 1 to effectively disable the thermal limiter (no scaling at max temp)
 fan_thermal_limit_coefficient: 0
 
+
+# Sensor Settings
+
+# voc index \in [175, 500], threshold where the system stops adjusting the
+# calibration because the air is "unusually dirty". (AKA 'gating')
+# VOC emissions can significantly vary between different filament materials and
+# brands.
+# Set this threshold to the 'typical' VOC index observed mid print.
+# Setting this *too* low will prevent the system from adjusting to normal
+# air quality variations.
+# If you print with multiple materials/brands, see the G-Code command
+# `NEVERMORE_VOC_GATING_THRESHOLD_OVERRIDE`.
+# (or as close as possible given the minimum)
+# voc index \in [175, 500]
+voc_gating_threshold: 240
+
 # Misc. Sensor Options
 
 # If temperature, humidity, etc, is unavailable on one side of the filter then
@@ -518,6 +534,26 @@ class_name_override: <optional, not set by default>
 plot_voc: false
 
 ```
+
+
+[#klipper-gcode-commands]
+=== G-Code Commands
+
+The following command can be used to influence behaviour at runtime.
+
+
+==== NEVERMORE_VOC_GATING_THRESHOLD_OVERRIDE
+
+Command:
+```
+NEVERMORE_VOC_GATING_THRESHOLD_OVERRIDE NEVERMORE=<name> [THRESHOLD=<int \in [175, 500]>]
+```
+
+Overrides the VOC gating threshold (see `voc_gating_threshold` in the klipper config). Omit the `THRESHOLD` parameter to clear any existing override.
+
+This is intended for setups where the slicer specifies the filament type using a user-defined G-Code macro (e.g. `SET_MATERIAL ABS`), and you would like to temporarily set the VOC gating threshold for a specific material/filament.
+
+Unlike the `voc_gating_threshold`, this is setting is *not* persisted and will be lost when the controller restarts.
 
 
 === Finding The BT Address
