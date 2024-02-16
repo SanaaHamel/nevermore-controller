@@ -275,12 +275,18 @@ Can't fix due to how Fluidd interprets Klipper state data. https://github.com/fl
 +
 Fluidd is more or less unsupported with regards to sensor display and visualisation. I recommend Mainsail 2.7.1 or later instead.
 
-== Touch Display Support
+== Display Support
 
+There are a handful of UIs available. You can select them using the xref:klipper-config-full[`display_ui` klipper option].
+
+.Supported Display UIs
+image::README-display-UIs.png[Supported Display UI,512]
+
+=== Touch Support
 Touch display support is early in development and currently very limited.
 For now you can:
 
-* Long press on the center plot to toggle the fan override on/off
+* Long press on the center area to toggle the fan override on/off
 * Press/drag on the fan power ring to set the fan override to a specific percent
 
 == Software Build Requirements
