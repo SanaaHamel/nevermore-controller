@@ -967,13 +967,13 @@ class Nevermore:
 
         self._display_brightness = opt(
             CmdDisplayBrightness,
-            config.getfloat("display_brightness", minval=0, maxval=1),
+            config.getfloat("display_brightness", default=None, minval=0, maxval=1),
         )
 
         try:
             self._display_ui = opt(
                 lambda x: CmdDisplayUI(DisplayUI[x.upper()].value),
-                config.get("display_ui"),
+                config.get("display_ui", default=None),
             )
         except KeyError:
             raise config.error(
