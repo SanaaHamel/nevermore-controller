@@ -7,7 +7,7 @@
 
 namespace nevermore::settings {
 
-constexpr auto MAX_SIZE = PICOWOTA_APP_STORE_SIZE;
+constexpr size_t MAX_SIZE = PICOWOTA_APP_STORE_SIZE;
 
 // TODO: Is there a library for doing this kind of lightweight versioning?
 // This structure **may not** change.
@@ -57,17 +57,17 @@ struct SettingsV0 {
     void merge_valid_fields(SettingsV0 const&);
 };
 
-using Settings = SettingsV0;
+using SettingsPersisted = SettingsV0;
+static_assert(sizeof(SettingsPersisted) <= MAX_SIZE);
 
-static_assert(sizeof(Settings) <= MAX_SIZE);
-
+using Settings = SettingsPersisted;  // This will be removed/replaced by a future commit.
 extern Settings g_active;
 
 void init();
 
 // HACK: by ref b/c `Settings` can get pretty big
 // HACK: mutates `header::crc`
-void save(Settings&);
+void save(SettingsPersisted&);
 
 constexpr bool validate(DisplayHW ui) {
     using enum DisplayHW;

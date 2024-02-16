@@ -26,7 +26,7 @@ namespace nevermore::settings {
 
 namespace {
 
-CRC32_t crc(Settings const& settings) {
+CRC32_t crc(SettingsPersisted const& settings) {
     // NB: it is possible for `settings.header.size < sizeof(Settings)` (e.g. we've a newer version)
     auto crc = [](uint8_t const* p, uint8_t const* q, CRC32_t init) {
         if (q <= p) return init;
@@ -35,7 +35,7 @@ CRC32_t crc(Settings const& settings) {
 
     // compute the CRC of `settings` (skip the CRC field) + extra fields (which are in the store section)
     auto size_total = min<size_t>(settings.header.size, MAX_SIZE);
-    auto size_body = min(size_total, sizeof(Settings));
+    auto size_body = min(size_total, sizeof(SettingsPersisted));
     auto const* bgn = reinterpret_cast<uint8_t const*>(&settings);
     // NOLINTBEGIN(cppcoreguidelines-pro-bounds-pointer-arithmetic)
     auto x = crc(bgn + sizeof(CRC32_t), bgn + size_body, 0xFF);  // skip the CRC field
@@ -45,9 +45,9 @@ CRC32_t crc(Settings const& settings) {
 }
 
 // can't use RVO if wrapped in `optional` :(
-bool UNSAFE_from_flash(Settings& dst) {
+bool UNSAFE_from_flash(SettingsPersisted& dst) {
     // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic)
-    auto const& stored = *reinterpret_cast<Settings const*>(PICOWOTA_APP_STORE);
+    auto const& stored = *reinterpret_cast<SettingsPersisted const*>(PICOWOTA_APP_STORE);
     if (stored.header.size < sizeof(Header) || MAX_SIZE < stored.header.size) {
         printf("corrupt settings: size=0x%08x not in range [0x%08x, 0x%08x]\n", (unsigned)stored.header.size,
                 sizeof(Header), MAX_SIZE);
@@ -66,12 +66,12 @@ bool UNSAFE_from_flash(Settings& dst) {
     }
 
     // old version, need to initialise new fields (crc will be dirty but that's fine)
-    if (stored.header.size < sizeof(Settings)) {
+    if (stored.header.size < sizeof(SettingsPersisted)) {
         // Need a temp settings to setup defaults for new fields, existing fields
         // may be malformed/invalid.
-        Settings default_init{};
+        SettingsPersisted default_init{};
         memcpy(&default_init, &stored, stored.header.size);
-        default_init.header.size = sizeof(Settings);
+        default_init.header.size = sizeof(SettingsPersisted);
         dst.merge_valid_fields(default_init);
         return true;
     }
@@ -84,19 +84,19 @@ void UNSAFE_save_internal(void* param) {
     static_assert(MAX_SIZE <= FLASH_SECTOR_SIZE, "more complex impl' required");
 
     auto const APP_STORE_OFFSET = reinterpret_cast<unsigned>(PICOWOTA_APP_STORE) - XIP_BASE;
-    auto const& settings = *reinterpret_cast<Settings const*>(param);
+    auto const& settings = *reinterpret_cast<SettingsPersisted const*>(param);
     // shouldn't be trying to save the persisted version to itself
     assert(reinterpret_cast<uint8_t const*>(&settings) != PICOWOTA_APP_STORE);
-    assert(sizeof(Settings) <= settings.header.size);
+    assert(sizeof(SettingsPersisted) <= settings.header.size);
     assert(settings.header.size <= MAX_SIZE);
 
     // need a page-sized scratch pad to copy flash-2-flash and for partial page writes.
     static uint8_t scratch_page[FLASH_PAGE_SIZE];
 
     auto const size_total_padded = align<uint32_t>(settings.header.size, FLASH_PAGE_SIZE);
-    auto const size_main_padded = align<uint32_t>(sizeof(Settings), FLASH_PAGE_SIZE);
+    auto const size_main_padded = align<uint32_t>(sizeof(SettingsPersisted), FLASH_PAGE_SIZE);
     auto const size_main_paged = size_main_padded - FLASH_PAGE_SIZE;
-    auto const size_main_tail = sizeof(Settings) - size_main_paged;
+    auto const size_main_tail = sizeof(SettingsPersisted) - size_main_paged;
     auto const size_extra_partial = FLASH_PAGE_SIZE - size_main_tail;
 
     // NOLINTBEGIN(cppcoreguidelines-pro-bounds-pointer-arithmetic)
@@ -165,7 +165,7 @@ void UNSAFE_save_internal(void* param) {
 
     // stash our partial page (if any)
     memcpy(scratch_page, reinterpret_cast<uint8_t const*>(&settings) + size_main_paged, size_main_tail);
-    memcpy(scratch_page + size_main_tail, PICOWOTA_APP_STORE + sizeof(Settings), size_extra_partial);
+    memcpy(scratch_page + size_main_tail, PICOWOTA_APP_STORE + sizeof(SettingsPersisted), size_extra_partial);
 
     flash_range_erase(APP_STORE_OFFSET, PICOWOTA_APP_STORE_SIZE);
     // copy whole-page parts
@@ -195,13 +195,13 @@ void init() {
     }
 }
 
-void save(Settings& settings) {
-    assert(sizeof(Settings) <= settings.header.size && "should have a full size field");
+void save(SettingsPersisted& settings) {
+    assert(sizeof(SettingsPersisted) <= settings.header.size && "should have a full size field");
 
     // FP:  false negatives due to non-canonical reps is fine, we just want to
     //      reduce the # of flashes.
     // NOLINTNEXTLINE(bugprone-suspicious-memory-comparison)
-    if (memcmp(PICOWOTA_APP_STORE, &settings, sizeof(Settings)) == 0) return;
+    if (memcmp(PICOWOTA_APP_STORE, &settings, sizeof(SettingsPersisted)) == 0) return;
 
     printf("Persisting settings...\n");
     // update CRC (we can do this safely since everything is read-only)
