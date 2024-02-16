@@ -60,6 +60,7 @@ NOTE: In the future, you'll be able to use Klipper sensors/thermistors to provid
 | BME280            | Humidity, Temperature, Pressure
 | BME680, BME688    | Humidity, Temperature, Pressure footnote:[This specific multi-sensor has a gas sensor, but does not reliably detect VOCs relevant to 3D printing.]
 | HTU2xD            | Humidity, Temperature
+| SGP30             | Volatile Organic Compounds footnote:[SGP40 is preferred, but this should be functional.]
 | SGP40             | Volatile Organic Compounds
 |===
 
