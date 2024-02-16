@@ -317,10 +317,21 @@ void on_chart_draw(bool begin, lv_event_t* e) {
         //              we do not draw over the exhaust line.
         if (series != ui_chart_voc_intake.ui) break;
 
-        auto y_fade_top = abs_pos_for_value(series, 200).y;
-        auto y_fade_bot = abs_pos_for_value(series, 100).y;
+        auto threshold =
+                settings::g_active.voc_gating_threshold_override.or_(settings::g_active.voc_gating_threshold);
+        if (threshold == BLE::NOT_KNOWN) break;  // no gating threshold? odd.
+
+        // not quite precise for visualising the gating region, but this is for
+        // Entertainment Purposes(TM) so who cares...
+        auto threshold_mid = int(threshold.value_or(0));
+        auto threshold_hi = threshold_mid + threshold_mid / 10;
+        auto threshold_lo = threshold_mid - threshold_mid / 10;
+        if (threshold_lo == threshold_hi) break;  // too small to visualise, don't bother
+
+        auto y_fade_top = abs_pos_for_value(series, lv_coord_t(threshold_hi)).y;
+        auto y_fade_bot = abs_pos_for_value(series, lv_coord_t(threshold_lo)).y;
         // everything below the line has 0 opacity -> no-op
-        if (y_fade_bot < min(desc.p1->y, desc.p2->y)) return;
+        if (y_fade_bot < min(desc.p1->y, desc.p2->y)) break;
 
         // mask everything above line
         lv_draw_mask_line_param_t line_mask_param{};
@@ -436,7 +447,7 @@ bool init() {
         }
         for (uint i = 0; i < CHART_SERIES_ENTIRES_MAX; ++i) {
             auto p = double(i) / (CHART_SERIES_ENTIRES_MAX - 1);
-            lv_chart_set_next_value(ui.chart, ui_chart_voc_intake.ui, p * 250);
+            lv_chart_set_next_value(ui.chart, ui_chart_voc_intake.ui, p * 500);
         }
     }
 #endif
