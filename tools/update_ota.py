@@ -441,7 +441,9 @@ async def _update_via_bt_spp(args: CmdLnArgs):
             )
             break
         except TimeoutError as e:
-            print(f"potentially transient comm error, retrying...", exc_info=e)
+            logging.warning(
+                f"potentially transient comm error, retrying...", exc_info=e
+            )
 
 
 async def _report_new_version(args: CmdLnArgs, prev_version: str):
