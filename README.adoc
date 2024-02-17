@@ -2,7 +2,7 @@
 :toc: macro
 :toclevels: 2
 
-https://discord.gg/hWJWkc9HA7[image:https://img.shields.io/discord/1017933489779245137?color=%235865F2&label=discord&logo=discord&logoColor=white&style=flat-square[Discord]]
+https://www.buymeacoffee.com/sanaahamel[image:https://img.shields.io/badge/Support%20This%20Project%20-Buy%20me%20a%20coffee-purple.svg?style=flat-square[Support This Project - Buy me a coffee]] https://discord.gg/hWJWkc9HA7[image:https://img.shields.io/discord/1017933489779245137?color=%235865F2&label=discord&logo=discord&logoColor=white&style=flat-square[Discord]]
 
 A Pi Pico W based controller for https://github.com/nevermore3d/Nevermore_Max[Nevermore Max] and
 https://github.com/nevermore3d/StealthMax[StealthMax] filters.
