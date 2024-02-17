@@ -131,8 +131,12 @@ REBOOT_DELAY = 1  # seconds
 
 OTA_UPDATE_FILENAME = "picowota_nevermore-controller-ota.uf2"
 
-URL_RELEASES_FETCH = (
+URL_RELEASES_FETCH_LATEST = (
     "https://api.github.com/repos/sanaahamel/nevermore-controller/releases?per_page=1"
+)
+
+URL_RELEASES_FETCH_TAG = (
+    "https://api.github.com/repos/sanaahamel/nevermore-controller/releases/tags/{0}"
 )
 
 FETCH_RELEASE_HEADERS = {
@@ -162,21 +166,30 @@ class ReleaseInfo:
     assets: List[str]
 
 
-async def fetch_latest_release() -> Optional[ReleaseInfo]:
+async def fetch_release(url: str) -> Optional[ReleaseInfo]:
     async with ClientSession() as session:
-        async with session.get(
-            URL_RELEASES_FETCH, headers=FETCH_RELEASE_HEADERS
-        ) as response:
+        async with session.get(url, headers=FETCH_RELEASE_HEADERS) as response:
             content = await response.read()
             if response.status != 200:
                 logging.error(f"fetch releases failed. http code={response.status}")
                 return None
 
-            content = json.loads(content)[0]
+            content = json.loads(content)
+            if isinstance(content, list):
+                content = content[0]
+
             return ReleaseInfo(
                 tag=content["tag_name"],
                 assets=[x["browser_download_url"] for x in content["assets"]],
             )
+
+
+async def fetch_release_by_tag(tag: str) -> Optional[ReleaseInfo]:
+    return await fetch_release(URL_RELEASES_FETCH_TAG.format(tag))
+
+
+async def fetch_release_latest() -> Optional[ReleaseInfo]:
+    return await fetch_release(URL_RELEASES_FETCH_LATEST)
 
 
 async def fetch_asset(asset_url: str):
@@ -192,11 +205,7 @@ async def fetch_asset(asset_url: str):
             return file
 
 
-async def download_update():
-    release = await fetch_latest_release()
-    if release is None:
-        return None
-
+async def download_update(release: ReleaseInfo):
     assert_candidates = [x for x in release.assets if x.endswith(OTA_UPDATE_FILENAME)]
     assert len(assert_candidates) <= 1
     if not assert_candidates:
@@ -205,6 +214,7 @@ async def download_update():
         )
         return None
 
+    print(f"fetching release {release.tag} from {assert_candidates[0]}")
     return await fetch_asset(assert_candidates[0])
 
 
@@ -377,6 +387,7 @@ class ConnectToWifiAccessPointNetworkManager(ConnectToWifiAccessPoint):
 class CmdLnArgs(tap.TypedArgs):
     bt_address: Optional[str] = tap.arg(help="device's BT adddress")
     file: Optional[Path] = tap.arg(help="filepath for image")
+    tag: Optional[str] = tap.arg(help="download specific release tag")
     # `--no-tmux` and `--ignore-klipper` are used/handled by the shell wrapper script.
     # They're listed here for `--help` and unknown-argument checking.
     no_tmux: bool = tap.arg(help="don't run in a tmux session")
@@ -430,7 +441,7 @@ async def _update_via_bt_spp(args: CmdLnArgs):
             )
             break
         except TimeoutError as e:
-            logging.info(f"potentially transient comm error, retrying...", exc_info=e)
+            print(f"potentially transient comm error, retrying...", exc_info=e)
 
 
 async def _report_new_version(args: CmdLnArgs, prev_version: str):
@@ -459,9 +470,20 @@ async def _main(args: CmdLnArgs):
         logging.error("invalid address for `--bt-address`")
         return
 
+    if args.file is not None and args.tag is not None:
+        logging.error("`--tag` and `--file` are mutually exclusive")
+        return
+
     if args.file is None:
-        print("downloading latest update...")
-        temp_file = await download_update()
+        if args.tag is None:
+            release = await fetch_release_latest()
+        else:
+            release = await fetch_release_by_tag(args.tag)
+
+        if release is None:
+            return
+
+        temp_file = await download_update(release)
         if temp_file is None:
             return
 
