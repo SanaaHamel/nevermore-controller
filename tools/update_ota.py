@@ -163,6 +163,7 @@ def _bssid_from_bt_address(bt_address: str):
 @dataclass
 class ReleaseInfo:
     tag: str
+    info: str
     assets: List[str]
 
 
@@ -180,6 +181,7 @@ async def fetch_release(url: str) -> Optional[ReleaseInfo]:
 
             return ReleaseInfo(
                 tag=content["tag_name"],
+                info=content.get("body", "<<NO RELEASE DESCRIPTION>>"),
                 assets=[x["browser_download_url"] for x in content["assets"]],
             )
 
@@ -392,6 +394,7 @@ class CmdLnArgs(tap.TypedArgs):
     # They're listed here for `--help` and unknown-argument checking.
     no_tmux: bool = tap.arg(help="don't run in a tmux session")
     ignore_klipper: bool = tap.arg(help="don't check if klipper is running")
+    unattended: bool = tap.arg(help="do not ask user for input", default=False)
     tcp: bool = tap.arg(help="connect via TCP instead of BT SPP")
     ip: str = tap.arg(
         default="192.168.4.1", help="if non-empty, connect via TCP to given IP"
@@ -484,6 +487,12 @@ async def _main(args: CmdLnArgs):
 
         if release is None:
             return
+
+        print(f"RELEASE TAG: {release.tag}")
+        print(f"RELEASE DESCRIPTION:\n{release.info}\n")
+
+        if not args.unattended:
+            input("PRESS ENTER TO CONTINUE")
 
         temp_file = await download_update(release)
         if temp_file is None:
