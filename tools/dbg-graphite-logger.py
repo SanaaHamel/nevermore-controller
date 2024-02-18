@@ -50,8 +50,15 @@ I suggest the following dashboard snippet (paste it via `Dashboard -> Edit Dashb
   },
   {
     "target": [
-      "seriesByTag(\"name=gas_raw\")"
+      "seriesByTag(\"name=gas_raw\")",
+      "alpha(seriesByTag(\"name=gas_raw_uncompensated\"), 0.25)",
+      "alpha(dashed(seriesByTag(\"name=gas_raw_mean\")), 0.75)",
+      "alpha(sumSeries(seriesByTag(\"name=gas_raw_mean\", \"side=intake\"), seriesByTag(\"name=gas_raw_var\", \"side=intake\")), 0.5)",
+      "alpha(sumSeries(seriesByTag(\"name=gas_raw_mean\", \"side=intake\"), scale(seriesByTag(\"name=gas_raw_var\", \"side=intake\"), -1)), 0.5)",
+      "alpha(sumSeries(seriesByTag(\"name=gas_raw_mean\", \"side=exhaust\"), seriesByTag(\"name=gas_raw_var\", \"side=exhaust\")), 0.5)",
+      "alpha(sumSeries(seriesByTag(\"name=gas_raw_mean\", \"side=exhaust\"), scale(seriesByTag(\"name=gas_raw_var\", \"side=exhaust\"), -1)), 0.5)"
     ],
+    "vtitle": "Resistance",
     "title": "VOC Raw"
   },
   {
@@ -84,38 +91,6 @@ I suggest the following dashboard snippet (paste it via `Dashboard -> Edit Dashb
     "title": "Fan",
     "vtitle": "PWM %",
     "vtitleRight": "RPM"
-  }
-]
-```
-
-
-Alternatively, for a VOC/GIA breakdown:
-```
-[
-  {
-    "target": [
-      "seriesByTag(\"name=gas\")",
-      "seriesByTag(\"side=intake\", \"name=~gas_raw_threshold.*\")"
-    ],
-    "vtitle": "VOC Index",
-    "title": "VOC Index",
-    "yMin": "0"
-  },
-  {
-    "target": [
-      "seriesByTag(\"name=gas_raw\")",
-      "alpha(seriesByTag(\"name=gas_raw_uncompensated\"), 0.25)",
-      "alpha(dashed(seriesByTag(\"name=gas_raw_mean\")), 0.75)",
-      "alpha(sumSeries(seriesByTag(\"name=gas_raw_mean\", \"side=intake\"), seriesByTag(\"name=gas_raw_var\", \"side=intake\")), 0.5)",
-      "alpha(sumSeries(seriesByTag(\"name=gas_raw_mean\", \"side=intake\"), scale(seriesByTag(\"name=gas_raw_var\", \"side=intake\"), -1)), 0.5)",
-      "alpha(sumSeries(seriesByTag(\"name=gas_raw_mean\", \"side=exhaust\"), seriesByTag(\"name=gas_raw_var\", \"side=exhaust\")), 0.5)",
-      "alpha(sumSeries(seriesByTag(\"name=gas_raw_mean\", \"side=exhaust\"), scale(seriesByTag(\"name=gas_raw_var\", \"side=exhaust\"), -1)), 0.5)"
-    ],
-    "title": "VOC Raw",
-    "vtitle": "Resistance",
-    "yMin": "",
-    "graphOnly": "false",
-    "hideLegend": "false"
   },
   {
     "target": [
