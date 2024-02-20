@@ -1114,9 +1114,11 @@ class Nevermore:
         if self._interface is not None:
             self._interface.send_command(self._voc_gating_threshold_override)
 
-    def cmd_NEVERMORE_VOC_CALIBRATION(self, gcmd: GCodeCommand) -> None:
+    def cmd_NEVERMORE_VOC_CALIBRATION(self, gcmd: Union[GCodeCommand, bool]) -> None:
         self._voc_calibrate_enabled = CmdConfigVocCalibrateEnabled(
-            gcmd.get_int("ENABLED", minval=0, maxval=1) == 1
+            gcmd
+            if isinstance(gcmd, bool)
+            else gcmd.get_int("ENABLED", minval=0, maxval=1) == 1
         )
         if self._interface is not None:
             self._interface.send_command(self._voc_calibrate_enabled)
@@ -1250,7 +1252,63 @@ class NevermoreSensor:
         return measured_time + 1  # 1s delay?
 
 
+class NevermoreGlobal:
+    cmd_NEVERMORE_PRINT_START_help = (
+        "Set Nevermores to printing state. See documentation for details."
+    )
+    cmd_NEVERMORE_PRINT_END_help = (
+        "Set Nevermores to idle state. See documentation for details."
+    )
+
+    @staticmethod
+    def get_or_create(printer: Printer) -> "NevermoreGlobal":
+        obj = printer.lookup_object("NevermoreGlobal", default=None)
+        if obj is not None:
+            assert isinstance(obj, NevermoreGlobal)
+            return obj
+
+        obj = NevermoreGlobal(printer)
+        printer.add_object(f"NevermoreGlobal", obj)
+        return obj
+
+    def __init__(self, printer: Printer) -> None:
+        self.printer = printer
+
+        gcode: GCodeDispatch = self.printer.lookup_object("gcode")
+        gcode.register_command(
+            "NEVERMORE_PRINT_START",
+            self.cmd_NEVERMORE_PRINT_START,
+            desc=self.cmd_NEVERMORE_PRINT_START_help,
+        )
+        gcode.register_command(
+            "NEVERMORE_PRINT_END",
+            self.cmd_NEVERMORE_PRINT_END,
+            desc=self.cmd_NEVERMORE_PRINT_END_help,
+        )
+
+    def nevermores(self) -> List[Tuple[str, Nevermore]]:
+        return self.printer.lookup_objects("nevermore")
+
+    def cmd_NEVERMORE_PRINT_START(self, gcmd: GCodeCommand) -> None:
+        fan_speed: Optional[float] = gcmd.get_float(
+            "FAN_SPEED", default=1.0, minval=0.0, maxval=1.0
+        )
+        if gcmd.get_int("FAN_AUTOMATIC", default=0, minval=0, maxval=1) == 1:
+            fan_speed = None
+
+        for _, nevermore in self.nevermores():
+            nevermore.set_fan_power(fan_speed)
+            nevermore.cmd_NEVERMORE_VOC_CALIBRATION(False)
+
+    def cmd_NEVERMORE_PRINT_END(self, gcmd: GCodeCommand) -> None:
+        for _, nevermore in self.nevermores():
+            nevermore.set_fan_power(None)
+            nevermore.cmd_NEVERMORE_VOC_CALIBRATION(True)
+
+
 def load_config(config: ConfigWrapper):
+    NevermoreGlobal.get_or_create(config.get_printer())
+
     heaters = config.get_printer().load_object(config, "heaters")
     heaters.add_sensor_factory("NevermoreSensor", NevermoreSensor)
 

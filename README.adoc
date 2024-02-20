@@ -110,9 +110,7 @@ xref:klipper-config-full[See here for complete documentation.]
 
 . Update your printer macros.
 
-.. Add `SET_FAN_SPEED FAN=nevermore_fan SPEED=1` and `NEVERMORE_VOC_CALIBRATION NEVERMORE=nevermore ENABLED=0` to your `print_start` macro.footnote:[I suggest adding gcode rather than a macro wrapper because you want the filter to start when the extruder/bed heats up, and your `print_start` probably does a lot of things (homing, QGL, purge, etc).]
-+
-This'll let you kick-start the filter before the chamber gets detectably filthy. Example:
+.. Add `<<NEVERMORE_PRINT_START>>` to your `print_start` macro.footnote:[I suggest adding gcode rather than a macro wrapper because you want the filter to start when the extruder/bed heats up, and your `print_start` probably does a lot of things (homing, QGL, purge, etc).]
 +
 ```ini
 [gcode_macro PRINT_START]
@@ -121,18 +119,16 @@ gcode:
 
     # Insert right before heating extruder or bed
     # (e.g. M104, M109, M190, ...)
-    # Override automatic control.
-    # Start filtering before sensors can detect VOCs.
-    SET_FAN_SPEED FAN=nevermore_fan SPEED=1
-    # Disable VOC sensor drift calibration during a print
-    NEVERMORE_VOC_CALIBRATION NEVERMORE=nevermore ENABLED=0
+
+    # See <<NEVERMORE_PRINT_START>> for details and options.
+    NEVERMORE_PRINT_START
 
     ... <SNIP YOUR CURRENT GCODE> ...
 ```
 
-.. Add `SET_FAN_SPEED FAN=nevermore_fan` and `NEVERMORE_VOC_CALIBRATION NEVERMORE=nevermore ENABLED=1` to your `TURN_OFF_HEATERS` macro.
+.. Add `<<NEVERMORE_PRINT_END>>` to your `TURN_OFF_HEATERS` macro.
 +
-WARNING: This assumes your `print_end` macro calls `TURN_OFF_HEATERS`. If it doesn't you'll want to put `SET_FAN_SPEED FAN=nevermore_fan` in your `print_end` macro to turn off the fan override.
+WARNING: This assumes your `print_end` macro calls `TURN_OFF_HEATERS`. If it doesn't you'll want to put `<<NEVERMORE_PRINT_END>>` in your `print_end` macro instead.
 +
 Easiest way would be to put this macro wrapper in your config:footnote:[Wherever you'd like.`TURN_OFF_HEATERS` is a built-in macro, and should never be overridden w/o calling the replaced macro, so it doesn't matter if another macro ends up wrapping this wrapper.]
 +
@@ -142,13 +138,8 @@ Easiest way would be to put this macro wrapper in your config:footnote:[Wherever
 rename_existing: NEVERMORE_CONTROLLER_INNER_TURN_OFF_HEATERS
 gcode:
     NEVERMORE_CONTROLLER_INNER_TURN_OFF_HEATERS
-    # Clear the fan control override, we're cooling down
-    # NB: Setting SPEED=0 does *NOT* clear control override.
-    #     It instead forces the speed to 0.
-    #     Omit `SPEED` argument entirely to clear override.
-    SET_FAN_SPEED FAN=nevermore_fan
-    # Re-enable VOC sensor drift calibration
-    NEVERMORE_VOC_CALIBRATION NEVERMORE=nevermore ENABLED=1
+    # See <<NEVERMORE_PRINT_END>> for options.
+    NEVERMORE_PRINT_END
 ```
 
 . Check your printer's log file. If everything went well you should see something like:
@@ -586,6 +577,41 @@ The following command can be used to influence behaviour at runtime.
 
 These typically require a `NEVERMORE=` parameter to specify which Nevermore to interact with.
 At this time, there can only be one Nevermore controller, which is named `nevermore`.
+
+
+==== NEVERMORE_PRINT_START
+
+Command:
+```
+NEVERMORE_PRINT_START [FAN_SPEED=1.0 <float \in [0, 1]>] [FAN_AUTOMATIC=0 <int \in [0, 1]>]
+```
+
+Set all Nevermores into a reasonable state for printing. **You should use this G-Code command instead of manually issuing the equivalent commands**; it will allow future updates to automatically apply recommended print-start actions.
+
+This command currently performs the following series of actions for every Nevermore (currently only 1):
+
+. If `FAN_AUTOMATIC=0`, turns on fan override w/ given `FAN_SPEED`, otherwise clears any override (go into automatic mode).
++
+Overriding automatic mode starts the filter without waiting for the air to get detectably dirty and ensures the fan is always running during a print (regardless of sensor readings).
+. Disables <<NEVERMORE_VOC_CALIBRATION>>.
+
+
+==== NEVERMORE_PRINT_END
+
+Command:
+```
+NEVERMORE_PRINT_END
+```
+
+Set all Nevermores into a reasonable idle state. **You should use this G-Code command instead of manually issuing the equivalent commands**; it will allow future updates to automatically apply recommended print-end actions.
+
+This command currently performs the following series of actions for every Nevermore (currently only 1):
+
+. If `FAN_AUTOMATIC=0`, turns on fan override w/ given `FAN_SPEED`, otherwise clears any override (go into automatic mode).
++
+Overriding automatic mode starts the filter without waiting for the air to get detectably dirty and ensures the fan is always running during a print (regardless of sensor readings).
+. Disables <<NEVERMORE_VOC_CALIBRATION>>.
+
 
 
 ==== NEVERMORE_STATUS
