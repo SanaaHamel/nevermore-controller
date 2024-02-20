@@ -11,6 +11,7 @@
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
+#include <utility>
 
 // defined by linker
 extern uint8_t PICOWOTA_APP_STORE[];
@@ -178,9 +179,38 @@ void UNSAFE_save_internal(void* param) {
     // NOLINTEND(cppcoreguidelines-pro-bounds-pointer-arithmetic)
 }
 
+constexpr bool operator&(ResetFlags lhs, ResetFlags rhs) {
+    return std::to_underlying(lhs) & std::to_underlying(rhs);
+}
+
 }  // namespace
 
 Settings g_active;
+
+void Settings::reset(ResetFlags flags) {
+    using enum ResetFlags;
+
+    if (flags & sensor_calibration) {
+        sensors::reset_calibrations();
+        voc_calibration = Settings{}.voc_calibration;
+    }
+
+    if (flags & policies) {
+        // FIXME: This is a maintence nightmare. There must be a better way of doing things.
+        auto header_ = g_active.header;
+        auto voc_calibration_ = voc_calibration;
+        auto display_hw_ = display_hw;
+        *this = {};
+        header = header_;
+        voc_calibration = voc_calibration_;
+        display_hw = display_hw_;
+    }
+
+    if (flags & hardware) {
+        // FIXME: This is a maintence nightmare. There must be a better way of doing things.
+        display_hw = Settings{}.display_hw;
+    }
+}
 
 void init() {
     // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic)

@@ -72,7 +72,16 @@ struct SettingsNonPersistent {
     bool voc_calibration_enabled = true;
 };
 
-struct Settings : SettingsPersisted, SettingsNonPersistent {};
+enum class ResetFlags : uint8_t {
+    sensor_calibration = 1 << 0,
+    policies = 1 << 1,  // basically everything except hardware & calibration
+    hardware = 1 << 2,
+};
+
+struct Settings : SettingsPersisted, SettingsNonPersistent {
+    void reset(ResetFlags);
+};
+
 extern Settings g_active;
 
 void init();

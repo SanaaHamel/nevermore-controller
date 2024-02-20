@@ -24,16 +24,6 @@ namespace nevermore::gatt::configuration {
 
 namespace {
 
-enum class ResetFlags : uint8_t {
-    sensor_calibration = 1 << 0,
-    policies = 1 << 1,  // basically everything except hardware & calibration
-    hardware = 1 << 2,
-};
-
-constexpr bool operator&(ResetFlags lhs, ResetFlags rhs) {
-    return to_underlying(lhs) & to_underlying(rhs);
-}
-
 constexpr auto REBOOT_DELAY = 200ms;
 
 constexpr array FLAGS{
@@ -126,29 +116,10 @@ optional<int> attr_write(
         return 0;
     }
     case HANDLE_ATTR(CONFIG_RESET_SETTINGS, VALUE): {
-        ResetFlags const flags = consume;
+        settings::ResetFlags const flags = consume;
         if (consume.remaining()) return ATT_ERROR_VALUE_NOT_ALLOWED;
 
-        using enum ResetFlags;
-        if (flags & sensor_calibration) {
-            sensors::reset_calibrations();
-            settings::g_active.voc_calibration = settings::Settings{}.voc_calibration;
-        }
-        if (flags & policies) {
-            // FIXME: This is a maintence nightmare. There must be a better way of doing things.
-            auto header = settings::g_active.header;
-            auto voc_calibration = settings::g_active.voc_calibration;
-            auto display_hw = settings::g_active.display_hw;
-            settings::g_active = {};
-            settings::g_active.header = header;
-            settings::g_active.voc_calibration = voc_calibration;
-            settings::g_active.display_hw = display_hw;
-        }
-        if (flags & hardware) {
-            // FIXME: This is a maintence nightmare. There must be a better way of doing things.
-            settings::g_active.display_hw = settings::Settings{}.display_hw;
-        }
-
+        settings::g_active.reset(flags);
         return 0;
     }
     case HANDLE_ATTR(CONFIG_VOC_GATING_THRESHOLD, VALUE): {
