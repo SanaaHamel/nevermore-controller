@@ -214,7 +214,7 @@ void Settings::reset(ResetFlags flags) {
 
 void init() {
     // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic)
-    size_t const LINKER_SIZE = (PICOWOTA_APP_STORE_END + 0) - (PICOWOTA_APP_STORE + 0);
+    [[maybe_unused]] size_t const LINKER_SIZE = (PICOWOTA_APP_STORE_END + 0) - (PICOWOTA_APP_STORE + 0);
     assert(LINKER_SIZE == PICOWOTA_APP_STORE_SIZE);
 
     UNSAFE_from_flash(g_active);

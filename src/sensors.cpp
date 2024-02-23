@@ -7,6 +7,7 @@
 #include "sensors/async_sensor.hpp"
 #include "sensors/bme280.hpp"
 #include "sensors/bme68x.hpp"
+#include "sensors/bmp280.hpp"
 #include "sensors/cst816s.hpp"
 #include "sensors/ens16x.hpp"
 #include "sensors/environmental.hpp"
@@ -32,6 +33,7 @@ constexpr auto SENSOR_POWER_ON_DELAY = max({
         AHTxx_POWER_ON_DELAY,
         BME280_POWER_ON_DELAY,
         BME68x_POWER_ON_DELAY,
+        BMP280_POWER_ON_DELAY,
         ENS16x_POWER_ON_DELAY,
         HTU21D_POWER_ON_DELAY,
         SGP30_POWER_ON_DELAY,
@@ -83,6 +85,7 @@ VecSensors sensors_init_bus(I2C_Bus& bus, EnvironmentalFilter state) {
     probe_for(ahtxx(bus, state));
     probe_for(bme280(bus, state));
     probe_for(bme68x(bus, state));
+    probe_for(bmp280(bus, state));
     probe_for(ens16x(bus, state));
     probe_for(htu2xd(bus, state));
     probe_for(sgp30(bus, state));

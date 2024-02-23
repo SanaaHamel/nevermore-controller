@@ -55,13 +55,15 @@ NOTE: In the future, you'll be able to use Klipper sensors/thermistors to provid
 .Supported Sensors
 [%autowidth]
 |===
-| Sensor            | Measures
-| AHT{10, 20, 21}   | Humidity, Temperature
-| BME280            | Humidity, Temperature, Pressure
-| BME680, BME688    | Humidity, Temperature, Pressure footnote:[This specific multi-sensor has a gas sensor, but does not reliably detect VOCs relevant to 3D printing.]
-| HTU2xD            | Humidity, Temperature
-| SGP30             | Volatile Organic Compounds footnote:[SGP40 is preferred, but this should be functional.]
-| SGP40             | Volatile Organic Compounds
+| Sensor            | Measures                          | Notes
+| AHT{10, 20, 21}   | Humidity, Temperature             |
+| BMP280            | Temperature, Pressure             | Do not use; does not measure humidity.
+footnote:[Only supported to detect when someone inadvertently uses a BMP280 instead of a BME280.]
+| BME280            | Humidity, Temperature, Pressure   |
+| BME680, BME688    | Humidity, Temperature, Pressure   | Cannot use gas sensor. footnote:[This specific multi-sensor has a gas sensor, but does not reliably detect VOCs relevant to 3D printing.]
+| HTU2xD            | Humidity, Temperature             |
+| SGP30             | Volatile Organic Compounds        | Deprecated. footnote:[SGP40s are preferred, but SGP30s should still be functional.]
+| SGP40             | Volatile Organic Compounds        |
 |===
 
 [#supported-displays]
@@ -845,7 +847,7 @@ If you would like to limit the maximum speed of the fan, e.g. to reduce noise, x
 == Credits
 
 * https://github.com/julianschill/klipper-led_effect[Julian Schill] - installation script (derived)
-* https://github.com/boschsensortec/BME280_driver[Bosch Sensors] - BME280, BME68x library (included)
+* https://github.com/boschsensortec/BME280_driver[Bosch Sensors] - BMP280, BME280, BME68x library (included)
 * https://github.com/sciosense/ENS160_driver[ScioSense] - ENS160 library (referenced)
 * https://github.com/Sensirion/embedded-sgp[Sensirion] - SGP30 library (referenced)
 * https://github.com/Sensirion/gas-index-algorithm[Sensirion] - SGP40 gas index library (included)
