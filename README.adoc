@@ -57,7 +57,7 @@ NOTE: In the future, you'll be able to use Klipper sensors/thermistors to provid
 |===
 | Sensor            | Measures                          | Notes
 | AHT{10, 20, 21}   | Humidity, Temperature             |
-| BMP280            | Temperature, Pressure             | Do not use; does not measure humidity.
+| BMP280            | Temperature, Pressure             | _**Do not use; does not measure humidity.**_
 footnote:[Only supported to detect when someone inadvertently uses a BMP280 instead of a BME280.]
 | BME280            | Humidity, Temperature, Pressure   |
 | BME680, BME688    | Humidity, Temperature, Pressure   | Cannot use gas sensor. footnote:[This specific multi-sensor has a gas sensor, but does not reliably detect VOCs relevant to 3D printing.]
