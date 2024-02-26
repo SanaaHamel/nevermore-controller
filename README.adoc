@@ -227,17 +227,18 @@ previous version: v0.7.0  # whatever version was installed
 == FAQ / Known Issues
 
 [#faq-is-the-bluetooth-on]
-* The controller is properly flashed (e.g. the LED is blinking) but my Klipper can't connect to it.
+* **The controller is properly flashed (e.g. the LED is blinking) but my Klipper can't connect to it.**
 +
-Make sure the Bluetooth is turned on & working.
-If you're using Linux you can use the following to check:
+There are several possible causes:
++
+. Verify sure the Bluetooth is turned on & working.
+If you're using Linux, follow the you can use the following to check
 +
 ```
 ⋊> ~ # ensure BT is on
 ⋊> ~ bluetoothctl power on
 Changing power on succeeded
 ⋊> ~ # scan to see if we see any BT devices
-⋊> ~ # if the nevermore controller is powered on then you should see it listed here
 ⋊> ~ bluetoothctl scan on
 Discovery started
 [CHG] Controller XX:XX:XX:XX:XX:XX Discovering: yes
@@ -246,10 +247,36 @@ Discovery started
 ^C⏎
 ```
 +
-If `bluetoothctl` works fine and the scan lists the Nevermore controller then something probably went wrong with the Klipper module. Go find me on the Nevermore Discord for help.
+If `bluetoothctl` doesn't work or the scan doesn't list any Bluetooth devices then there's something wrong with your OS's configuration and/or Bluetooth adapter.
+You'll need to fix that first (see other FAQ entries for some ideas).
++
+. Verify that your Bluetooth adapter can connect to the device. xref:xref:find-the-bt-address-bluetoothctl[If you're on Linux, follow this procedure to find and connect directly to the controller.]
+. Verify that *both* your Klipper installation and your controller are the same release version.
++
+xref:guide-updating[Easiest way ensure this is to follow the update guide.]
++
+If the printer log has exceptions similar to:
++
+```
+Exception: 4553d138-1d00-4b6f-bc42-955a89cf8c36 (Handle: 67): Unknown doesn't have exactly N characteristic(s) 00002b04-0000-1000-8000-00805f9b34fb with properties ...
+```
++
+Then you probably have a mismatch between your controller and Klipper module.
+
++
+If you've checked all of the above and you still have exceptions in your printer log then you may go find me on the Nevermore Discord for help.
+
+[#faq-2.4ghz-interference]
+* **I'm having trouble getting a reliable connection to the controller. Sometimes it works, sometimes it just doesn't connect.**
++
+There might be interference on the 2.4 GHz wireless band. If your Klipper host is connected via WiFi make sure it's using 5.0 GHz or try using Ethernet instead.
++
+You can test to see if the problem is specific to your Klipper host by xref:find-the-bt-address-nrf-connect[connecting with another machine, such as your pocket supercomputer].
++
+This can also happen in environments with absurd number of wireless devices or faulty microwave ovens.
 
 [#faq-mainsail-os]
-* I'm using MainsailOS and I'm having trouble with BlueTooth.
+* **I'm using MainsailOS and I'm having trouble with BlueTooth.**
 +
 This distro disables BlueTooth by default. footnote:[Mainsail OS disabled BlueTooth to enable hardware UART on Raspberry Pi SBCs.] Please follow https://docs-os.mainsail.xyz/faq/enable-bluetooth-on-rpi[this guide] to enable BlueTooth. Alternatively, the install script will attempt to apply the changes for you.
 +
@@ -257,12 +284,12 @@ Alternatively, you can flash Klipper to the Pico and use it like any other Klipp
 +
 NOTE: I intend to improve the experience for people using a wired connection instead of wireless (via the Klipper MCU), but have no concrete timeline.
 
-* I'm using the xref:klipper-config-minimal[minimal configuration] and I only see the VOC plot entry in Mainsail, there's no 'Nevermore' item.
+* **I'm using the xref:klipper-config-minimal[minimal configuration] and I only see the VOC plot entry in Mainsail, there's no 'Nevermore' item.**
 +
 Verify that your Mainsail version is at least 2.7.1 (first release w/ official support).
 If that's fine then double check there isn't any config errors.
 
-* Fluidd doesn't show sensor values other than temperature, even with the `class_name_override` hack.
+* **Fluidd doesn't show sensor values other than temperature, even with the `class_name_override` hack.**
 +
 Can't fix due to how Fluidd interprets Klipper state data. https://github.com/fluidd-core/fluidd/pull/1114[There's a PR fixing the issue, but it hasn't received much support.]
 +
@@ -797,11 +824,26 @@ Device FA:KE:AD:RE:SS:02 FA-KE-AD-RE-SS-02
 Device FA:KE:AD:RE:SS:03 FA-KE-AD-RE-SS-03
 ```
 +
-Look for the entries named "Nevermore" or "Nevermore Controller", and copy their address into the printer configuration.
+Look for the entries named "Nevermore", "Nevermore Controller", or "picowota" footnote:[This is the name it uses when in bootloader mode. Unfortunately BlueZ is too aggressive about caching device names.], and copy their address into the printer configuration.
 +
 In this example, we could use `bt_address: FA:KE:AD:RE:SS:00` or `bt_address: FA:KE:AD:RE:SS:01`.
 
+. You should try connecting to the controller to verify that there's no significant interference:
++
+Run: `connect <BT address>`
++
+```
+[bluetooth]# connect FA:KE:AD:RE:SS:00
+Attempting to connect to FA:KE:AD:RE:SS:00
+[CHG] Device FA:KE:AD:RE:SS:00 Connected: yes
+Connection successful
+<lots of of new services/characteristics announced>
+```
++
+If connecting fails, or momentarily succeeds and then connection is lost, then there might be interference from your WiFi adapter. xref:faq-2.4ghz-interference[See this FAQ for details.]
 
+
+[#find-the-bt-address-nrf-connect]
 ==== Method C - Use Your Phone + nRF Connect
 
 WARNING: If you're hosting Klipper on MacOS then you cannot use this approach and must use <<Method A - Check the Klipper Log>>.
@@ -809,10 +851,12 @@ WARNING: If you're hosting Klipper on MacOS then you cannot use this approach an
 nRF Connect is an app by Nordic Semi.
 It's meant for debugging/exploring BLE devices, but we can (ab)use to find the BT addresses.
 
-Load the app, scan for BLE devices. The controllers will all be named "Nevermore", and their BT addresses will be listed below.
+Load the app, scan for BLE devices. The controllers will all be named "Nevermore" (or "picowota", if in bootloader more), and their BT addresses will be listed below.
 
 .nRF Connect displays device names & addresses
 image::README-nrf-connect.png[nRC Connect Screenshot,256]
+
+You can test if your controller is accepting new connections by pressing the 'connect' button.
 
 
 [#fan-control]
