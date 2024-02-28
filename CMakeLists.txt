@@ -48,7 +48,7 @@ pico_sdk_init()
 
 set(PICOWOTA_TCP 0)
 set(PICOWOTA_BT_SPP 1)
-set(PICOWOTA_APP_STORE_SIZE "4")
+set(PICOWOTA_APP_STORE_SIZE "16") # each slot is 4 KiB (== erase sector size), want 4 slots to cycle
 add_subdirectory(picowota)
 
 set(SRC_DIR ${CMAKE_SOURCE_DIR}/src)

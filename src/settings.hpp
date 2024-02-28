@@ -9,7 +9,8 @@ namespace nevermore::settings {
 
 using VOCIndex = sensors::VOCIndex;
 
-constexpr size_t MAX_SIZE = PICOWOTA_APP_STORE_SIZE;
+// future work may allow it, but for now keep things simple
+constexpr size_t MAX_SIZE = 4096;
 
 // Below this limit will prevent the GIA from updating the MVE in reasonable
 // conditions.
@@ -29,6 +30,14 @@ struct Header {
     uint32_t size;  // includes the CRC32 field
 };
 
+struct SaveCounter {
+    uint8_t n = 0;
+    [[nodiscard]] SaveCounter next() const {
+        return {.n = uint8_t((n + 1) & 0xFF)};
+    }
+    auto operator<=>(SaveCounter const&) const = default;
+};
+
 // 16 octets should be more than enough.
 // Will be initialised to all-zeros by default.
 using SensorCalibrationBlob = std::array<uint8_t, 16>;
@@ -45,7 +54,12 @@ enum class DisplayUI : uint8_t {
 
 // Layout **cannot** change. This would break back-compatibility.
 // Fields **can** be appended w/o bumping the header version.
+// Padding **must** be explicitly declared using `Padding<N>`.
+//  (initialisation of padding affects CRC and is poorly standardised)
 struct SettingsV0 {
+    template <size_t N>
+    using Padding = std::array<uint8_t, N>;
+
     Header header{.version = Header::Version::v0, .size = sizeof(SettingsV0)};
     FanPolicyEnvironmental fan_policy_env;
     FanPolicyThermal fan_policy_thermal;
@@ -56,7 +70,10 @@ struct SettingsV0 {
     VOCIndex voc_gating_threshold = 240;  // not-known -> disallowed
     DisplayHW display_hw = DisplayHW::GC9A01_240_240;
     DisplayUI display_ui = DisplayUI::CIRCLE_240_CLASSIC;
+    Padding<1> _0 = {};
     float display_brightness = 1.f;  // range: [0, 1]; don't edit directly, use `display::brightness`
+    SaveCounter save_counter = {};
+    Padding<3> _1 = {};
 
     // replaces valid fields from RHS into self
     void merge_valid_fields(SettingsV0 const&);
