@@ -270,7 +270,7 @@ extern "C" {
 /*1: Show CPU usage and FPS count*/
 #ifndef LV_USE_PERF_MONITOR
 #ifndef NDEBUG
-#define LV_USE_PERF_MONITOR 1
+#define LV_USE_PERF_MONITOR 0
 #else
 #define LV_USE_PERF_MONITOR 0
 #endif
