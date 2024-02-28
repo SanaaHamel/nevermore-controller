@@ -163,6 +163,8 @@ if(CMAKE_BUILD_TYPE STREQUAL "Debug")
   add_compile_definitions(PICO_DEBUG_MALLOC=0)
 endif()
 
+pico_enable_stdio_usb(picowota 1)
+
 pico_btstack_make_gatt_header(nevermore-controller PRIVATE ${SRC_DIR}/nevermore.gatt)
 pico_generate_pio_header(nevermore-controller ${SRC_DIR}/lib/pio_i2c.pio)
 pico_generate_pio_header(nevermore-controller ${SRC_DIR}/ws2812.pio)
