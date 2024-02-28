@@ -140,7 +140,7 @@ target_link_libraries(nevermore-controller
   FreeRTOS-Kernel-Heap4
   lvgl::drivers
   lvgl::lvgl
-  picowota_reboot
+  picowota_client
 )
 
 list(TRANSFORM SRC_IN REPLACE "(.*)\.in$" "\\1" OUTPUT_VARIABLE SRC_IN_BYPRODUCTS)
