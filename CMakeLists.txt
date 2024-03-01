@@ -93,6 +93,8 @@ add_compile_definitions(CYW43_LWIP=0)
 add_compile_definitions(CYW43_HOST_NAME="Nevermore")
 add_compile_definitions(NEVERMORE_CONFIG="${NEVERMORE_CONFIG}")
 add_compile_definitions(NEVERMORE_PICO_W_BT=${NEVERMORE_PICO_W_BT})
+add_compile_definitions(USBD_PRODUCT="Pico Nevermore")
+target_compile_definitions(picowota PUBLIC USBD_PRODUCT="Pico Nevermore")
 
 # UGLY: Also defines the value of `nevermore::Priority::Communication`.
 # We want a priority above almost anything else.
