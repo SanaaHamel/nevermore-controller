@@ -6,8 +6,7 @@
 #include "hardware/adc.h"
 #include "hardware/gpio.h"
 #include "hardware/i2c.h"
-#include "hardware/platform_defs.h"
-#include "pico/cyw43_arch.h"
+#include "pico.h"  // IWYU pragma: keep for transitive includes (e.g. board)
 #include "pico/stdio.h"
 #include "sdk/i2c.hpp"
 #include "sdk/spi.hpp"
@@ -22,6 +21,10 @@
 #include <cstdio>
 #include <string_view>
 #include <utility>
+
+#if NEVERMORE_PICO_W_BT || defined(CYW43_WL_GPIO_LED_PIN)
+#include "pico/cyw43_arch.h"
+#endif
 
 #ifndef NDEBUG
 #include "utility/square_wave.hpp"
@@ -92,6 +95,13 @@ void pins_setup() {
     } else
         printf("!! No available PWM slice for square wave generator.\n");
 #endif
+
+#if defined(PICO_DEFAULT_LED_PIN)
+    gpio_init(PICO_DEFAULT_LED_PIN);
+    gpio_set_dir(PICO_DEFAULT_LED_PIN, GPIO_OUT);
+#elif defined(PICO_DEFAULT_WS2812_PIN)
+    // FUTURE WORK: implement WS2812 LED
+#endif
 }
 
 // NB: changes pin function assignments
@@ -140,12 +150,12 @@ int main() {
             spi_init(spi, SPI_BAUD_RATE_DISPLAY), unsigned(SPI_BAUD_RATE_DISPLAY));
 
     mk_task("startup", Priority::Startup, 1024)([]() {
-        if constexpr (std::string_view(PICO_BOARD) == "pico_w") {
-            // need the CYW43 up to access the LED, even if we don't have BT enabled
-            if (auto err = cyw43_arch_init()) {
-                panic("ERR - cyw43_arch_init failed = 0x%08x\n", err);
-            }
+#if NEVERMORE_PICO_W_BT || defined(CYW43_WL_GPIO_LED_PIN)
+        // need the CYW43 up to access the LED, even if we don't have BT enabled
+        if (auto err = cyw43_arch_init()) {
+            panic("ERR - cyw43_arch_init failed = 0x%08x\n", err);
         }
+#endif
 
         ws2812::init();
         if (!gatt::init()) return;
@@ -156,19 +166,20 @@ int main() {
         mk_timer("led-blink", SENSOR_UPDATE_PERIOD)([](TimerHandle_t) {
             static bool led_on = false;
             led_on = !led_on;
-            if constexpr (std::string_view(PICO_BOARD) == "pico_w") {
-                // HACK:  `cyw43_arch_gpio_put` w/o having the HCI powered on
-                //        kills the timer task when it enters `cyw43_ensure_up`.
-                //        Root cause unknown. This hack should be benign since
-                //        Pico W is typically built w/ BT enabled.
-                if constexpr (NEVERMORE_PICO_W_BT) {
-                    cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, led_on);
-                }
-            } else {
-                // TODO:  Make this configurable/generalisable to other boards?
-                // constexpr uint8_t PICO_LED_PIN = 25;
-                // gpio_put(PICO_LED_PIN, led_on);
+
+#if defined(PICO_DEFAULT_LED_PIN)
+            gpio_put(PICO_DEFAULT_LED_PIN, led_on);
+#elif defined(PICO_DEFAULT_WS2812_PIN)
+            // FUTURE WORK: implement WS2812 LED
+#elif defined(CYW43_WL_GPIO_LED_PIN)
+            // HACK:  `cyw43_arch_gpio_put` w/o having the HCI powered on
+            //        kills the timer task when it enters `cyw43_ensure_up`.
+            //        Root cause unknown. This hack should be benign since
+            //        Pico W is typically built w/ BT enabled.
+            if constexpr (NEVERMORE_PICO_W_BT) {
+                cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, led_on);
             }
+#endif
         });
 
         if constexpr (NEVERMORE_PICO_W_BT) {

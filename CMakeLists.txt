@@ -125,14 +125,13 @@ target_link_libraries(nevermore-controller
 
   # Pico SDK
   hardware_adc
+  hardware_dma
   hardware_flash
   hardware_i2c
   hardware_pio
   hardware_pwm
   hardware_spi
   pico_btstack_ble
-  pico_btstack_cyw43
-  pico_cyw43_arch_sys_freertos
   pico_stdlib
 
   # Others
@@ -177,11 +176,24 @@ pico_enable_stdio_uart(nevermore-controller-no-bootloader 1)
 pico_add_extra_outputs(nevermore-controller-no-bootloader)
 picowota_build_no_bootloader_with_app_store(nevermore-controller-no-bootloader)
 
-add_executable(nevermore-controller-ota)
-target_link_libraries(nevermore-controller-ota PRIVATE nevermore-controller)
-pico_enable_stdio_usb(nevermore-controller-ota 1)
-pico_enable_stdio_uart(nevermore-controller-ota 1)
-pico_add_extra_outputs(nevermore-controller-ota)
+if(NEVERMORE_PICO_W_BT)
+  target_link_libraries(nevermore-controller
+    PUBLIC
+    pico_btstack_cyw43
+    pico_cyw43_arch_sys_freertos
+  )
 
-picowota_share_cyw43_firmware(nevermore-controller)
-picowota_build_combined(nevermore-controller-ota)
+  add_executable(nevermore-controller-ota)
+  target_link_libraries(nevermore-controller-ota PRIVATE nevermore-controller)
+  pico_enable_stdio_usb(nevermore-controller-ota 1)
+  pico_enable_stdio_uart(nevermore-controller-ota 1)
+  pico_add_extra_outputs(nevermore-controller-ota)
+
+  picowota_share_cyw43_firmware(nevermore-controller)
+  picowota_build_combined(nevermore-controller-ota)
+else()
+  set_target_properties(picowota
+    PROPERTIES
+    EXCLUDE_FROM_ALL TRUE
+  )
+endif()
