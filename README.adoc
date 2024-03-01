@@ -222,9 +222,86 @@ previous version: v0.7.0  # whatever version was installed
  current version: v0.7.0  # in this example it tried to update to the same version
 ```
 
+[#usb-console-minicom]
+== Getting Console Logs Via USB
+
+WARNING: **Disconnect the controller from the printer's power supply before connecting via USB unless you're plugging into the printer's Raspberry Pi.** You can damage things if you connect the Pico via USB to a computer that isn't using the printer's power supply.
+
+NOTE: It is safe to plug the Pico via USB into the printer's Raspberry Pi (or equivalent) because they share the same power supply.
+
+NOTE: You can do all of this using the UART pins (0, 1) instead of USB if you have a UART adapter. In rare cases USB output might not work, but UART always should.
+
+If you run into any problems that look hardware related, you can plug the controller via USB to get logs. If you have a debug build, this will also work in bootloader mode. The following assume you're on Linux (you can use your printer's Raspberry Pi).
+
+. **Disconnect the controller from the printer's power supply if you are _not_ connecting to the printer's Raspberry Pi.**
+See the big warning above that you ignored.
+
+. Plug in the controller using a USB cable.
++
+The controller should now be visible as a serial device at `/dev/serial/by-id/usb-Raspberry_Pi_Pico_
+Nevermore_<device-specific-id>`.
+
+. Open a terminal and run `minicom -c on -b 115200 -D /dev/serial/by-id/usb-Raspberry_Pi_Pico_
+Nevermore_<device-specific-id>`.
++
+You will probably get a screen that looks like this:
++
+```
+Welcome to minicom 2.8
+
+OPTIONS: I18n
+Port /dev/serial/by-id/usb-Raspberry_Pi_Pico_Nevermore_E6616408432C432E-if00, 15:36:28
+
+Press CTRL-A Z for help on special keys
+```
+
+. Restart the controller using one of the following:
+.. Use the reset button (if your board has one).
+.. Reboot it via `<<NEVERMORE_REBOOT>>` or directly via BLE.
+.. Unplug the controller and plug it back in.
+
+. The `minicom` session should now look like this:
+```
+Welcome to minicom 2.8
+
+OPTIONS: I18n
+Port /dev/serial/by-id/usb-Raspberry_Pi_Pico_Nevermore_E6616408432C432E-if00, 15:36:28
+
+Press CTRL-A Z for help on special keys
+
+Checking settings slot #0
+corrupt settings: size=0xffffffff not in range [0x0000000c, 0x00001000]
+Checking settings slot #1
+Checking settings slot #2
+corrupt settings: size=0xffffffff not in range [0x0000000c, 0x00001000]
+Checking settings slot #3
+corrupt settings: size=0xffffffff not in range [0x0000000c, 0x00001000]
+Restored settings from slot #1 (CRC: 0x4a1427d1)
+DEBUG - SQUARE WAVE pin=10 w/ 30 hz @ 50.00% duty
+        div=63.10 top=65487 level=32744
+I2C bus 0 running at 399361 baud/s (requested 400000 baud/s)
+I2C bus 1 running at 399361 baud/s (requested 400000 baud/s)
+SPI bus 0 running at 62500000 baud/s (requested 62500000 baud/s)
+[Warn]  (1.017, +1017)   lv_init: Style sanity checks are enabled that uses more RAM    (in lv_obj.c line #181)
+BLE GATT - ready; address is 28:CD:C1:0B:7B:63
+Waiting 100 ms for sensor init
+I2C0 - initializing sensors...
+ERR - [I2C0 ***] *** - write failed; len=*** result=-2  # expect lots of these lines
+I2C1 - initializing sensors...
+ERR - [I2C1 ***] *** - write failed; len=*** result=-2  # expect lots of these lines
+...
+```
+
+I2C errors during startup are generally normal and expected; that's how the system probes for sensors. If you see `!! No sensors found?`, however, you probably have a problem (unless there are no sensors connected).
+
+When a sensor is found, there will be a line saying so (e.g. `Found SGP30`, or `Found BME280`).
 
 [#faq]
 == FAQ / Known Issues
+
+* **The controller's LED is blinking very quickly and I can't connect to it.**
++
+The controller is in bootloader mode. If the image isn't corrupted it'll restart in application mode in about 60 seconds if you leave it alone. If it is corrupted, it won't reboot and will stay in bootloader mode to let you upload a valid image using the update tool.
 
 [#faq-is-the-bluetooth-on]
 * **The controller is properly flashed (e.g. the LED is blinking) but my Klipper can't connect to it.**
