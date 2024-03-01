@@ -123,7 +123,7 @@ void pins_i2c_reset() {
 
 }  // namespace
 
-int main() {
+void startup() {
     stdio_init_all();
     adc_init();
 
@@ -149,43 +149,47 @@ int main() {
     printf("SPI bus %d running at %u baud/s (requested %u baud/s)\n", spi_gpio_bus_num(PINS_DISPLAY_SPI[0]),
             spi_init(spi, SPI_BAUD_RATE_DISPLAY), unsigned(SPI_BAUD_RATE_DISPLAY));
 
-    mk_task("startup", Priority::Startup, 1024)([]() {
 #if NEVERMORE_PICO_W_BT || defined(CYW43_WL_GPIO_LED_PIN)
-        // need the CYW43 up to access the LED, even if we don't have BT enabled
-        if (auto err = cyw43_arch_init()) {
-            panic("ERR - cyw43_arch_init failed = 0x%08x\n", err);
-        }
+    // need the CYW43 up to access the LED, even if we don't have BT enabled
+    if (auto err = cyw43_arch_init()) {
+        panic("ERR - cyw43_arch_init failed = 0x%08x\n", err);
+    }
 #endif
 
-        ws2812::init();
-        if (!gatt::init()) return;
-        // display must be init before sensors b/c some sensors are display input devices
-        if (!display::init_with_ui()) return;
-        if (!sensors::init()) return;
+    ws2812::init();
+    if (!gatt::init()) return;
+    // display must be init before sensors b/c some sensors are display input devices
+    if (!display::init_with_ui()) return;
+    if (!sensors::init()) return;
 
-        mk_timer("led-blink", SENSOR_UPDATE_PERIOD)([](TimerHandle_t) {
-            static bool led_on = false;
-            led_on = !led_on;
+    mk_timer("led-blink", SENSOR_UPDATE_PERIOD)([](TimerHandle_t) {
+        static bool led_on = false;
+        led_on = !led_on;
 
 #if defined(PICO_DEFAULT_LED_PIN)
-            gpio_put(PICO_DEFAULT_LED_PIN, led_on);
+        gpio_put(PICO_DEFAULT_LED_PIN, led_on);
 #elif defined(PICO_DEFAULT_WS2812_PIN)
-            // FUTURE WORK: implement WS2812 LED
+        // FUTURE WORK: implement WS2812 LED
 #elif defined(CYW43_WL_GPIO_LED_PIN)
-            // HACK:  `cyw43_arch_gpio_put` w/o having the HCI powered on
-            //        kills the timer task when it enters `cyw43_ensure_up`.
-            //        Root cause unknown. This hack should be benign since
-            //        Pico W is typically built w/ BT enabled.
-            if constexpr (NEVERMORE_PICO_W_BT) {
-                cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, led_on);
-            }
-#endif
-        });
-
+        // HACK:  `cyw43_arch_gpio_put` w/o having the HCI powered on
+        //        kills the timer task when it enters `cyw43_ensure_up`.
+        //        Root cause unknown. This hack should be benign since
+        //        Pico W is typically built w/ BT enabled.
         if constexpr (NEVERMORE_PICO_W_BT) {
-            mk_task("bluetooth", Priority::Communication, 1024)(btstack_run_loop_execute).release();
+            cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, led_on);
         }
+#endif
+    });
 
+    if constexpr (NEVERMORE_PICO_W_BT) {
+        mk_task("bluetooth", Priority::Communication, 1024)(btstack_run_loop_execute).release();
+    }
+}
+
+int main() {
+    // has to be done on core 0 for `stdio_init_all`.
+    mk_task("startup", Priority::Startup, 1024, 1 << 0)([]() {
+        startup();
         vTaskDelete(nullptr);  // we're done, delete ourselves
     }).release();
 

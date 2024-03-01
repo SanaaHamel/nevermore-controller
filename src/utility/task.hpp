@@ -33,19 +33,22 @@ struct Task {
 
     explicit Task(TaskHandle_t task) : task(task) {}
 
-    Task(void (*go)(void*), char const* name, uint32_t stack_depth, void* param, Priority priority) {
-        xTaskCreate(go, "", stack_depth, param, UBaseType_t(priority), &task);
+    Task(void (*go)(void*), void* param, char const* name, uint32_t stack_depth, Priority priority,
+            UBaseType_t affinity_mask = tskNO_AFFINITY) {
+        xTaskCreateAffinitySet(go, "", stack_depth, param, UBaseType_t(priority), affinity_mask, &task);
     }
 
-    Task(void (*go)(), char const* name, Priority priority, uint32_t stack_depth) {
-        xTaskCreate([](void* go) { reinterpret_cast<void (*)()>(go)(); }, "", stack_depth,
-                reinterpret_cast<void*>(go), UBaseType_t(priority), &task);
+    Task(void (*go)(), char const* name, Priority priority, uint32_t stack_depth,
+            UBaseType_t affinity_mask = tskNO_AFFINITY) {
+        xTaskCreateAffinitySet([](void* go) { reinterpret_cast<void (*)()>(go)(); }, "", stack_depth,
+                reinterpret_cast<void*>(go), UBaseType_t(priority), affinity_mask, &task);
     }
 
     template <typename A>
-    Task(A (*go)(), char const* name, Priority priority, uint32_t stack_depth) {
-        xTaskCreate([](void* go) { reinterpret_cast<A (*)()>(go)(); }, "", stack_depth,
-                reinterpret_cast<void*>(go), UBaseType_t(priority), &task);
+    Task(A (*go)(), char const* name, Priority priority, uint32_t stack_depth,
+            UBaseType_t affinity_mask = tskNO_AFFINITY) {
+        xTaskCreateAffinitySet([](void* go) { reinterpret_cast<A (*)()>(go)(); }, "", stack_depth,
+                reinterpret_cast<void*>(go), UBaseType_t(priority), affinity_mask, &task);
     }
 
     ~Task() {
@@ -86,8 +89,9 @@ private:
     TaskHandle_t task{};
 };
 
-constexpr auto mk_task(char const* name, Priority priority, uint32_t stack_depth) {
-    return [=](auto go) { return Task(go, name, priority, stack_depth); };
+constexpr auto mk_task(char const* name, Priority priority, uint32_t stack_depth,
+        UBaseType_t affinity_set = tskNO_AFFINITY) {
+    return [=](auto go) { return Task(go, name, priority, stack_depth, affinity_set); };
 }
 
 template <typename A, typename Period>
