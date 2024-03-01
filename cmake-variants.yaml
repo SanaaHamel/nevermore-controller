@@ -31,6 +31,13 @@ board:
       short: Waveshare Touch LCD-1.28
       long: Waveshare Touch LCD-1.28 (w/o wireless)
       settings:
-        PICO_BOARD: bare
+        PICO_BOARD: waveshare_rp2040_lcd_1.28
         NEVERMORE_PICO_W_BT: "false"
         NEVERMORE_CONFIG: config/pins/waveshare-touch-lcd-1.28.hpp
+    waveshare-zero:
+      short: Waveshare RP2040-Zero
+      long: Waveshare RP2040-Zero
+      settings:
+        PICO_BOARD: waveshare_rp2040_zero
+        NEVERMORE_PICO_W_BT: "false"
+        NEVERMORE_CONFIG: config/pins/waveshare-rp2040-zero.hpp

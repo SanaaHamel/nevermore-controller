@@ -3,6 +3,11 @@
 #pragma once
 
 #include "config/pins.hpp"
+#include "pico.h"
+
+#ifndef WAVESHARE_RP2040_ZERO
+#error "`PICO_BOARD` is likely incorrect, `WAVESHARE_RP2040_ZERO` is not defined"
+#endif
 
 constexpr GPIO_Pin PIN_FAN_PWM = 28;
 constexpr GPIO_Pin PIN_FAN_TACHOMETER = 27;

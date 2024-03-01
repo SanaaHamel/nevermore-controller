@@ -3,6 +3,11 @@
 #pragma once
 
 #include "config/pins.hpp"
+#include "pico.h"
+
+#ifndef RASPBERRYPI_PICO_W
+#error "`PICO_BOARD` is likely incorrect, `RASPBERRYPI_PICO_W` is not defined"
+#endif
 
 constexpr GPIO_Pin PIN_FAN_PWM = 13;
 constexpr GPIO_Pin PIN_FAN_TACHOMETER = 15;
