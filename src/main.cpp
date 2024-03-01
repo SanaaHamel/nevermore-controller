@@ -46,8 +46,11 @@ namespace {
 
 // Leave pins {0, 1} set to UART TX/RX.
 // Clear everything else.
-void pins_clear_except_uart() {
+void pins_clear_user_defined() {
     for (GPIO_Pin pin = 2; pin < PIN_MAX; ++pin) {
+        if (find(begin(PINS_RESERVED_BOARD), end(PINS_RESERVED_BOARD), pin) != end(PINS_RESERVED_BOARD))
+            continue;
+
         gpio_set_function(pin, GPIO_FUNC_NULL);
         gpio_set_dir(pin, false);
         gpio_pull_down(pin);
@@ -116,10 +119,10 @@ int main() {
 
     nevermore::settings::init();
 
-    pins_clear_except_uart();
-    pins_i2c_reset();          // bit-bang out a reset for the I2C buses
-    pins_clear_except_uart();  // clear pins again, `pins_i2c_reset` leaves things dirty
-    pins_setup();              // setup everything (except UART, which should be set to default 0/1)
+    pins_clear_user_defined();
+    pins_i2c_reset();           // bit-bang out a reset for the I2C buses
+    pins_clear_user_defined();  // clear pins again, `pins_i2c_reset` leaves things dirty
+    pins_setup();               // setup everything (except UART, which should be set to default 0/1)
 
     // GCC 12.2.1 bug: -Werror=format reports that `I2C_BAUD_RATE` is a `long unsigned int`.
     // This is technically true on this platform, see static-assert below, but it is benign since
