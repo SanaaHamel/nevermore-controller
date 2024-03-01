@@ -8,6 +8,7 @@
 #include "hardware/i2c.h"
 #include "pico.h"  // IWYU pragma: keep for transitive includes (e.g. board)
 #include "pico/stdio.h"
+#include "pico/time.h"
 #include "sdk/i2c.hpp"
 #include "sdk/spi.hpp"
 #include "sensors.hpp"
@@ -22,7 +23,13 @@
 #include <string_view>
 #include <utility>
 
-#if NEVERMORE_PICO_W_BT || defined(CYW43_WL_GPIO_LED_PIN)
+#if NEVERMORE_PICO_W_BT || defined(CYW43_WL_GPIO_LED_PIN) || CYW43_USES_VSYS_PIN
+#define CYW43_IN_USE 1
+#else
+#define CYW43_IN_USE 0
+#endif
+
+#if CYW43_IN_USE
 #include "pico/cyw43_arch.h"
 #endif
 
@@ -43,6 +50,9 @@ void vApplicationStackOverflowHook(TaskHandle_t Task, char* pcTaskName) {
 void vApplicationMallocFailedHook() {
     panic("PANIC - heap alloc failed\n");
 }
+
+// declared/defined by `pico_stdio_usb`
+bool stdio_usb_connected();
 }
 
 namespace {
@@ -121,11 +131,37 @@ void pins_i2c_reset() {
     }
 }
 
+optional<bool> vbus_powered() {
+#if defined(CYW43_WL_GPIO_VBUS_PIN)
+    return cyw43_arch_gpio_get(CYW43_WL_GPIO_VBUS_PIN);
+#elif defined(PICO_VBUS_PIN)
+    gpio_set_function(PICO_VBUS_PIN, GPIO_FUNC_SIO);
+    gpio_set_dir(pin, false);
+    return gpio_get(PICO_VBUS_PIN);
+#else
+    return {};  // don't know
+#endif
+}
+
 }  // namespace
 
 void startup() {
     stdio_init_all();
     adc_init();
+
+#if CYW43_IN_USE
+    // need the CYW43 up to access the LED, even if we don't have BT enabled
+    if (auto err = cyw43_arch_init()) {
+        panic("ERR - cyw43_arch_init failed = 0x%08x\n", err);
+    }
+#endif
+
+    // tri-logic: some boards can't tell if VBUS is powered
+    if (vbus_powered() != false) {
+        auto const deadline = make_timeout_time_ms(STDIO_USB_CONNECT_TIMEOUT / 1ms);
+        while (!stdio_usb_connected() && !time_reached(deadline))
+            sleep(100ms);
+    }
 
     nevermore::settings::init();
 
@@ -148,13 +184,6 @@ void startup() {
     auto* spi = spi_gpio_bus(PINS_DISPLAY_SPI[0]);
     printf("SPI bus %d running at %u baud/s (requested %u baud/s)\n", spi_gpio_bus_num(PINS_DISPLAY_SPI[0]),
             spi_init(spi, SPI_BAUD_RATE_DISPLAY), unsigned(SPI_BAUD_RATE_DISPLAY));
-
-#if NEVERMORE_PICO_W_BT || defined(CYW43_WL_GPIO_LED_PIN)
-    // need the CYW43 up to access the LED, even if we don't have BT enabled
-    if (auto err = cyw43_arch_init()) {
-        panic("ERR - cyw43_arch_init failed = 0x%08x\n", err);
-    }
-#endif
 
     ws2812::init();
     if (!gatt::init()) return;

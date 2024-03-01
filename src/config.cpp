@@ -26,6 +26,9 @@ static_assert(
         (I2C_BAUD_RATE == 100 * 1000) || (I2C_BAUD_RATE == 400 * 1000) || (I2C_BAUD_RATE == 1000 * 1000),
         "`config.hpp`'s `I2C_BAUD_RATE` isn't a valid mode (100 kbit/s, 400 kbit/s, or 1000 kbit/s)");
 
+static_assert(1ms <= STDIO_USB_CONNECT_TIMEOUT || STDIO_USB_CONNECT_TIMEOUT.count() == 0,
+        "`config.hpp`'s `STDIO_USB_CONNECT_TIMEOUT` must either be 0ms or a minimum of 1ms");
+
 namespace {
 
 // Don't ever allow these pins to be used.

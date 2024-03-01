@@ -135,6 +135,7 @@ target_link_libraries(nevermore-controller
   hardware_spi
   pico_btstack_ble
   pico_stdlib
+  pico_time
 
   # Others
   FreeRTOS-Kernel

@@ -25,3 +25,7 @@ constexpr uint32_t I2C_BAUD_RATE = 400 * 1000;
 // TODO:  Find what's the actual max baud rate for a GC9A01.
 //        So far I've ran all the way to max (125M).
 constexpr uint32_t SPI_BAUD_RATE_DISPLAY = 125'000'000 / 2;
+
+// basically `PICO_STDIO_USB_CONNECT_WAIT_TIMEOUT_MS`, but only applies
+// when we know for certain that we're not USB powered.
+constexpr auto STDIO_USB_CONNECT_TIMEOUT = 1s;
