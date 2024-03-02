@@ -377,7 +377,7 @@ Fluidd is more or less unsupported with regards to sensor display and visualisat
 There are a handful of UIs available. You can select them using the xref:klipper-config-full[`display_ui` klipper option].
 
 .Supported Display UIs
-image::README-display-UIs.png[Supported Display UI,512]
+image::doc/README-display-UIs.png[Supported Display UI,512]
 
 === Touch Support
 Touch display support is early in development and currently very limited.
@@ -931,7 +931,7 @@ It's meant for debugging/exploring BLE devices, but we can (ab)use to find the B
 Load the app, scan for BLE devices. The controllers will all be named "Nevermore" (or "picowota", if in bootloader more), and their BT addresses will be listed below.
 
 .nRF Connect displays device names & addresses
-image::README-nrf-connect.png[nRC Connect Screenshot,256]
+image::doc/README-nrf-connect.png[nRC Connect Screenshot,256]
 
 You can test if your controller is accepting new connections by pressing the 'connect' button.
 
