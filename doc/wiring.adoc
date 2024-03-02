@@ -39,18 +39,33 @@ NOTE: If you're using a lot of 12v equipment (e.g. hotend and bed), double check
 +
 Powering using the `VBUS` pin will cause the controller to think it is connected via USB, and will cause it to wait while for a serial port connection during startup. This isn't a fatal mistake but it is trivial to avoid.
 
+== Standard Fan Pin Layout
 
-== General / Nevermore StealthMax (S) - Pico W
+> Help! All the fan wires are black/white/fuchsia! How do I tell them apart?
+
+Assuming the fan's mfg isn't insane:
+
+.Standard 4 Pin Fan Connector Layout
+image::wiring-fan-pins.png[]
+
+For 3 pins, it's exactly the same except you don't have a PWM pin.
+
+If you've any doubts, test by briefly pulsing what you think is V~in~ and ground with 5v. If the fan twitches, you got the right ones and can deduce the rest of the pins.
+
+
+== Builds
+
+=== General / Nevermore StealthMax (S) - Pico W
 
 **Author: Fragmon (Steven, Crydteam)**
 
 This diagram is illustrates a Pico W setup w/ nearly all features enabled. This would typically be seen in a https://github.com/nevermore3d/StealthMax[Nevermore StealthMax (S)] filter, though the display is not a standard feature and would require either a custom cap (search the Discord) or be mounted outside the filter.
 
 .https://github.com/nevermore3d/StealthMax[Nevermore StealthMax (S)] Wiring Diagram
-image::wiring-stealthmax.png[Nevermore StealthMax (S) Wiring Diagram]
+image::wiring-stealthmax.png[]
 
 
-== https://github.com/nevermore3d/Nevermore_Mini[Nevermore Mini] - https://www.waveshare.com/product/rp2040-touch-lcd-1.28.htm[Waveshare Touch 1.28"]
+=== https://github.com/nevermore3d/Nevermore_Mini[Nevermore Mini] - https://www.waveshare.com/product/rp2040-touch-lcd-1.28.htm[Waveshare Touch 1.28"]
 
 **Author: Fragmon (Steven, Crydteam)**
 
@@ -60,5 +75,5 @@ NOTE: The fan listed in the diagram is rated for 12v but can operate at 5v.
 
 WARNING: The general release UF2 **cannot** be used with this board because it is not a Pico W. There are custom builds floating on the discord. Consider this a beta/early release.
 
-.https://github.com/nevermore3d/Nevermore_Mini[Nevermore Mini] - Waveshare Touch 1.28" Wiring Diagram
-image::wiring-mini-waveshare-touch-1.28.png[Nevermore StealthMax (S) Wiring Diagram]
+.https://github.com/nevermore3d/Nevermore_Mini[Nevermore Mini] - https://www.waveshare.com/product/rp2040-touch-lcd-1.28.htm[Waveshare Touch 1.28"] Wiring Diagram
+image::wiring-mini-waveshare-touch-1.28.png[]
