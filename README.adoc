@@ -4,12 +4,13 @@
 
 https://www.buymeacoffee.com/sanaahamel[image:https://img.shields.io/badge/Support%20This%20Project%20-Buy%20me%20a%20coffee-purple.svg?style=flat-square[Support This Project - Buy me a coffee]] https://discord.gg/hWJWkc9HA7[image:https://img.shields.io/discord/1017933489779245137?color=%235865F2&label=discord&logo=discord&logoColor=white&style=flat-square[Discord]]
 
-A Pi Pico W based controller for https://github.com/nevermore3d/Nevermore_Max[Nevermore Max] and
-https://github.com/nevermore3d/StealthMax[StealthMax] filters.
+A Pi Pico W based controller for the https://github.com/nevermore3d[Nevermore] family of 3D printer filters (including https://github.com/nevermore3d/StealthMax[StealthMax (S)], https://github.com/nevermore3d/Nevermore_Max[Max], and https://github.com/nevermore3d/Nevermore_Mini[Mini] variants).
 This controller is BlueTooth LE enabled, minimising required wiring and allowing multiple clients
 to interact with the controller.
 
 xref:guide-setup[A setup guide is available.]
+
+xref:doc/wiring.adoc[Wiring diagrams for common setups are available.]
 
 toc::[]
 
