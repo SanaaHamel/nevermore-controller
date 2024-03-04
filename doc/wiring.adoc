@@ -22,8 +22,6 @@ Complete the entire xref:testing-checklist[Electronics Testing Checklist].
 The electronics system should be fully operational on your table/floor/work surface before anything else gets built.
 This will save you from disassembling the entire build if something was damaged during soldering, wiring, or assembly.
 
-
-
 * **You might not need everything you see.**
 +
 These guides often include optional components.
@@ -49,6 +47,12 @@ NOTE: If you're using a lot of 12v equipment (e.g. hotend and bed), double check
 * **Power the Pico/RP2040 using `VSYS`, not `VBUS`.**
 +
 Powering using the `VBUS` pin will cause the controller to think it is connected via USB, and will cause it to wait while for a serial port connection during startup. This isn't a fatal mistake but it is trivial to avoid.
+
+* **Don't touch the tiny sensor surface mounted devices (SMDs) with your filthy raccoon fingers.**
++
+Handling the sensor's board is fine, but don't touch the sensors themselves. It probably won't damage them, but it will smear skin oils/fats all over them which can affect readings.
++
+WARNING: Do not clean them with soap or alcohols. This can damage the sensor's isolating membranes. If you've touched it, either leave it alone or use the softest paper towel or microfiber cloth you have and gently wipe off the surface.
 
 
 [#testing-checklist]
