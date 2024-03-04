@@ -96,9 +96,11 @@ template <typename A>
 auto label_set(lv_obj_t* obj, char const* unk, char const* fmt, A&& value, double scale = 1) {
     if (!obj) return;
 
-    if (value == BLE::NOT_KNOWN) {
-        lv_label_set_text(obj, unk);
-        return;
+    if constexpr (BLE::has_not_known<std::decay_t<A>>) {
+        if (value == BLE::NOT_KNOWN) {
+            lv_label_set_text(obj, unk);
+            return;
+        }
     }
 
     // b/c we apparently don't have `<format>` yet in GCC 12.2.1
@@ -160,7 +162,7 @@ void display_update_labels() {
     label_set(ui.temp_out, "--- c", "%.1fc", state.temperature_exhaust);
 
     label_set(ui.fan_power, "", "%.0f%%", BLE::Percentage8(ceil(gatt::fan::fan_power())));
-    label_set(ui.fan_rpm, "", "%.0f", BLE::Percentage8(ceil(gatt::fan::fan_rpm())));
+    label_set(ui.fan_rpm, "", "%.0f", gatt::fan::fan_rpm());
 
     if (ui.fan_power_arc) {
         lv_arc_set_percent(ui.fan_power_arc, gatt::fan::fan_power() / 100);
