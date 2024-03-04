@@ -94,13 +94,13 @@ e.g. `SET_FAN_SPEED FAN=nevermore_fan SPEED=0`
 
 . Open the printer door/enclosure.
 
-. Let some fresh air into the room for a minute or two.
-+
-Open a window for a few minutes, flap a hand towel in the doorway, whatever. The objective is to get clean air into the enclosure. **This air will serve as reference for the baseline.** If you're not happy breathing it, it isn't clean air.
-
 . *[Optional]* Remove the carbon basket (if applicable).
 +
 This helps ensure both intake/exhaust sensors are exposed to the same air and reach similar calibrations. You can leave the basket on the printer bed during calibration.
+
+. Let some fresh air into the room for a minute or two.
++
+Open a window for a few minutes, flap a hand towel in the doorway, whatever. The objective is to get clean air into the enclosure. **This air will serve as reference for the baseline.** If you're not happy breathing it, it isn't clean air.
 
 . Close the printer door/enclosure.
 
