@@ -69,10 +69,10 @@ Cheap consumer grade VOC sensors make a number of compromises:
 
 * They generally cannot distinguish between different gases or VOCs.
 * Their sensitivity varies between gases/VOCs.
+* Their response can drift slightly over time.
+* Their response can vary between devices.
 * Their response is temperature dependent.
 * They are *very* sensitive to water vapor (humidity).
-* They can exhibit some sensor drift over time.
-* Response can vary somewhat from device to device.
 
 The degree of all of these varies between different models but generally applies to all consumer grade VOC sensors. Some of these considerations can be compensated for. (e.g. temperature and humidity.)
 
