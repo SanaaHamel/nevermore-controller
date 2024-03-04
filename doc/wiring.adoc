@@ -8,10 +8,21 @@ A guide for building attractive wire nests that'll impress anyone, guaranteed.
 
 These guides should *not* be considered authoritative: if ever in doubt, refer to the BOM/build guide for your filter and the pins list in the main documentation.
 
+NOTE: The diagrams themselves were not made by Sanaa, and credit should be attributed to their authors listed above each section.
 
 toc::[]
 
 == Gotchas & General Notes (READ ME DAMN IT)
+
+* **Build and test all your electronics twice: once before mounting anything in a build, then again once everything is mounted but just before you screw/press everything closed.**
+footnote:[This really matters for builds like the StealthMax, where there's 20,00+ screws and half the parts of press-fit and are not made to be easily disassembled.]
++
+Complete the entire xref:testing-checklist[Electronics Testing Checklist].
++
+The electronics system should be fully operational on your table/floor/work surface before anything else gets built.
+This will save you from disassembling the entire build if something was damaged during soldering, wiring, or assembly.
+
+
 
 * **You might not need everything you see.**
 +
@@ -38,6 +49,21 @@ NOTE: If you're using a lot of 12v equipment (e.g. hotend and bed), double check
 * **Power the Pico/RP2040 using `VSYS`, not `VBUS`.**
 +
 Powering using the `VBUS` pin will cause the controller to think it is connected via USB, and will cause it to wait while for a serial port connection during startup. This isn't a fatal mistake but it is trivial to avoid.
+
+
+[#testing-checklist]
+=== Electronics Testing Checklist
+
+If any of these fail, fix them before proceeding with the rest of the build.
+
+[%interactive]
+* [ ] Fan Works: Fan spins when powered **and PWM pin is disconnected**.
+* [ ] Controller Flashed: Controller's LED blinks slowly (~1 hz)
+* [ ] Klipper Connects: The `NEVERMORE_STATUS` G-Code command should report "connected". xref:../README.adoc[See main documentation.]
+* [ ] Sensors Registering: Mainsail shows *sane* values for intake and exhaust temperature, humidity, and VOC index. (It can take up to 30 seconds after power on for VOC to show up.)
+* [ ] Fan PWM: Can turn on/off the fan using `SET_FAN_SPEED FAN=nevermore_fan SPEED=0/1`.
+* [ ] Fan Tachometer: Fan RPM in Mainsail is non-zero when fan is turned on.
+
 
 == Standard Fan Pin Layout
 
