@@ -2613,6 +2613,17 @@
                                   255
                                 ],
                                 "InheritedType": 7
+                              },
+                              {
+                                "nid": 1453561863,
+                                "strtype": "_style/Padding",
+                                "intarray": [
+                                  0,
+                                  0,
+                                  0,
+                                  0
+                                ],
+                                "InheritedType": 7
                               }
                             ],
                             "InheritedType": 1
@@ -17908,6 +17919,17 @@
                                   0,
                                   0,
                                   255
+                                ],
+                                "InheritedType": 7
+                              },
+                              {
+                                "nid": -1286038342,
+                                "strtype": "_style/Padding",
+                                "intarray": [
+                                  0,
+                                  0,
+                                  0,
+                                  0
                                 ],
                                 "InheritedType": 7
                               }
