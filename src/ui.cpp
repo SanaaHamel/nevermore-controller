@@ -284,6 +284,21 @@ void on_chart_draw(bool begin, lv_event_t* e) {
         if (desc.p1 || desc.p2 || !desc.line_dsc) break;  // drawing main lines, or no line-info
 
         if (begin) {
+            auto p1 = abs_pos_for_value(ui_chart_voc_intake.ui, 200, false);
+            auto p2 = abs_pos_for_value(ui_chart_voc_intake.ui, 45, true);
+
+            lv_draw_rect_dsc_t draw_rect_dsc{};
+            lv_draw_rect_dsc_init(&draw_rect_dsc);
+            draw_rect_dsc.bg_opa = LV_OPA_20;
+            draw_rect_dsc.bg_color = lv_color_make(128, 128, 255);
+            lv_area_t a{
+                    .x1 = p1.x,
+                    .y1 = p1.y,
+                    .x2 = p2.x,
+                    .y2 = p2.y,
+            };
+            lv_draw_rect(desc.draw_ctx, &draw_rect_dsc, &a);
+
             if constexpr (CHAR_DRAW_TEMPERATURE_HDIV) {
                 // draw the secondary axis division lines before the primary axis lines
                 auto y_secondary_range = max(0, chart.ymax[1] - chart.ymin[1]);
