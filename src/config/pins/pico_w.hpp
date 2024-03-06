@@ -3,7 +3,8 @@
 #pragma once
 
 #include "config/pins.hpp"
-#include "pico.h"
+#include "pico.h"  // IWYU pragma: keep for `RASPBERRYPI_PICO_W`
+#include <optional>
 
 #ifndef RASPBERRYPI_PICO_W
 #error "`PICO_BOARD` is likely incorrect, `RASPBERRYPI_PICO_W` is not defined"
@@ -12,6 +13,7 @@
 constexpr GPIO_Pin PIN_FAN_PWM = 13;
 constexpr GPIO_Pin PIN_FAN_TACHOMETER = 15;
 constexpr GPIO_Pin PIN_NEOPIXEL_DATA_IN = 12;
+constexpr std::optional<GPIO_Pin> PIN_PHOTOCATALYTIC_PWM = 10;
 
 constexpr GPIO_Pin PINS_I2C[] = {
         20, 21,  // I2C 0

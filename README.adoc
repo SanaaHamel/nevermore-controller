@@ -426,7 +426,7 @@ WARNING: The default assignments are tentative and will probably change after we
 |7  | Display - Backlight Brightness PWM
 |8  | Display Touch - CST816S - Interrupt
 |9  | Display Touch - CST816S - Reset
-|10 | Reserved - Photo-Catalytic Control (PWM)
+|10 | Photocatalytic Control (PWM)
 |12 | NeoPixel - Data
 |13 | Fan - PWM
 |15 | Fan - Tachometer

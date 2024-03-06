@@ -98,6 +98,10 @@ void pins_setup() {
     gpio_set_dir(PIN_TOUCH_INTERRUPT, false);
     gpio_set_dir(PIN_TOUCH_RESET, true);
 
+    if constexpr (PIN_PHOTOCATALYTIC_PWM) {
+        gpio_set_function(*PIN_PHOTOCATALYTIC_PWM, GPIO_FUNC_PWM);
+    }
+
 #ifndef NDEBUG
     if (PIN_DBG_SQUARE_WAVE) {
         // setup a debug

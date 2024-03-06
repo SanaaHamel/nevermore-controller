@@ -4,7 +4,8 @@
 
 #include "boards/waveshare_rp2040_zero.h"
 #include "config/pins.hpp"
-#include "pico.h"
+#include "pico.h"  // IWYU pragma: keep for `WAVESHARE_RP2040_ZERO`
+#include <optional>
 
 #ifndef WAVESHARE_RP2040_ZERO
 #error "`PICO_BOARD` is likely incorrect, `WAVESHARE_RP2040_ZERO` is not defined"
@@ -16,6 +17,7 @@
 constexpr GPIO_Pin PIN_FAN_PWM = 13;
 constexpr GPIO_Pin PIN_FAN_TACHOMETER = 15;
 constexpr GPIO_Pin PIN_NEOPIXEL_DATA_IN = 12;
+constexpr std::optional<GPIO_Pin> PIN_PHOTOCATALYTIC_PWM;
 
 // This layout sucks, but we're rather constrained.
 constexpr GPIO_Pin PINS_I2C[] = {

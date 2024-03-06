@@ -3,6 +3,7 @@
 // 4553d138-1d00-4b6f-bc42-955a89cf8c36 Service - Fan
 // 260a0845-e62f-48c6-aef9-04f62ff8bffd Service - Fan Control Policy
 // f62918ab-33b7-4f47-9fba-8ce9de9fecbb Service - NeoPixel
+// de44dd71-2400-4cd1-a3f3-9fb00c4697d7 Service - Photocatalytic
 
 // 216aa791-97d0-46ac-8752-60bbc00611e1 VOC Indexed
 // c3acb286-8071-427b-bbed-d64987373f23 VOC Sensor Raw
@@ -179,6 +180,18 @@ PRIMARY_SERVICE, 7be8ac4b-7eb4-4e09-b134-91a46b622832
 CHARACTERISTIC, 2B04, READ | WRITE | DYNAMIC
 CHARACTERISTIC_USER_DESCRIPTION, READ | DYNAMIC
 CHARACTERISTIC, 86a25d55-1893-4d01-8ea8-8970f622c243, READ | WRITE | DYNAMIC
+CHARACTERISTIC_USER_DESCRIPTION, READ | DYNAMIC
+
+/////////////////////////////
+// Photocatalytic Service
+/////////////////////////////
+
+PRIMARY_SERVICE, de44dd71-2400-4cd1-a3f3-9fb00c4697d7
+// Photocatalytic PWM %
+CHARACTERISTIC, 2B04, READ | DYNAMIC
+CHARACTERISTIC_USER_DESCRIPTION, READ | DYNAMIC
+// Photocatalytic PWM % - Override (not-known -> automatic control)
+CHARACTERISTIC, 2B04, READ | WRITE | DYNAMIC
 CHARACTERISTIC_USER_DESCRIPTION, READ | DYNAMIC
 
 /////////////////////////////

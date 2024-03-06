@@ -25,6 +25,7 @@ constexpr bool pins_forall(F&& go) {
     if (!go(PIN_DISPLAY_BRIGHTNESS)) return false;
     if (!go(PIN_TOUCH_INTERRUPT)) return false;
     if (!go(PIN_TOUCH_RESET)) return false;
+    if (PIN_PHOTOCATALYTIC_PWM && !go(*PIN_PHOTOCATALYTIC_PWM)) return false;
 
     return true;
 }

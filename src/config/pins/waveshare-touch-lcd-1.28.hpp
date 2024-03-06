@@ -3,7 +3,8 @@
 #pragma once
 
 #include "config/pins.hpp"
-#include "pico.h"
+#include "pico.h"  // IWYU pragma: keep for `WAVESHARE_RP2040_LCD_1_28`
+#include <optional>
 
 #ifndef WAVESHARE_RP2040_LCD_1_28
 #error "`PICO_BOARD` is likely incorrect, `WAVESHARE_RP2040_LCD_1_28` is not defined"
@@ -12,6 +13,7 @@
 constexpr GPIO_Pin PIN_FAN_PWM = 28;
 constexpr GPIO_Pin PIN_FAN_TACHOMETER = 27;
 constexpr GPIO_Pin PIN_NEOPIXEL_DATA_IN = 26;
+constexpr std::optional<GPIO_Pin> PIN_PHOTOCATALYTIC_PWM;
 
 constexpr GPIO_Pin PINS_I2C[] = {
         16, 17,  // I2C 0
