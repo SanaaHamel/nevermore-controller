@@ -23,6 +23,8 @@ namespace nevermore::ui {
 
 namespace {
 
+constexpr bool CHAR_DRAW_TEMPERATURE_HDIV = false;
+
 constexpr auto CHART_X_AXIS_LENGTH = 1.h;
 constexpr uint8_t CHART_SERIES_ENTIRES_MAX = display::RESOLUTION.width / 3;
 
@@ -229,8 +231,8 @@ void display_update_plot() {
 }
 
 // Code more or less ripped from LVGL's `lv_chart.c`.
-void chart_draw_hdivs(lv_draw_ctx_t& draw_ctx, lv_draw_line_dsc_t const& line_desc, lv_chart_t const& chart,
-        uint16_t hdiv_cnt) {
+[[maybe_unused]] void chart_draw_hdivs(lv_draw_ctx_t& draw_ctx, lv_draw_line_dsc_t const& line_desc,
+        lv_chart_t const& chart, uint16_t hdiv_cnt) {
     if (hdiv_cnt <= 0) return;
 
     auto const border_opa = lv_obj_get_style_border_opa(&chart.obj, LV_PART_MAIN);
@@ -282,14 +284,16 @@ void on_chart_draw(bool begin, lv_event_t* e) {
         if (desc.p1 || desc.p2 || !desc.line_dsc) break;  // drawing main lines, or no line-info
 
         if (begin) {
-            // draw the secondary axis division lines before the primary axis lines
-            auto y_secondary_range = max(0, chart.ymax[1] - chart.ymin[1]);
-            auto hdiv_cnt = 1 + (y_secondary_range / CHART_DIV_TEMP.value_per);
+            if constexpr (CHAR_DRAW_TEMPERATURE_HDIV) {
+                // draw the secondary axis division lines before the primary axis lines
+                auto y_secondary_range = max(0, chart.ymax[1] - chart.ymin[1]);
+                auto hdiv_cnt = 1 + (y_secondary_range / CHART_DIV_TEMP.value_per);
 
-            auto line_desc = *desc.line_dsc;
-            line_desc.dash_gap = 6;
-            line_desc.dash_width = 6;
-            chart_draw_hdivs(*desc.draw_ctx, line_desc, chart, hdiv_cnt);
+                auto line_desc = *desc.line_dsc;
+                line_desc.dash_gap = 6;
+                line_desc.dash_width = 6;
+                chart_draw_hdivs(*desc.draw_ctx, line_desc, chart, hdiv_cnt);
+            }
         } else {
             // draw the VOC clean-line after all other lines
             lv_draw_line_dsc_t line_desc{
