@@ -37,7 +37,7 @@ struct ChartDivY {
     lv_coord_t value_per;
 };
 
-constexpr ChartDivY CHART_DIV_VOC{.min = 4, .value_per = 25};
+constexpr ChartDivY CHART_DIV_VOC{.min = 5, .value_per = 50};
 constexpr ChartDivY CHART_DIV_TEMP{.min = 6, .value_per = 10};
 constexpr lv_opa_t CHART_RED_ZONE_HI = LV_OPA_30;
 
