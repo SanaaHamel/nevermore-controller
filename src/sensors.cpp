@@ -71,29 +71,58 @@ private:
     }
 } g_mcu_temperature_sensor;
 
-VecSensors sensors_init_bus(I2C_Bus& bus, EnvironmentalFilter state) {
+VecSensors sensors_init_bus(I2C_Bus& bus, optional<EnvironmentalFilter::Kind> state) {
     printf("%s - initializing sensors...\n", bus.name());
 
     VecSensors sensors;
-    auto probe_for = [&](auto p) {
+    auto add = [&](auto p) {
         if (!p) return;
         printf("Found %s\n", p->name());
         p->start();
         sensors.push_back(std::move(p));
     };
 
-    probe_for(ahtxx(bus, state));
-    probe_for(bme280(bus, state));
-    probe_for(bme68x(bus, state));
-    probe_for(bmp280(bus, state));
-    probe_for(ens16x(bus, state));
-    probe_for(htu2xd(bus, state));
-    probe_for(sgp30(bus, state));
-    probe_for(sgp40(bus, state));
-    probe_for(CST816S::mk(bus));
+    if (state) {
+        auto add_env = [&](auto&& fn) { add(fn(bus, *state)); };
+        add_env(ahtxx);
+        add_env(bme280);
+        add_env(bme68x);
+        add_env(bmp280);
+        add_env(ens16x);
+        add_env(htu2xd);
+        add_env(sgp30);
+        add_env(sgp40);
+    }
+
+    add(CST816S::mk(bus));
 
     if (sensors.empty()) printf("!! No sensors found?\n");
     return sensors;
+}
+
+template <typename F>
+void foreach_sensor_bus(F&& go) {
+    for (auto const& bus_pins : Pins::active().i2c) {
+        if (!bus_pins) continue;
+
+        optional<EnvironmentalFilter::Kind> kind;
+        switch (bus_pins.kind) {
+        default: break;
+        case Pins::BusI2C::Kind::intake: kind = EnvironmentalFilter::Kind::Intake; break;
+        case Pins::BusI2C::Kind::exhaust: kind = EnvironmentalFilter::Kind::Exhaust; break;
+        }
+
+        I2C_Bus* bus;
+        if (auto hw = bus_pins.hardware_bus_num()) {
+            assert(hw <= 1);
+            bus = &i2c.at(*hw);
+        } else {
+            assert(false && "PIO I2C not impl");
+            continue;
+        }
+
+        go(*bus, kind);
+    }
 }
 
 }  // namespace
@@ -121,28 +150,16 @@ bool init() {
 
     // Explicitly reset b/c we may be restarting the program w/o power cycling the device.
     CST816S::reset_all();
-
-#if 1
-    pair<I2C_Bus&, EnvironmentalFilter::Kind> buses[] = {
-            {i2c[0], EnvironmentalFilter::Kind::Intake},
-            {i2c[1], EnvironmentalFilter::Kind::Exhaust},
-    };
-#else
-    static I2C_PIO dummy0{pio0, 20, 21};
-    // static I2C_PIO dummy1{pio1, 18, 19};
-    pair<I2C_Bus&, EnvironmentalFilter::Kind> buses[] = {
-            {dummy0, EnvironmentalFilter::Kind::Intake},
-            // {dummy1, EnvironmentalFilter::Kind::Exhaust},
-    };
-#endif
+    CST816S::register_isr();
 
     printf("Waiting %u ms for sensor init\n", unsigned(SENSOR_POWER_ON_DELAY / 1ms));
     task_delay(SENSOR_POWER_ON_DELAY);
 
-    for (auto&& [bus, kind] : buses) {
-        auto xs = sensors_init_bus(bus, {kind});
+    foreach_sensor_bus([](auto&& bus, auto&& kind) {
+        auto xs = sensors_init_bus(bus, kind);
         std::move(begin(xs), end(xs), back_inserter(g_sensor_devices));
-    }
+    });
+
     // honestly if we low on space or are getting fragmentation issues we might
     // as well just reserve a `sizeof(P*) * 32` block and call it a day.
     g_sensor_devices.shrink_to_fit();

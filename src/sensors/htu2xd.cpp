@@ -14,8 +14,8 @@ using namespace BLE;
 namespace nevermore::sensors {
 
 // HTU21D supports "up to 400 kbits/s"
-static_assert(
-        I2C_BAUD_RATE <= 400 * 1000, "`config.hpp`'s `I2C_BAUD_RATE` is too high for SGP40 (max 400 kbit/s)");
+static_assert(I2C_BAUD_RATE_SENSOR_MAX <= 400'000,
+        "`config.hpp`'s `I2C_BAUD_RATE_SENSOR_MAX` is too high for HTU2x (max 400 kbit/s)");
 
 namespace {
 

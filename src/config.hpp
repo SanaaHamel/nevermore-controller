@@ -1,6 +1,5 @@
 #pragma once
 
-#include "config/pins.hpp"  // IWYU pragma: keep
 #include <chrono>
 
 namespace nevermore {
@@ -23,10 +22,7 @@ constexpr auto ADVERTISE_INTERVAL_MAX = 500ms;
 
 // Set to desired baud rate. Most sensors support 400 kbit/s.
 // Compile time error checks will trigger if set too high for included sensors.
-constexpr uint32_t I2C_BAUD_RATE = 400 * 1000;
-// TODO:  Find what's the actual max baud rate for a GC9A01.
-//        So far I've ran all the way to max (125M).
-constexpr uint32_t SPI_BAUD_RATE_DISPLAY = 125'000'000 / 2;
+constexpr uint32_t I2C_BAUD_RATE_SENSOR_MAX = 400 * 1000;
 
 // basically `PICO_STDIO_USB_CONNECT_WAIT_TIMEOUT_MS`, but only applies
 // when we know for certain that we're not USB powered.

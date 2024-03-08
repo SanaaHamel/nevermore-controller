@@ -1,6 +1,7 @@
 #include "gc9a01.hpp"
 #include "FreeRTOS.h"  // IWYU pragma: keep
 #include "config.hpp"  // IWYU pragma: keep, don't want to include board specific file
+#include "display.hpp"
 #include "display/GC9A01.h"
 #include "hardware/dma.h"
 #include "hardware/irq.h"
@@ -88,6 +89,9 @@ void gc9a01_flush_dma(lv_disp_drv_t* disp_drv, const lv_area_t* area, lv_color_t
     assert(!g_update_display_driver && "transfer already in progres (assume we have 1 display)");
     if (area->x2 < area->x1 || area->y2 < area->y1) return;  // zero area write
 
+    auto* spi = display::active_spi();
+    if (!spi) return;
+
     g_update_display_driver = disp_drv;
 
     LV_DRV_DISP_SPI_CS(false);  // Listen to us
@@ -98,7 +102,6 @@ void gc9a01_flush_dma(lv_disp_drv_t* disp_drv, const lv_area_t* area, lv_color_t
     LV_DRV_DISP_CMD_DATA(GC9A01_DATA_MODE);
 
     // SPI seems to require 8 bit chunks. Get corrupted writes w/ 16 bits.
-    auto* spi = spi_gpio_bus(PINS_DISPLAY_SPI[0]);
     auto c = dma_channel_get_default_config(g_dma_channel);
     channel_config_set_dreq(&c, spi_get_dreq(spi, true));
     channel_config_set_transfer_data_size(&c, DMA_SIZE_8);

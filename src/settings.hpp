@@ -1,5 +1,6 @@
 #pragma once
 
+#include "config/pins.hpp"
 #include "utility/crc.hpp"
 #include "utility/fan_policy.hpp"
 #include "utility/fan_policy_thermal.hpp"
@@ -73,7 +74,8 @@ struct SettingsV0 {
     Padding<1> _0 = {};
     float display_brightness = 1.f;  // range: [0, 1]; don't edit directly, use `display::brightness`
     SaveCounter save_counter = {};
-    Padding<3> _1 = {};
+    Pins pins = PINS_DEFAULT;
+    Padding<2> _1 = {};
 
     // replaces valid fields from RHS into self
     void merge_valid_fields(SettingsV0 const&);

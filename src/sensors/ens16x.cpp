@@ -14,8 +14,8 @@ using namespace BLE;
 
 namespace nevermore::sensors {
 
-static_assert(
-        I2C_BAUD_RATE <= 1'000'000, "`config.hpp`'s `I2C_BAUD_RATE` is too high for ENS16x (max 1 M/s)");
+static_assert(I2C_BAUD_RATE_SENSOR_MAX <= 1'000'000,
+        "`config.hpp`'s `I2C_BAUD_RATE_SENSOR_MAX` is too high for ENS16x (max 1 M/s)");
 
 namespace {
 

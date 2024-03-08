@@ -1,5 +1,5 @@
 #include "ws2812.hpp"
-#include "config.hpp"
+#include "config/pins.hpp"
 #include "hardware/dma.h"
 #include "hardware/irq.h"
 #include "hardware/pio.h"
@@ -159,7 +159,13 @@ void init() {
     dma_channel_set_irq0_enabled(g_dma_channel, true);
 
     uint offset = pio_add_program(WS2812_PIO, &ws2812_program);
-    ws2812_program_init(WS2812_PIO, WS2812_SM, offset, PIN_NEOPIXEL_DATA_IN, 1s / WS2812_TIME_PER_BIT);
+    bool done_one = false;
+    for (auto&& pin : Pins::active().neopixel_data) {
+        if (!pin) continue;
+        assert(!done_one && "multiple neopixel pins not impl");
+        done_one = true;  // FUTURE WORK: support multiple neopixel-data pins
+        ws2812_program_init(WS2812_PIO, WS2812_SM, offset, pin, 1s / WS2812_TIME_PER_BIT);
+    }
 
     // Initialise to max by default.
     // Upside: Clients can skip setup (useful if we lose power and reset)

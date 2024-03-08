@@ -1,5 +1,6 @@
 #pragma once
 
+#include "hardware/spi.h"
 #include <cstdint>
 
 namespace nevermore::display {
@@ -19,5 +20,8 @@ constexpr Resolution RESOLUTION{
         .width = 240,
         .height = 240,
 };
+
+// HACK: internal API, do not use
+spi_inst_t* active_spi();
 
 };  // namespace nevermore::display

@@ -163,7 +163,7 @@ void restore_from_slot(SettingsPersisted& dst, SettingsPersisted const& stored) 
         // Need a temp settings to setup defaults for new fields, existing fields
         // may be malformed/invalid.
         SettingsPersisted default_init{};
-        memcpy(&default_init, &stored, stored.header.size);
+        memcpy((void*)&default_init, (void*)&stored, stored.header.size);
         default_init.header.size = sizeof(SettingsPersisted);
         dst.merge_valid_fields(default_init);
         return;
@@ -328,6 +328,7 @@ void Settings::reset(ResetFlags flags) {
     if (flags & hardware) {
         // FIXME: This is a maintence nightmare. There must be a better way of doing things.
         display_hw = Settings{}.display_hw;
+        pins = PINS_DEFAULT;
     }
 }
 
@@ -398,6 +399,13 @@ void SettingsV0::merge_valid_fields(SettingsV0 const& x) {
 
     if (0 <= x.display_brightness && x.display_brightness <= 1) display_brightness = x.display_brightness;
     save_counter = x.save_counter;
+
+    try {
+        x.pins.validate_or_throw();
+        pins = x.pins;
+    } catch (char const* msg) {
+        printf("WARN - Settings - pins invalid, resetting to defaults. reason: %s\n", msg);
+    }
 }
 
 }  // namespace nevermore::settings

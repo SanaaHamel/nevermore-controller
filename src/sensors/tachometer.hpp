@@ -1,6 +1,7 @@
 #pragma once
 
 #include "async_sensor.hpp"
+#include "config/pins.hpp"
 #include "sdk/pwm.hpp"
 #include <chrono>
 #include <cstdint>
@@ -16,10 +17,19 @@ struct Tachometer final : SensorPeriodic {
     constexpr static auto TACHOMETER_READ_PERIOD = SENSOR_UPDATE_PERIOD;
     static_assert(100ms <= TACHOMETER_READ_PERIOD && "need at least 100ms to get a good sampling");
 
-    Tachometer(GPIO_Pin pin, uint32_t pulses_per_revolution = 1)
-            : slice_num(pwm_gpio_to_slice_num_(pin)), pulses_per_revolution(pulses_per_revolution) {
-        assert(pwm_gpio_to_channel(pin) == PWM_CHAN_B && "tachometers must run on a B channel");
+    Tachometer(GPIO pin = GPIO::none(), uint32_t pulses_per_revolution = 1) {
+        setup(pin, pulses_per_revolution);
+    }
+
+    void setup(GPIO pin, uint32_t pulses_per_revolution = 1) {
+        assert((!pin || pwm_gpio_to_channel(pin) == PWM_CHAN_B) && "tachometers must run on a B channel");
         assert(0 < pulses_per_revolution);
+        this->pin_ = pin;
+        this->pulses_per_revolution = pulses_per_revolution;
+    }
+
+    [[nodiscard]] GPIO pin() const {
+        return pin_;
     }
 
     [[nodiscard]] double revolutions_per_second() const {
@@ -32,6 +42,9 @@ struct Tachometer final : SensorPeriodic {
 
 protected:
     void read() override {
+        if (!pin_) return;
+        auto slice_num = pwm_gpio_to_slice_num_(pin_);
+
         pwm_set_counter(slice_num, 0);
         auto begin = std::chrono::steady_clock::now();
         pwm_set_enabled(slice_num, true);
@@ -51,8 +64,8 @@ protected:
     }
 
 private:
-    uint slice_num;
-    uint pulses_per_revolution;
+    GPIO pin_;
+    uint pulses_per_revolution = 1;
     double revolutions_per_second_ = 0;
 };
 

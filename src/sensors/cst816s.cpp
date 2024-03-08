@@ -1,6 +1,7 @@
 #include "cst816s.hpp"
 #include "FreeRTOS.h"  // IWYU pragma: keep
 #include "config.hpp"
+#include "config/pins.hpp"
 #include "hardware/gpio.h"
 #include "lvgl.h"  // IWYU pragma: keep
 #include "sdk/i2c.hpp"
@@ -16,7 +17,8 @@ using namespace std;
 
 namespace nevermore::sensors {
 
-static_assert(I2C_BAUD_RATE <= 400'000, "CST816S only supports up to 400 k baud/s");
+static_assert(I2C_BAUD_RATE_SENSOR_MAX <= 400'000,
+        "`config.hpp`'s `I2C_BAUD_RATE_SENSOR_MAX` is too high for CST816S (max 400 kbit/s)");
 
 namespace {
 
@@ -163,16 +165,11 @@ struct CST816S::ISR {
     ISR() {
         lock = xSemaphoreCreateBinary();
         xSemaphoreGive(lock);  // created w/ count 0, set it to 1
-
-        // NOT IDEMPOTENT. Will consume a shared interrupt handler each time.
-        // This is a horrible foot-gun of an API.
-        gpio_set_irq_enabled_with_callback(
-                PIN_TOUCH_INTERRUPT, GPIO_IRQ_EDGE_RISE | GPIO_IRQ_EDGE_FALL, true, &isr);
     }
 
     static void isr(uint gpio, [[maybe_unused]] uint32_t event_mask) {
-        assert(gpio == PIN_TOUCH_INTERRUPT);
-        if (gpio != PIN_TOUCH_INTERRUPT) return;
+        assert(Pins::active().touch_interrupt == GPIO(gpio));
+        if (Pins::active().touch_interrupt != GPIO(gpio)) return;
 
         BaseType_t xHigherPriorityTaskWoken = pdFALSE;
         if (!xSemaphoreTakeFromISR(lock, &xHigherPriorityTaskWoken)) {
@@ -211,11 +208,21 @@ struct CST816S::ISR {
 
 SemaphoreHandle_t CST816S::ISR::lock;
 
+void CST816S::register_isr() {
+    // NOT IDEMPOTENT. Will consume a shared interrupt handler each time.
+    // This is a horrible foot-gun of an API.
+    if (auto pin = Pins::active().touch_interrupt) {
+        gpio_set_irq_enabled_with_callback(pin, GPIO_IRQ_EDGE_RISE | GPIO_IRQ_EDGE_FALL, true, &ISR::isr);
+    }
+}
+
 void CST816S::reset_all() {
-    gpio_put(PIN_TOUCH_RESET, false);  // trigger on low
-    task_delay(5ms);
-    gpio_put(PIN_TOUCH_RESET, true);
-    task_delay(50ms);
+    if (auto pin = Pins::active().touch_reset) {
+        gpio_put(pin, false);  // trigger on low
+        task_delay(5ms);
+        gpio_put(pin, true);
+        task_delay(50ms);
+    }
 }
 
 CST816S::CST816S(I2C_Bus& bus) : bus(&bus) {

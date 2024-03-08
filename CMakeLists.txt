@@ -102,8 +102,6 @@ add_compile_definitions(WANT_HCI_DUMP=1)
 add_compile_definitions(PICO_USE_MALLOC_MUTEX=1)
 add_compile_definitions(CYW43_LWIP=0)
 add_compile_definitions(CYW43_HOST_NAME="Nevermore")
-add_compile_definitions(NEVERMORE_CONFIG="${NEVERMORE_CONFIG}")
-add_compile_definitions(NEVERMORE_PICO_W_BT=${NEVERMORE_PICO_W_BT})
 add_compile_definitions(USBD_PRODUCT="Pico Nevermore")
 target_compile_definitions(picowota PUBLIC USBD_PRODUCT="Pico Nevermore")
 
@@ -125,6 +123,11 @@ if(BLUETOOTH_LOW_LEVEL_DEBUG)
 endif()
 
 add_library(nevermore-controller ${SRC_FILES})
+
+target_compile_definitions(
+  nevermore-controller PUBLIC NEVERMORE_CONFIG_PINS="${NEVERMORE_CONFIG_PINS}"
+                              NEVERMORE_PICO_W_BT=${NEVERMORE_PICO_W_BT}
+)
 
 target_include_directories(nevermore-controller PUBLIC ${SRC_DIR} ${SRC_CONFIG_DIR})
 

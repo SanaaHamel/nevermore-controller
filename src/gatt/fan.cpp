@@ -42,13 +42,9 @@ constexpr uint8_t FAN_POLICY_UPDATE_RATE_HZ = 10;
 constexpr uint8_t TACHOMETER_PULSE_PER_REVOLUTION = 2;
 constexpr uint32_t FAN_PWN_HZ = 25'000;
 
-constexpr auto SLICE_PWM = pwm_gpio_to_slice_num_(PIN_FAN_PWM);
-constexpr auto SLICE_TACHOMETER = pwm_gpio_to_slice_num_(PIN_FAN_TACHOMETER);
-static_assert(pwm_gpio_to_channel_(PIN_FAN_TACHOMETER) == PWM_CHAN_B, "can only read from B channel");
-
 BLE::Percentage8 g_fan_power = 0;
 BLE::Percentage8 g_fan_power_override;  // not-known -> automatic control
-nevermore::sensors::Tachometer g_tachometer{PIN_FAN_TACHOMETER, TACHOMETER_PULSE_PER_REVOLUTION};
+array<sensors::Tachometer, Pins{}.fan_tachometer.size()> g_tachometers;
 
 struct [[gnu::packed]] FanPowerTachoAggregate {
     BLE::Percentage8 power = g_fan_power;
@@ -90,13 +86,18 @@ void fan_power_set(BLE::Percentage8 power, sensors::Sensors const& sensors = sen
 
     auto scale = (power.value_or(0) / 100.) * (settings.fan_power_coefficient.value_or(0) / 100.);
     auto duty = uint16_t(numeric_limits<uint16_t>::max() * scale);
-    pwm_set_gpio_duty(PIN_FAN_PWM, duty);
+    for (auto&& pin : Pins::active().fan_pwm)
+        if (pin) pwm_set_gpio_duty(pin, duty);
 }
 
 }  // namespace
 
 double fan_rpm() {
-    return g_tachometer.revolutions_per_second() * 60;
+    double total = 0;
+    for (auto const& t : g_tachometers)
+        total += t.revolutions_per_second() * 60;
+
+    return total;
 }
 
 double fan_power() {
@@ -120,26 +121,39 @@ BLE::Percentage8 fan_power_override() {
 
 bool init() {
     // setup PWM configurations for fan PWM and fan tachometer
-    auto cfg_pwm = pwm_get_default_config();
-    pwm_config_set_freq_hz(cfg_pwm, FAN_PWN_HZ);
-    pwm_init(SLICE_PWM, &cfg_pwm, true);
+    for (auto&& pin : Pins::active().fan_pwm) {
+        if (!pin) continue;
 
-    auto cfg_tachometer = pwm_get_default_config();
-    pwm_config_set_clkdiv_mode(&cfg_tachometer, PWM_DIV_B_FALLING);
-    pwm_init(SLICE_TACHOMETER, &cfg_tachometer, false);
+        auto cfg = pwm_get_default_config();
+        pwm_config_set_freq_hz(cfg, FAN_PWN_HZ);
+        pwm_init(pwm_gpio_to_slice_num_(pin), &cfg, true);
+    }
+
+    auto* it_tacho = begin(g_tachometers);
+    for (auto&& pin : Pins::active().fan_tachometer) {
+        if (!pin) continue;
+        assert(it_tacho != end(g_tachometers));
+        it_tacho->setup(pin, TACHOMETER_PULSE_PER_REVOLUTION);
+        it_tacho++;  // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+
+        auto cfg = pwm_get_default_config();
+        pwm_config_set_clkdiv_mode(&cfg, PWM_DIV_B_FALLING);
+        pwm_init(pwm_gpio_to_slice_num_(pin), &cfg, false);
+    }
 
     // set fan PWM level
     fan_power_set(g_fan_power);
 
-    g_tachometer.start();
+    for (auto& t : g_tachometers)
+        if (t.pin()) t.start();
 
     // HACK:  We'd like to notify on write to tachometer changes, but the code base isn't setup
     //        for that yet. Internally poll and update based on diffs for now.
     mk_timer("gatt-fan-tachometer-notify", SENSOR_UPDATE_PERIOD)([](auto*) {
-        static double g_prev;
-        if (g_prev == g_tachometer.revolutions_per_second()) return;
+        static decltype(fan_rpm()) g_prev;
+        if (g_prev == fan_rpm()) return;
 
-        g_prev = g_tachometer.revolutions_per_second();
+        g_prev = fan_rpm();
         g_notify_fan_power_tacho_aggregate.notify();
         g_notify_aggregate.notify();
     });

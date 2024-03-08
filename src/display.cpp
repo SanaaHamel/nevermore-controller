@@ -1,12 +1,11 @@
 #include "display.hpp"
-#include "config.hpp"
 #include "config/lib/lv_drv_conf.h"  // need the `extern "C"` decls for LVGL driver interface
+#include "config/pins.hpp"
 #include "display/gc9a01.hpp"
 #include "hardware/gpio.h"
 #include "hardware/spi.h"
 #include "lvgl.h"  // IWYU pragma: keep
 #include "sdk/pwm.hpp"
-#include "sdk/spi.hpp"
 #include "sdk/task.hpp"
 #include "settings.hpp"
 #include "ui.hpp"
@@ -33,7 +32,9 @@ lv_disp_t* g_display;
 
 void brightness(float power) {
     settings::g_active.display_brightness = clamp(power, 0.f, 1.f);
-    pwm_set_gpio_duty(PIN_DISPLAY_BRIGHTNESS, UINT16_MAX * settings::g_active.display_brightness);
+    if (auto pin = Pins::active().display_brightness_pwm) {
+        pwm_set_gpio_duty(pin, UINT16_MAX * settings::g_active.display_brightness);
+    }
 }
 
 float brightness() {
@@ -44,9 +45,11 @@ float brightness() {
 // FUTURE WORK: Move to second core if we ever run into perf issues.
 //              Have a care regarding potential issues w/ interrupts/timers w/ core 0.
 bool init_with_ui() {
-    auto cfg_display_brightness = pwm_get_default_config();
-    pwm_config_set_freq_hz(cfg_display_brightness, DISPLAY_BACKLIGHT_FREQ);
-    pwm_init(pwm_gpio_to_slice_num_(PIN_DISPLAY_BRIGHTNESS), &cfg_display_brightness, true);
+    if (auto pin = Pins::active().display_brightness_pwm) {
+        auto cfg = pwm_get_default_config();
+        pwm_config_set_freq_hz(cfg, DISPLAY_BACKLIGHT_FREQ);
+        pwm_init(pwm_gpio_to_slice_num_(pin), &cfg, true);
+    }
     brightness(settings::g_active.display_brightness);
 
     lv_init();
@@ -78,6 +81,23 @@ bool init_with_ui() {
     return ui::init();
 }
 
+spi_inst_t* active_spi() {
+    for (auto&& bus : Pins::active().spi) {
+        if (!bus || bus.kind != Pins::BusSPI::Kind::display) continue;
+
+        // FUTURE WORK: won't work correctly when PIO buses happen b/c this
+        // might be a PIO even if it can be a HW
+        if (auto hw = bus.hardware_bus_num()) {
+            assert(hw <= 1);
+            return hw == 0 ? spi0 : spi1;
+        }
+
+        assert(false && "PIO `LV_DRV_DISP_SPI_WR_ARRAY` not impl");
+    }
+
+    return nullptr;
+}
+
 }  // namespace nevermore::display
 
 ////////////////////////////////////
@@ -85,21 +105,30 @@ bool init_with_ui() {
 ////////////////////////////////////
 
 void LV_DRV_DISP_CMD_DATA(bool value) {
-    gpio_put(PIN_DISPLAY_COMMAND, value);
+    if (auto pin = Pins::active().display_command) {
+        gpio_put(pin, value);
+    }
 }
 
 void LV_DRV_DISP_RST(bool value) {
-    gpio_put(PIN_DISPLAY_RESET, value);
+    if (auto pin = Pins::active().display_reset) {
+        gpio_put(pin, value);
+    }
 }
 
 void LV_DRV_DISP_SPI_CS(bool) {
     // NOP - got a single device on the SPI bus for now, can always assume active
 }
 
+// Slow path fallback. It is expected that the driver use DMA to feed the SPI engine.
 void LV_DRV_DISP_SPI_WR_ARRAY(uint8_t const* src, unsigned len) {
     assert(src);
-    [[maybe_unused]] auto n = spi_write_blocking(spi_gpio_bus(PINS_DISPLAY_SPI[0]), src, len);
-    assert(n == int(len) && "failed to write octet");
+    if (len <= 0) return;
+
+    if (auto* spi = display::active_spi()) {
+        [[maybe_unused]] auto n = spi_write_blocking(spi, src, len);
+        assert(n == int(len) && "failed to write octet");
+    }
 }
 
 // The LVGL driver API seems to use `char` instead of `uint8_t`. Whatever. Keep warning free.

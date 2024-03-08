@@ -1,4 +1,4 @@
-#include "config.hpp"
+#include "config/pins.hpp"
 #include "pico/binary_info.h"  // IWYU pragma: keep
 #include "sdk/i2c.hpp"
 #include "sdk/spi.hpp"
@@ -7,22 +7,32 @@ namespace nevermore {
 
 namespace {
 
-constexpr GPIO_Pin first_i2c_pin(uint8_t bus, I2C_Pin kind) {
-    for (auto pin : PINS_I2C) {
-        if (i2c_gpio_bus_num(pin) != bus) continue;
-        if (i2c_gpio_kind(pin) != kind) continue;
-        return pin;
+constexpr GPIO first_pin(Pins::BusI2C::Kind bus_kind, I2C_Pin kind) {
+    for (auto const& bus : PINS_DEFAULT.i2c) {
+        if (bus.kind == bus_kind) {
+            switch (kind) {
+            case I2C_Pin::SCL: return bus.clock;
+            case I2C_Pin::SDA: return bus.data;
+            }
+        }
     }
 
-    return PIN_MAX;
+    return {};
 }
 
-template <typename A>
-constexpr GPIO_Pin first_spi_pin(A const& xs, SPI_Pin kind) {
-    for (GPIO_Pin pin : xs)
-        if (spi_gpio_kind(pin) == kind) return pin;
+constexpr GPIO first_pin(Pins::BusSPI::Kind bus_kind, SPI_Pin kind) {
+    for (auto const& bus : PINS_DEFAULT.spi) {
+        if (bus.kind == bus_kind) {
+            switch (kind) {
+            case SPI_Pin::CLOCK: return bus.clock;
+            case SPI_Pin::SEND: return bus.send;
+            case SPI_Pin::RECV: return bus.recv;
+            case SPI_Pin::SELECT: return {}; // not used
+            }
+        }
+    }
 
-    return PIN_MAX;
+    return {};
 }
 
 }  // namespace
@@ -41,33 +51,34 @@ bi_decl(bi_program_build_date_string("@BUILD_TIMESTAMP@"));
 bi_decl(bi_2pins_with_names(
     0, "UART - TX",
     1, "UART - RX"));
+static_assert(nevermore::PINS_RESERVED_UART == decltype(nevermore::PINS_RESERVED_UART){0, 1});
 
 bi_decl(bi_4pins_with_names(
-    first_i2c_pin(0, I2C_Pin::SDA), "Intake I2C SDA",
-    first_i2c_pin(0, I2C_Pin::SCL), "Intake I2C SCL",
-    first_i2c_pin(1, I2C_Pin::SDA), "Exhaust I2C SDA",
-    first_i2c_pin(1, I2C_Pin::SCL), "Exhaust I2C SCL"));
+    first_pin(Pins::BusI2C::Kind::intake  , I2C_Pin::SDA), "Intake I2C SDA",
+    first_pin(Pins::BusI2C::Kind::intake  , I2C_Pin::SCL), "Intake I2C SCL",
+    first_pin(Pins::BusI2C::Kind::exhaust , I2C_Pin::SDA), "Exhaust I2C SDA",
+    first_pin(Pins::BusI2C::Kind::exhaust , I2C_Pin::SCL), "Exhaust I2C SCL"));
 
 bi_decl(bi_2pins_with_names(
-    PIN_FAN_PWM         , "Fan PWM",
-    PIN_FAN_TACHOMETER  , "Fan Tachometer"));
+    PINS_DEFAULT.fan_pwm[0].gpio        , "Fan PWM",
+    PINS_DEFAULT.fan_tachometer[0].gpio , "Fan Tachometer"));
 
 bi_decl(bi_1pin_with_name(
-    PIN_NEOPIXEL_DATA_IN, "NeoPixel Data In"));
+    PINS_DEFAULT.neopixel_data[0].gpio  , "NeoPixel Data"));
 
 bi_decl(bi_3pins_with_names(
-    first_spi_pin(PINS_DISPLAY_SPI, SPI_Pin::CLOCK), "Display - SPI CLOCK",
-    first_spi_pin(PINS_DISPLAY_SPI, SPI_Pin::SEND ), "Display - SPI SEND",
-    first_spi_pin(PINS_DISPLAY_SPI, SPI_Pin::RECV ), "Display - SPI RECV"));
+    first_pin(Pins::BusSPI::Kind::display , SPI_Pin::CLOCK), "Display - SPI CLOCK",
+    first_pin(Pins::BusSPI::Kind::display , SPI_Pin::SEND ), "Display - SPI SEND",
+    first_pin(Pins::BusSPI::Kind::display , SPI_Pin::RECV ), "Display - SPI RECV"));
 
 bi_decl(bi_3pins_with_names(
-    PIN_DISPLAY_COMMAND     , "Display - Command",
-    PIN_DISPLAY_RESET       , "Display - Reset",
-    PIN_DISPLAY_BRIGHTNESS  , "Display - Brightness"));
+    PINS_DEFAULT.display_command        , "Display - Command",
+    PINS_DEFAULT.display_reset          , "Display - Reset",
+    PINS_DEFAULT.display_brightness_pwm , "Display - Brightness"));
 
 bi_decl(bi_2pins_with_names(
-    PIN_TOUCH_INTERRUPT , "Touch Interrupt",
-    PIN_TOUCH_RESET     , "Touch Reset"));
+    PINS_DEFAULT.touch_interrupt, "Touch Interrupt",
+    PINS_DEFAULT.touch_reset    , "Touch Reset"));
 // clang-format on
 
 }  // namespace nevermore

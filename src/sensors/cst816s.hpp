@@ -21,6 +21,8 @@ struct CST816S final : SensorPeriodic {
 
     // Pulse the reset pin. (This device is somewhat finicky.)
     static void reset_all();
+    // Register ISR with runtime. NOT IDEMPOTENT.
+    static void register_isr();
 
     enum class Touch : uint8_t {
         Down = 0,

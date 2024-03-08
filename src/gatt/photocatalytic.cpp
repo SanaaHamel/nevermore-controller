@@ -1,5 +1,5 @@
 #include "photocatalytic.hpp"
-#include "config.hpp"
+#include "config/pins.hpp"
 #include "handler_helpers.hpp"
 #include "nevermore.h"
 #include "sdk/ble_data_types.hpp"
@@ -21,11 +21,10 @@ constexpr uint32_t PWM_HZ = 10'000;
 BLE::Percentage8 g_power_override;  // not-known -> automatic control
 
 void pc_power_set(BLE::Percentage8 const& power) {
-    if constexpr (PIN_PHOTOCATALYTIC_PWM) {
-        auto scale = power.value_or(0) / 100.;
-        auto duty = uint16_t(numeric_limits<uint16_t>::max() * scale);
-        pwm_set_gpio_duty(*PIN_PHOTOCATALYTIC_PWM, duty);
-    }
+    auto scale = power.value_or(0) / 100.;
+    auto duty = uint16_t(numeric_limits<uint16_t>::max() * scale);
+    for (auto&& pin : Pins::active().photocatalytic_pwm)
+        if (pin) pwm_set_gpio_duty(pin, duty);
 }
 
 void pc_power_override(BLE::Percentage8 override) {
@@ -37,10 +36,12 @@ void pc_power_override(BLE::Percentage8 override) {
 
 bool init() {
     // setup PWM configurations for fan PWM and fan tachometer
-    if constexpr (PIN_PHOTOCATALYTIC_PWM) {
-        auto cfg_pwm = pwm_get_default_config();
-        pwm_config_set_freq_hz(cfg_pwm, PWM_HZ);
-        pwm_init(pwm_gpio_to_slice_num_(*PIN_PHOTOCATALYTIC_PWM), &cfg_pwm, true);
+    for (auto&& pin : Pins::active().photocatalytic_pwm) {
+        if (!pin) continue;
+
+        auto cfg = pwm_get_default_config();
+        pwm_config_set_freq_hz(cfg, PWM_HZ);
+        pwm_init(pwm_gpio_to_slice_num_(pin), &cfg, true);
     }
 
     // set fan PWM level

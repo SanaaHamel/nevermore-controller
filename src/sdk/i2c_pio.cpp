@@ -8,13 +8,13 @@
 
 namespace nevermore {
 
-I2C_PIO::I2C_PIO(PIO pio, GPIO_Pin pin_sda, GPIO_Pin pin_scl)
-        : I2C_PIO(pio, pio_claim_unused_sm(pio, true), pin_sda, pin_scl) {}
+I2C_PIO::I2C_PIO(PIO pio, uint32_t baud_rate, GPIO pin_sda, GPIO pin_scl)
+        : I2C_PIO(pio, baud_rate, pio_claim_unused_sm(pio, true), pin_sda, pin_scl) {}
 
-I2C_PIO::I2C_PIO(PIO pio, uint sm, GPIO_Pin pin_sda, GPIO_Pin pin_scl)
-        : pio(pio), sm(sm), _name(format_string("PIO-%02d/%02d", pin_sda, pin_scl)) {
+I2C_PIO::I2C_PIO(PIO pio, uint32_t baud_rate, uint sm, GPIO pin_sda, GPIO pin_scl)
+        : pio(pio), sm(sm), _name(format_string("PIO-%02d/%02d", pin_sda.gpio, pin_scl.gpio)) {
     uint offset = pio_add_program(pio, &i2c_program);
-    i2c_program_init(I2C_BAUD_RATE, pio, sm, offset, pin_sda, pin_scl);
+    i2c_program_init(baud_rate, pio, sm, offset, pin_sda, pin_scl);
 }
 
 int I2C_PIO::write(uint8_t addr, uint8_t const* src, size_t len) {

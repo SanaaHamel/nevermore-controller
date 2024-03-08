@@ -8,8 +8,8 @@
 namespace nevermore {
 
 struct I2C_PIO final : I2C_Bus {  // NOLINT(cppcoreguidelines-special-member-functions)
-    I2C_PIO(PIO, GPIO_Pin pin_sda, GPIO_Pin pin_scl);
-    I2C_PIO(PIO, uint sm, GPIO_Pin pin_sda, GPIO_Pin pin_scl);
+    I2C_PIO(PIO, uint32_t baud_rate, GPIO pin_sda, GPIO pin_scl);
+    I2C_PIO(PIO, uint32_t baud_rate, uint sm, GPIO pin_sda, GPIO pin_scl);
 
     [[nodiscard]] char const* name() const override;
 

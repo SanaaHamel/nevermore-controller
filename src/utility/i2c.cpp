@@ -5,7 +5,6 @@
 #include "sdk/timer.hpp"
 #include <cassert>
 #include <chrono>
-#include <cstdint>
 
 using namespace std::literals::chrono_literals;
 
@@ -16,7 +15,7 @@ constexpr auto CLOCK_PULSE_DURATION = 10us;
 // Derived from Apache Nuttx's implementation.
 // https://github.com/apache/nuttx/blob/master/arch/arm/src/rp2040/rp2040_i2c.c#L623
 // Consider this function under the Apache License.
-bool i2c_bitbang_reset(GPIO_Pin const sda, GPIO_Pin const scl, unsigned const clock_cycles_timeout) {
+bool i2c_bitbang_reset(GPIO const sda, GPIO const scl, unsigned const clock_cycles_timeout) {
     assert(i2c_gpio_bus_num(sda) == i2c_gpio_bus_num(scl) && "must be on same bus");
     assert(i2c_gpio_kind(sda) == I2C_Pin::SDA && "must be an SDA pin");
     assert(i2c_gpio_kind(scl) == I2C_Pin::SCL && "must be an SCL pin");
@@ -33,7 +32,7 @@ bool i2c_bitbang_reset(GPIO_Pin const sda, GPIO_Pin const scl, unsigned const cl
     gpio_put(sda, true);
     gpio_put(scl, true);
 
-    auto put_pause = [](GPIO_Pin gpio, bool value) {
+    auto put_pause = [](GPIO gpio, bool value) {
         gpio_put(gpio, value);
         sleep(CLOCK_PULSE_DURATION);
     };

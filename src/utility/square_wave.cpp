@@ -8,7 +8,7 @@
 
 namespace nevermore {
 
-void square_wave_pwm_init(GPIO_Pin pin, uint32_t hz, float duty_f) {
+void square_wave_pwm_init(GPIO pin, uint32_t hz, float duty_f) {
     assert(0 < hz);
     assert(0 <= duty_f && duty_f <= 1);
 
