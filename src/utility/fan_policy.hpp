@@ -12,7 +12,7 @@ struct FanPolicyEnvironmental {
 
     // How long to keep spinning after `should_filter` returns `false`
     BLE::TimeSecond16 cooldown = 60 * 15;
-    VOCIndex voc_passive_max = 125;  // <= max(intake, exhaust)  -> filthy in here; get scrubbin'
+    VOCIndex voc_passive_max = 200;  // <= max(intake, exhaust)  -> filthy in here; get scrubbin'
     VOCIndex voc_improve_min = 25;   // <= (intake - exhaust)    -> things are improving, keep filtering
 
     // for now there's nothing to do; no additional constraints on any fields
