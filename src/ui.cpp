@@ -310,6 +310,23 @@ void on_chart_draw(bool begin, lv_event_t* e) {
                 chart_draw_hdivs(*desc.draw_ctx, line_desc, chart, hdiv_cnt);
             }
         } else {
+            auto draw_h_line = [&](lv_coord_t y, lv_draw_line_dsc_t const& line_desc) {
+                auto p1 = abs_pos_for_value(ui_chart_voc_intake.ui, y, false);
+                auto p2 = abs_pos_for_value(ui_chart_voc_intake.ui, y, true);
+                lv_draw_line(desc.draw_ctx, &line_desc, &p1, &p2);
+            };
+
+            if (auto y = settings::g_active.fan_policy_env.voc_passive_max.value_or(0); 0 < y) {
+                lv_draw_line_dsc_t line_desc2{
+                        .color = lv_color_make(255, 255, 255),
+                        .width = 2,
+                        .dash_width = 3,
+                        .dash_gap = 3,
+                        .opa = LV_OPA_20,
+                };
+                draw_h_line(lv_coord_t(y), line_desc2);
+            }
+
             // draw the VOC clean-line after all other lines
             lv_draw_line_dsc_t line_desc{
                     .color = lv_color_make(0, 255, 0),
@@ -318,9 +335,7 @@ void on_chart_draw(bool begin, lv_event_t* e) {
                     .dash_gap = 6,
                     .opa = LV_OPA_50,
             };
-            auto p1 = abs_pos_for_value(ui_chart_voc_intake.ui, 100, false);
-            auto p2 = abs_pos_for_value(ui_chart_voc_intake.ui, 100, true);
-            lv_draw_line(desc.draw_ctx, &line_desc, &p1, &p2);
+            draw_h_line(100, line_desc);
         }
     } break;
 
