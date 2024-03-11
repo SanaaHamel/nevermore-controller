@@ -237,7 +237,7 @@ int8_t bmp280_init(struct bmp280_dev *dev)
     int8_t rslt;
 
     /* Maximum number of tries before timeout */
-    uint8_t try_count = 5;
+    uint8_t try_count = 1;
 
     rslt = null_ptr_check(dev);
     if (rslt == BMP280_OK)
