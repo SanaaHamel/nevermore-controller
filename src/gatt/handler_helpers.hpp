@@ -58,7 +58,7 @@ struct WriteConsumer {
         // ARM has stricter alignment requirements than x86's *ANYTHING-GOES!* approach.
         A value;
         // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic)
-        memcpy(&value, buffer + offset, sizeof(value));
+        memcpy((void*)&value, buffer + offset, sizeof(value));
         offset += sizeof(A);
         return value;
     }

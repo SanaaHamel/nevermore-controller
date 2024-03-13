@@ -18,6 +18,8 @@ using namespace std;
 #define CONFIG_VOC_GATING_THRESHOLD 216aa791_97d0_46ac_8752_60bbc00611e1_05
 #define CONFIG_VOC_GATING_THRESHOLD_OVERRIDE 216aa791_97d0_46ac_8752_60bbc00611e1_06
 #define CONFIG_VOC_CALIBRATE_ENABLED ee786ac0_7700_47dd_b7de_9958f96303f2_01
+#define CONFIG_PINS 2e9410cb_30fd_4b2c_8c95_934226a9ba29_01
+#define CONFIG_PINS_ERROR 0f6d7c4b_c30c_45b2_b32a_0e5b130429f0_01
 
 namespace nevermore::gatt::configuration {
 
@@ -46,6 +48,8 @@ void reboot_delayed(bool to_bootloader) {
 constexpr BLE::ValidRange VOC_GATING_THRESHOLD_RANGE{.min = settings::VOC_GATING_THRESHOLD_MIN,
         .max = sensors::VOCIndex(500)};
 
+char const* g_pins_config_error = "";
+
 }  // namespace
 
 bool init() {
@@ -64,6 +68,8 @@ optional<uint16_t> attr_read(
         USER_DESCRIBE(CONFIG_VOC_GATING_THRESHOLD, "VOC Gating Threshold")
         USER_DESCRIBE(CONFIG_VOC_GATING_THRESHOLD_OVERRIDE, "VOC Gating Threshold Override")
         USER_DESCRIBE(CONFIG_VOC_CALIBRATE_ENABLED, "VOC Calibration Enabled")
+        USER_DESCRIBE(CONFIG_PINS, "Pin Assignments")
+        USER_DESCRIBE(CONFIG_PINS_ERROR, "Pin Assignments Validation Message")
 
         // NOLINTNEXTLINE(bugprone-branch-clone)
         HANDLE_READ_BLOB(CONFIG_VOC_GATING_THRESHOLD, VALID_RANGE, VOC_GATING_THRESHOLD_RANGE)
@@ -79,6 +85,11 @@ optional<uint16_t> attr_read(
         READ_VALUE(CONFIG_VOC_GATING_THRESHOLD, settings::g_active.voc_gating_threshold)
         READ_VALUE(CONFIG_VOC_GATING_THRESHOLD_OVERRIDE, settings::g_active.voc_gating_threshold_override)
         READ_VALUE(CONFIG_VOC_CALIBRATE_ENABLED, settings::g_active.voc_calibration_enabled)
+        READ_VALUE(CONFIG_PINS, settings::g_active.pins)
+
+    case HANDLE_ATTR(CONFIG_PINS_ERROR, VALUE):
+        return ::att_read_callback_handle_blob(reinterpret_cast<uint8_t const*>(g_pins_config_error),
+                strlen(g_pins_config_error), offset, buffer, buffer_size);
 
     default: return {};
     }
@@ -140,6 +151,21 @@ optional<int> attr_write(
         if (value != 0 && value != 1) return ATT_ERROR_VALUE_NOT_ALLOWED;
 
         settings::g_active.voc_calibration_enabled = !!value;
+        return 0;
+    }
+
+    case HANDLE_ATTR(CONFIG_PINS, VALUE): {
+        g_pins_config_error = "Incorrect `Pins` struct size.";
+        Pins value = consume;
+        try {
+            value.validate_or_throw();
+        } catch (char const* msg) {
+            g_pins_config_error = msg;
+            return ATT_ERROR_VALUE_NOT_ALLOWED;
+        }
+
+        g_pins_config_error = "";
+        settings::g_active.pins = value;
         return 0;
     }
 
