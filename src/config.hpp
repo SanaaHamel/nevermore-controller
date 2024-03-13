@@ -3,6 +3,8 @@
 #include "config/pins.hpp"  // IWYU pragma: keep
 #include <chrono>
 
+namespace nevermore {
+
 using namespace std::literals::chrono_literals;
 
 // period between setting changes getting persisted
@@ -29,3 +31,5 @@ constexpr uint32_t SPI_BAUD_RATE_DISPLAY = 125'000'000 / 2;
 // basically `PICO_STDIO_USB_CONNECT_WAIT_TIMEOUT_MS`, but only applies
 // when we know for certain that we're not USB powered.
 constexpr auto STDIO_USB_CONNECT_TIMEOUT = 1s;
+
+}  // namespace nevermore
