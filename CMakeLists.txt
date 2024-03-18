@@ -3,18 +3,21 @@ cmake_minimum_required(VERSION 3.20)
 include(FetchContent)
 include(cmake/pico_sdk_import.cmake)
 
-FetchContent_Declare(freertos_kernel
+FetchContent_Declare(
+  freertos_kernel
   GIT_REPOSITORY https://github.com/FreeRTOS/FreeRTOS-Kernel.git
   GIT_TAG smp # V202110.00-SMP
   GIT_SHALLOW ON
   SOURCE_SUBDIR "this path doesn't exist. it is here to disable the auto build inclusion"
 )
-FetchContent_Declare(lvgl
+FetchContent_Declare(
+  lvgl
   GIT_REPOSITORY git@github.com:lvgl/lvgl.git
   GIT_TAG release/v8.3
   GIT_SHALLOW ON
 )
-FetchContent_Declare(lv_drivers
+FetchContent_Declare(
+  lv_drivers
   GIT_REPOSITORY https://github.com/lvgl/lv_drivers
   GIT_TAG release/v8.3
   GIT_SHALLOW ON
@@ -22,12 +25,21 @@ FetchContent_Declare(lv_drivers
 
 FetchContent_MakeAvailable(lvgl lv_drivers)
 
-set(FREERTOS_HEAP "4" CACHE STRING "" FORCE)
-set(FREERTOS_PORT "GCC_POSIX" CACHE STRING "" FORCE) # Select the native compile PORT
+set(FREERTOS_HEAP
+    "4"
+    CACHE STRING "" FORCE
+)
+set(FREERTOS_PORT
+    "GCC_POSIX"
+    CACHE STRING "" FORCE
+) # Select the native compile PORT
 set(FREERTOS_KERNEL_PATH "${CMAKE_BINARY_DIR}/_deps/freertos_kernel-src")
 
 if(CMAKE_CROSSCOMPILING) # Select the cross-compile PORT
-  set(FREERTOS_PORT "GCC_ARM_CA9" CACHE STRING "" FORCE)
+  set(FREERTOS_PORT
+      "GCC_ARM_CA9"
+      CACHE STRING "" FORCE
+  )
 endif()
 
 FetchContent_MakeAvailable(freertos_kernel)
@@ -52,28 +64,27 @@ set(PICOWOTA_APP_STORE_SIZE "16") # each slot is 4 KiB (== erase sector size), w
 add_subdirectory(picowota)
 
 set(SRC_DIR ${CMAKE_SOURCE_DIR}/src)
-set(SRC_CONFIG_DIR ${SRC_DIR}/config/lib) # HACK: libs often include a config header (e.g. lvgl, btstack, etc)
+# HACK: libs often include a config header (e.g. lvgl, btstack, etc)
+set(SRC_CONFIG_DIR ${SRC_DIR}/config/lib)
 
 # modify lvgl to add config header path & sdk dependencies
 target_include_directories(lvgl PRIVATE ${SRC_CONFIG_DIR})
 target_include_directories(lv_drivers PRIVATE ${SRC_CONFIG_DIR})
-target_link_libraries(lvgl pico_time) # add `pico_time` dependency so lvgl can get a millisecond tick
+# add `pico_time` dependency so lvgl can get a millisecond tick
+target_link_libraries(lvgl pico_time)
 
 # Completely exclude `lvgl_demos` & `lvgl_examples` from being built.
 # Even if they're not linked it's annoying.
-set_target_properties(lvgl_demos lvgl_examples
-  PROPERTIES
-  EXCLUDE_FROM_ALL TRUE
-)
+set_target_properties(lvgl_demos lvgl_examples PROPERTIES EXCLUDE_FROM_ALL TRUE)
 
 # Touch outputs of config files so the rest of config knows there'll be associated outputs
 file(GLOB_RECURSE SRC_IN ${SRC_DIR}/*.in)
 
-foreach(IN_FILE ${SRC_IN})
-  cmake_path(REMOVE_EXTENSION IN_FILE LAST_ONLY)
+foreach(in_file ${SRC_IN})
+  cmake_path(REMOVE_EXTENSION in_file LAST_ONLY)
 
-  if(NOT EXISTS ${IN_FILE})
-    file(TOUCH "${IN_FILE}")
+  if(NOT EXISTS ${in_file})
+    file(TOUCH "${in_file}")
   endif()
 endforeach()
 
@@ -113,47 +124,37 @@ if(BLUETOOTH_LOW_LEVEL_DEBUG)
   add_compile_definitions(CMAKE_BLUETOOTH_LOW_LEVEL_DEBUG=1)
 endif()
 
-add_library(nevermore-controller
-  ${SRC_FILES}
-)
+add_library(nevermore-controller ${SRC_FILES})
 
-target_include_directories(nevermore-controller PUBLIC
-  ${SRC_DIR}
-  ${SRC_CONFIG_DIR}
-)
+target_include_directories(nevermore-controller PUBLIC ${SRC_DIR} ${SRC_CONFIG_DIR})
 
-target_link_libraries(nevermore-controller
-  PUBLIC
-
-  # Pico SDK
-  hardware_adc
-  hardware_dma
-  hardware_flash
-  hardware_i2c
-  hardware_pio
-  hardware_pwm
-  hardware_spi
-  pico_btstack_ble
-  pico_stdlib
-  pico_time
-
-  # Others
-  FreeRTOS-Kernel
-  FreeRTOS-Kernel-Heap4
-  lvgl::drivers
-  lvgl::lvgl
-  picowota_client
+target_link_libraries(
+  nevermore-controller
+  PUBLIC # Pico SDK
+         hardware_adc
+         hardware_dma
+         hardware_flash
+         hardware_i2c
+         hardware_pio
+         hardware_pwm
+         hardware_spi
+         pico_btstack_ble
+         pico_stdlib
+         pico_time
+         # Others
+         FreeRTOS-Kernel
+         FreeRTOS-Kernel-Heap4
+         lvgl::drivers
+         lvgl::lvgl
+         picowota_client
 )
 
 list(TRANSFORM SRC_IN REPLACE "(.*)\.in$" "\\1" OUTPUT_VARIABLE SRC_IN_BYPRODUCTS)
-add_custom_target(nevermore-controller-generate-build-info
-  COMMAND ${CMAKE_COMMAND}
-  -D EXTRA_MODULES_DIR=${CMAKE_CURRENT_SOURCE_DIR}/cmake
-  -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/configure_files.cmake
-  --
-  ${SRC_IN}
-  BYPRODUCTS
-  ${SRC_IN_BYPRODUCTS}
+add_custom_target(
+  nevermore-controller-generate-build-info
+  COMMAND ${CMAKE_COMMAND} -D EXTRA_MODULES_DIR=${CMAKE_CURRENT_SOURCE_DIR}/cmake -P
+          ${CMAKE_CURRENT_SOURCE_DIR}/cmake/configure_files.cmake -- ${SRC_IN}
+  BYPRODUCTS ${SRC_IN_BYPRODUCTS}
 )
 
 add_dependencies(nevermore-controller nevermore-controller-generate-build-info)
@@ -180,11 +181,7 @@ pico_add_extra_outputs(nevermore-controller-no-bootloader)
 picowota_build_no_bootloader_with_app_store(nevermore-controller-no-bootloader)
 
 if(NEVERMORE_PICO_W_BT)
-  target_link_libraries(nevermore-controller
-    PUBLIC
-    pico_btstack_cyw43
-    pico_cyw43_arch_sys_freertos
-  )
+  target_link_libraries(nevermore-controller PUBLIC pico_btstack_cyw43 pico_cyw43_arch_sys_freertos)
 
   add_executable(nevermore-controller-ota)
   target_link_libraries(nevermore-controller-ota PRIVATE nevermore-controller)
@@ -195,8 +192,5 @@ if(NEVERMORE_PICO_W_BT)
   picowota_share_cyw43_firmware(nevermore-controller)
   picowota_build_combined(nevermore-controller-ota)
 else()
-  set_target_properties(picowota
-    PROPERTIES
-    EXCLUDE_FROM_ALL TRUE
-  )
+  set_target_properties(picowota PROPERTIES EXCLUDE_FROM_ALL TRUE)
 endif()
