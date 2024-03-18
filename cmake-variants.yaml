@@ -18,33 +18,26 @@ board:
       long: Classic Pico W
       settings:
         PICO_BOARD: pico_w
+        NEVERMORE_BOARD: pico_w
         NEVERMORE_PICO_W_BT: "true"
-        NEVERMORE_CONFIG_PINS: config/pins/pico_w.hpp
-    pico_w_custom:
-      short: Pico W (Custom Pins)
-      long: Classic Pico W w/ custom pin assignments
-      settings:
-        PICO_BOARD: pico_w
-        NEVERMORE_PICO_W_BT: "true"
-        NEVERMORE_CONFIG_PINS: config/pins/custom.hpp
     waveshare-rp2040-lcd-1.28:
       short: Waveshare RP2040 LCD-1.28
       long: Waveshare RP2040 LCD-1.28 (w/o wireless)
       settings:
         PICO_BOARD: waveshare_rp2040_lcd_1.28
+        NEVERMORE_BOARD: waveshare-rp2040-lcd-1.28
         NEVERMORE_PICO_W_BT: "false"
-        NEVERMORE_CONFIG_PINS: config/pins/waveshare-rp2040-lcd-1.28.hpp
     waveshare-rp2040-touch-lcd-1.28:
       short: Waveshare RP2040 Touch LCD-1.28
       long: Waveshare RP2040 Touch LCD-1.28 (w/o wireless)
       settings:
         PICO_BOARD: waveshare_rp2040_lcd_1.28
+        NEVERMORE_BOARD: waveshare-rp2040-touch-lcd-1.28
         NEVERMORE_PICO_W_BT: "false"
-        NEVERMORE_CONFIG_PINS: config/pins/waveshare-rp2040-touch-lcd-1.28.hpp
     waveshare-rp2040-zero:
       short: Waveshare RP2040-Zero
       long: Waveshare RP2040-Zero
       settings:
         PICO_BOARD: waveshare_rp2040_zero
+        NEVERMORE_BOARD: waveshare-rp2040-zero
         NEVERMORE_PICO_W_BT: "false"
-        NEVERMORE_CONFIG_PINS: config/pins/waveshare-rp2040-zero.hpp

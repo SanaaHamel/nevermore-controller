@@ -125,8 +125,10 @@ endif()
 add_library(nevermore-controller ${SRC_FILES})
 
 target_compile_definitions(
-  nevermore-controller PUBLIC NEVERMORE_CONFIG_PINS="${NEVERMORE_CONFIG_PINS}"
-                              NEVERMORE_PICO_W_BT=${NEVERMORE_PICO_W_BT}
+  nevermore-controller
+  PUBLIC NEVERMORE_BOARD="${NEVERMORE_BOARD}"
+         NEVERMORE_BOARD_HEADER="config/pins/${NEVERMORE_BOARD}.hpp"
+         NEVERMORE_PICO_W_BT=${NEVERMORE_PICO_W_BT}
 )
 
 target_include_directories(nevermore-controller PUBLIC ${SRC_DIR} ${SRC_CONFIG_DIR})
@@ -153,12 +155,17 @@ target_link_libraries(
 )
 
 list(TRANSFORM SRC_IN REPLACE "(.*)\.in$" "\\1" OUTPUT_VARIABLE SRC_IN_BYPRODUCTS)
+# cmake-format: off
 add_custom_target(
   nevermore-controller-generate-build-info
-  COMMAND ${CMAKE_COMMAND} -D EXTRA_MODULES_DIR=${CMAKE_CURRENT_SOURCE_DIR}/cmake -P
-          ${CMAKE_CURRENT_SOURCE_DIR}/cmake/configure_files.cmake -- ${SRC_IN}
+  COMMAND ${CMAKE_COMMAND}
+          -D EXTRA_MODULES_DIR=${CMAKE_CURRENT_SOURCE_DIR}/cmake
+          -D NEVERMORE_BOARD=${NEVERMORE_BOARD}
+          -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/configure_files.cmake
+          -- ${SRC_IN}
   BYPRODUCTS ${SRC_IN_BYPRODUCTS}
 )
+# cmake-format: on
 
 add_dependencies(nevermore-controller nevermore-controller-generate-build-info)
 
@@ -177,7 +184,9 @@ pico_generate_pio_header(nevermore-controller ${SRC_DIR}/ws2812.pio)
 picowota_app_store_declare(nevermore-controller)
 
 add_executable(nevermore-controller-no-bootloader)
-set_target_properties(nevermore-controller-no-bootloader PROPERTIES OUTPUT_NAME "nevermore-controller_${PICO_BOARD}")
+set_target_properties(
+  nevermore-controller-no-bootloader PROPERTIES OUTPUT_NAME "nevermore-controller_${PICO_BOARD}"
+)
 target_link_libraries(nevermore-controller-no-bootloader PRIVATE nevermore-controller)
 pico_enable_stdio_usb(nevermore-controller-no-bootloader 1)
 pico_enable_stdio_uart(nevermore-controller-no-bootloader 1)
@@ -188,7 +197,9 @@ if(NEVERMORE_PICO_W_BT)
   target_link_libraries(nevermore-controller PUBLIC pico_btstack_cyw43 pico_cyw43_arch_sys_freertos)
 
   add_executable(nevermore-controller-ota)
-  set_target_properties(nevermore-controller-ota PROPERTIES OUTPUT_NAME "ota-nevermore-controller_${PICO_BOARD}")
+  set_target_properties(
+    nevermore-controller-ota PROPERTIES OUTPUT_NAME "ota-nevermore-controller_${PICO_BOARD}"
+  )
   target_link_libraries(nevermore-controller-ota PRIVATE nevermore-controller)
   pico_enable_stdio_usb(nevermore-controller-ota 1)
   pico_enable_stdio_uart(nevermore-controller-ota 1)

@@ -294,11 +294,11 @@ private:
 
 }  // namespace nevermore
 
-#ifndef NEVERMORE_CONFIG_PINS
-#error "`NEVERMORE_CONFIG_PINS` not defined"
+#ifndef NEVERMORE_BOARD_HEADER
+#error "`NEVERMORE_BOARD_HEADER` not defined"
 #endif
 
-#include NEVERMORE_CONFIG_PINS  // IWYU pragma: keep
+#include NEVERMORE_BOARD_HEADER  // IWYU pragma: keep
 
 inline constexpr void nevermore::Pins::validate_or_throw() const {
     if (pins_exist(contains(PINS_RESERVED_UART))) throw "Config uses a GPIO reserved for UART (0, 1).";

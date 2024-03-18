@@ -1,6 +1,6 @@
 format:
   dangle_parens: true
-  line_width: 120
+  line_width: 100
   tab_size: 2
   use_tabchars: false
 
