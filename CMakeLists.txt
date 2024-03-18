@@ -185,7 +185,8 @@ picowota_app_store_declare(nevermore-controller)
 
 add_executable(nevermore-controller-no-bootloader)
 set_target_properties(
-  nevermore-controller-no-bootloader PROPERTIES OUTPUT_NAME "nevermore-controller_${PICO_BOARD}"
+  nevermore-controller-no-bootloader PROPERTIES OUTPUT_NAME
+                                                "nevermore-controller_${NEVERMORE_BOARD}"
 )
 target_link_libraries(nevermore-controller-no-bootloader PRIVATE nevermore-controller)
 pico_enable_stdio_usb(nevermore-controller-no-bootloader 1)
@@ -198,7 +199,7 @@ if(NEVERMORE_PICO_W_BT)
 
   add_executable(nevermore-controller-ota)
   set_target_properties(
-    nevermore-controller-ota PROPERTIES OUTPUT_NAME "ota-nevermore-controller_${PICO_BOARD}"
+    nevermore-controller-ota PROPERTIES OUTPUT_NAME "ota-nevermore-controller_${NEVERMORE_BOARD}"
   )
   target_link_libraries(nevermore-controller-ota PRIVATE nevermore-controller)
   pico_enable_stdio_usb(nevermore-controller-ota 1)
