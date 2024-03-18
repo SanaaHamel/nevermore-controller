@@ -540,12 +540,13 @@ async def _main(args: CmdLnArgs):
         await _update_via_bt_spp(args)
 
     print("update complete.")
-    print("(You may safely abort if the following steps take too long [ctrl-c].)")
 
     try:
-        print(f"waiting for device to reboot ({REBOOT_DELAY} seconds)...")
-        await asyncio.sleep(REBOOT_DELAY)  # block b/c we need to wait for it to reboot
-        await _report_new_version(args, prev_version)
+        if not args.unattended:
+            print("You may safely abort if the following steps take too long [ctrl-c].")
+            print(f"waiting for device to reboot ({REBOOT_DELAY} seconds)...")
+            await asyncio.sleep(REBOOT_DELAY)
+            await _report_new_version(args, prev_version)
     except asyncio.exceptions.CancelledError:
         pass
     except KeyboardInterrupt:
