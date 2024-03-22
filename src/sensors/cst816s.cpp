@@ -168,7 +168,6 @@ struct CST816S::ISR {
     }
 
     static void isr(uint gpio, [[maybe_unused]] uint32_t event_mask) {
-        assert(Pins::active().touch_interrupt == GPIO(gpio));
         if (Pins::active().touch_interrupt != GPIO(gpio)) return;
 
         BaseType_t xHigherPriorityTaskWoken = pdFALSE;
