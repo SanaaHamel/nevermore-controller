@@ -470,14 +470,14 @@ async def _report_new_version(args: CmdLnArgs, prev_version: str):
     await retry_if_disconnected(args.bt_address, go, connection_timeout=None)
 
 
-async def _main(args: CmdLnArgs):
+async def _main(args: CmdLnArgs) -> int:
     if args.bt_address is not None and not bt_address_validate(args.bt_address):
         logging.error("invalid address for `--bt-address`")
-        return
+        return 1
 
     if args.file is not None and args.tag is not None:
         logging.error("`--tag` and `--file` are mutually exclusive")
-        return
+        return 1
 
     if args.file is None:
         if args.tag is None:
@@ -486,7 +486,7 @@ async def _main(args: CmdLnArgs):
             release = await fetch_release_by_tag(args.tag)
 
         if release is None:
-            return
+            return 1
 
         print(f"RELEASE TAG: {release.tag}")
         print(f"RELEASE DESCRIPTION:\n{release.info}\n")
@@ -496,7 +496,7 @@ async def _main(args: CmdLnArgs):
 
         temp_file = await download_update(release)
         if temp_file is None:
-            return
+            return 1
 
         args.file = Path(temp_file.name)
 
@@ -552,10 +552,12 @@ async def _main(args: CmdLnArgs):
     except KeyboardInterrupt:
         pass
 
+    return 0
+
 
 def main():
     def go(args: CmdLnArgs):
-        asyncio.run(_main(args))
+        exit(asyncio.run(_main(args)))
 
     tap.Parser(CmdLnArgs).bind(go).run()
 
