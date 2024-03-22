@@ -98,13 +98,14 @@ __doc__ = """Script for updating Nevermore controllers."""
 import asyncio
 import json
 import logging
+import os
 import subprocess
 import typing
 from abc import abstractmethod
 from dataclasses import dataclass
 from pathlib import Path
 from tempfile import NamedTemporaryFile
-from typing import Any, Callable, Coroutine, List, Optional, TypeVar
+from typing import Any, Callable, Coroutine, Iterable, List, Optional, Set, TypeVar
 
 import serial_flash
 import typed_argparse as tap
@@ -121,6 +122,7 @@ if typing.TYPE_CHECKING:
 else:
     _LoggerAdapter = logging.LoggerAdapter
 
+__all__ = ['CmdLnArgs', '_main']
 
 NEVERMORE_OTA_WIFI_SSID = 'nevermore-update-ota'
 NEVERMORE_OTA_WIFI_KEY = 'raccoons-love-floor-onions'
@@ -128,8 +130,6 @@ NEVERMORE_OTA_WIFI_KEY = 'raccoons-love-floor-onions'
 CONNECT_TO_AP_TIMEOUT = 20  # seconds
 CONNECT_TO_AP_DELAY = 2  # seconds
 REBOOT_DELAY = 1  # seconds
-
-OTA_UPDATE_FILENAME = "picowota_nevermore-controller-ota.uf2"
 
 URL_RELEASES_FETCH_LATEST = (
     "https://api.github.com/repos/sanaahamel/nevermore-controller/releases?per_page=1"
@@ -149,7 +149,16 @@ DOWNLOAD_ASSET_HEADERS = {
     "X-GitHub-Api-Version": "2022-11-28",
 }
 
+ADDRESS_2_BOARD_CACHE_FILENAME = ".update_ota.cache.address-2-board.json"
+ADDRESS_2_BOARD_CACHE_PATH = os.path.join(
+    os.path.dirname(os.path.realpath(__file__)), ADDRESS_2_BOARD_CACHE_FILENAME
+)
+
 _A = TypeVar("_A")
+
+
+def join_multi_line_list_tabbed(xs: Iterable[str]) -> Optional[str]:
+    return ("\n\t" + "\n\t".join(xs)) if xs else None
 
 
 def _bssid_from_bt_address(bt_address: str):
@@ -158,6 +167,15 @@ def _bssid_from_bt_address(bt_address: str):
     bssid = bt_address.split(':')
     bssid[-1] = f"{(int(bssid[-1], 16) - 1) & 0xFF:02x}"
     return ":".join(bssid)
+
+
+# in order of preference
+def update_filename_candidates(board: str) -> List[str]:
+    xs = [f"picowota_ota-nevermore-controller_{board}.uf2"]
+    if board == "pico_w":  # fallback to old build names
+        xs.append("picowota_nevermore-controller-ota.uf2")
+
+    return xs
 
 
 @dataclass
@@ -194,7 +212,7 @@ async def fetch_release_latest() -> Optional[ReleaseInfo]:
     return await fetch_release(URL_RELEASES_FETCH_LATEST)
 
 
-async def fetch_asset(asset_url: str):
+async def fetch_asset(asset_url: str, file_suffix: str):
     async with ClientSession() as session:
         async with session.get(asset_url, headers=DOWNLOAD_ASSET_HEADERS) as response:
             content = await response.read()
@@ -202,22 +220,45 @@ async def fetch_asset(asset_url: str):
                 logging.error(f"download asset failed. http code={response.status}")
                 return None
 
-            file = NamedTemporaryFile(suffix=OTA_UPDATE_FILENAME)
+            file = NamedTemporaryFile(suffix=file_suffix)
             file.write(content)
             return file
 
 
-async def download_update(release: ReleaseInfo):
-    assert_candidates = [x for x in release.assets if x.endswith(OTA_UPDATE_FILENAME)]
-    assert len(assert_candidates) <= 1
-    if not assert_candidates:
+async def download_filename(release: ReleaseInfo, filename: str):
+    assert_candidates = [x for x in release.assets if x.endswith(filename)]
+    if 1 < len(assert_candidates):
         logging.error(
-            f"latest release does not have an asset named `{OTA_UPDATE_FILENAME}`"
+            f"multiple candidates for `{filename}`:{join_multi_line_list_tabbed(sorted(assert_candidates))}"
         )
         return None
 
-    print(f"fetching release {release.tag} from {assert_candidates[0]}")
-    return await fetch_asset(assert_candidates[0])
+    if not assert_candidates:
+        return None
+
+    print(f"downloading {release.tag} [{assert_candidates[0]}]")
+    return await fetch_asset(assert_candidates[0], file_suffix=filename)
+
+
+# keep downloaded files alive until program terminates
+g_download_board_files: Set[Any] = set()
+
+
+async def download_board_update(release: ReleaseInfo, board: str):
+    global g_download_board_files
+    candidates = update_filename_candidates(board)
+    for filename in candidates:
+        file = await download_filename(release, filename)
+        if file is not None:
+            g_download_board_files.add(file)
+            return Path(file.name)
+
+    logging.error(f"release {release.tag} has no updates for board `{board}`.")
+    logging.error(f"candidates:{join_multi_line_list_tabbed(candidates) or ' <NONE>'}")
+    logging.error(
+        f"release assets:{join_multi_line_list_tabbed(sorted(release.assets)) or ' <NONE>'}"
+    )
+    return None
 
 
 async def discover_device_address(
@@ -242,6 +283,17 @@ async def discover_device_address(
         return None
 
     return xs[0].address
+
+
+async def hardware_board(client: BleakClient):
+    char_hardware = client.services.get_characteristic(UUID_CHAR_HARDWARE_REVISION)
+    if char_hardware is None:
+        logging.warning(
+            "device does not have a hardware revision characteristic, assuming board is `pico_w`"
+        )
+        return "pico_w"
+
+    return str(await client.read_gatt_char(char_hardware), "UTF-8")
 
 
 async def software_revision(client: BleakClient):
@@ -390,6 +442,7 @@ class CmdLnArgs(tap.TypedArgs):
     bt_address: Optional[str] = tap.arg(help="device's BT adddress")
     file: Optional[Path] = tap.arg(help="filepath for image")
     tag: Optional[str] = tap.arg(help="download specific release tag")
+    board: Optional[str] = tap.arg(help="override/specify board (USE WITH CAUTION!)")
     # `--no-tmux` and `--ignore-klipper` are used/handled by the shell wrapper script.
     # They're listed here for `--help` and unknown-argument checking.
     no_tmux: bool = tap.arg(help="don't run in a tmux session")
@@ -470,6 +523,67 @@ async def _report_new_version(args: CmdLnArgs, prev_version: str):
     await retry_if_disconnected(args.bt_address, go, connection_timeout=None)
 
 
+def input_yes_no(args: CmdLnArgs, default: _A, msg: str) -> Union[_A, bool]:
+    if args.unattended:
+        return default
+
+    while True:
+        response = input(f"{msg} (y/n)")
+        if response == "y":
+            return True
+        if response == "n":
+            return False
+
+
+def address_2_board_cache_load() -> Dict[str, str]:
+    try:
+        with open(ADDRESS_2_BOARD_CACHE_PATH) as f:
+            xs = json.load(f)
+
+        if not isinstance(xs, dict):
+            raise TypeError
+
+        for k, v in xs.items():
+            if not isinstance(k, str) or not isinstance(v, str):
+                raise TypeError
+
+        return xs
+    except FileNotFoundError:
+        return {}  # quieter to avoid alarming people
+    except:
+        logging.warning("unable to read address-board cache", exc_info=True)
+        return {}
+
+
+def address_2_board_cache_add(addr: str, board: str):
+    xs = address_2_board_cache_load()
+    xs[addr.lower()] = board
+
+    try:
+        with open(ADDRESS_2_BOARD_CACHE_PATH, "w") as f:
+            json.dump(xs, f, sort_keys=True)
+    except:
+        logging.warning("failed to save address-2-board cache", exc_info=True)
+
+
+def guess_board(args: CmdLnArgs) -> Optional[str]:
+    if args.bt_address is not None:
+        board = address_2_board_cache_load().get(args.bt_address.lower())
+        if board is not None:
+            print(f"{args.bt_address} was previously seen using `{board}`")
+            return board
+
+    if args.unattended:
+        logging.error("unattended and unable to guess board")
+        return None
+
+    print("Unable to connect to nevermore to query board. Please specify board.")
+    while True:
+        board = input("Board: ").strip()
+        if board != "":
+            return board
+
+
 async def _main(args: CmdLnArgs) -> int:
     if args.bt_address is not None and not bt_address_validate(args.bt_address):
         logging.error("invalid address for `--bt-address`")
@@ -478,6 +592,8 @@ async def _main(args: CmdLnArgs) -> int:
     if args.file is not None and args.tag is not None:
         logging.error("`--tag` and `--file` are mutually exclusive")
         return 1
+
+    release: Optional[ReleaseInfo] = None
 
     if args.file is None:
         if args.tag is None:
@@ -493,12 +609,6 @@ async def _main(args: CmdLnArgs) -> int:
 
         if not args.unattended:
             input("PRESS ENTER TO CONTINUE")
-
-        temp_file = await download_update(release)
-        if temp_file is None:
-            return 1
-
-        args.file = Path(temp_file.name)
 
     address_found = await discover_device_address(
         "Nevermore controllers",
@@ -516,12 +626,39 @@ async def _main(args: CmdLnArgs) -> int:
         async def go(client: BleakClient):
             nonlocal prev_version
             prev_version = await software_revision(client)
-            print(f"current revision: {prev_version}")
-            await reboot_into_ota_mode(client)
+            board = await hardware_board(client)
+            print(f"board  : {board}")
+            print(f"version: {prev_version}")
+
+            args.board = args.board or board
+            if args.board != board:
+                logging.warning(
+                    f"board mismatch: override=`{args.board}`; reported={board}"
+                )
+                if not input_yes_no(
+                    args, False, f"Do you wish to continue anyway using `{args.board}`?"
+                ):
+                    return
+
+            address_2_board_cache_add(client.address, args.board)
+
+            assert args.file is not None or release is not None
+            args.file = args.file or await download_board_update(release, args.board)
+            if args.file is not None:
+                await reboot_into_ota_mode(client)
 
         await retry_if_disconnected(address_found, go, connection_timeout=None)
     else:
         print("attempting to connect to bootloader anyways...")
+
+        if args.file is None:
+            assert release is not None
+            args.board = args.board or guess_board(args)
+            if args.board is not None:
+                args.file = await download_board_update(release, args.board)
+
+    if args.file is None:  # no file specified or didn't manage to download an update
+        return 1
 
     if args.tcp:
         bssid = (
