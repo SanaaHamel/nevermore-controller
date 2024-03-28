@@ -128,7 +128,7 @@ import typed_argparse as tap
 import websockets.exceptions
 import websockets.legacy.client as WSClient
 from bleak import BleakClient
-from bleak.backends.device import BLEDevice
+from nevermore_tool_utilities import NevermoreToolCmdLnArgs
 from nevermore_utilities import *
 from typing_extensions import override
 
@@ -261,30 +261,6 @@ def graphite_connection(dst: Ip4Port, sampling_period: float) -> GraphiteLogger:
     return log
 
 
-async def discover_device_address(
-    display_name: str,
-    filter: Callable[[BLEDevice], Coroutine[Any, Any, bool]],
-    bt_address: Optional[str],
-):
-    print(f"discovering {display_name}...")
-    xs = await discover_bluetooth_devices(filter, bt_address)
-    if not xs:
-        logging.warning(f"no {display_name} found")
-        return None
-
-    if 1 < len(xs):
-        logging.error(
-            f"multiple {display_name} found. use `--bt-address` to disambiguate"
-        )
-        logging.error(f"{display_name} found:")
-        xs.sort(key=lambda x: x.address)
-        for x in xs:
-            logging.error(x)
-        return None
-
-    return xs[0].address
-
-
 def _extract_fields(fields: Dict[str, Any]):
     parts: Dict[Tuple[str, Optional[Side]], float] = {}
     for field, value in fields.items():
@@ -315,11 +291,7 @@ def _extract_fields(fields: Dict[str, Any]):
 
 
 async def _main_bluetooth(log: GraphiteLogger, address: Optional[str]):
-    address = await discover_device_address(
-        "Nevermore controllers",
-        device_is_likely_a_nevermore,
-        address,
-    )
+    address = await discover_nevermore_address(address)
     if address is None:
         print(f"failed to find a nevermore")
         return
@@ -491,14 +463,13 @@ async def _main_moonraker(
                 raise
 
 
-class CmdLnArgs(tap.TypedArgs):
+class CmdLnArgs(NevermoreToolCmdLnArgs):
     # HACK: cast to `float` b/c `type-args` is stupid and doesn't do subtyping checks
     sampling_period: float = tap.arg(
         help="seconds between samples",
         # a bit less than the resolution to ensure we fill every slot
         default=float(GRAPHITE_DEFAULT_RETENTION_RESOLUTION * 0.75),
     )
-    bt_address: Optional[str] = tap.arg(help="device's BT adddress")
     moonraker: Optional[Ip4Port] = tap.arg(
         help=f"ip4:port, mutex w/ `bt-address`, \"\" for \"localhost:{MOONRAKER_DEFAULT_PORT}\"",
         type=Ip4Port.parse("localhost", MOONRAKER_DEFAULT_PORT),
@@ -515,14 +486,19 @@ class CmdLnArgs(tap.TypedArgs):
         default=False, help="install a systemd startup service using current arguments"
     )
 
+    @override
+    def validate(self):
+        ok = super().validate()
+
+        if self.bt_address is not None and self.moonraker is not None:
+            logging.error("can't specify both `--moonraker` and `--bt-address`")
+            ok = False
+
+        return ok
+
 
 async def _main(args: CmdLnArgs):
-    if args.bt_address is not None and not bt_address_validate(args.bt_address):
-        logging.error("invalid address for `--bt-address`")
-        exit(1)
-
-    if args.bt_address is not None and args.moonraker is not None:
-        logging.error("can't specify both `--moonraker` and `--bt-address`")
+    if not args.validate():
         exit(1)
 
     if args.install_systemd_service:

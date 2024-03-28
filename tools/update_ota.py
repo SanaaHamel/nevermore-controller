@@ -105,13 +105,13 @@ from abc import abstractmethod
 from dataclasses import dataclass
 from pathlib import Path
 from tempfile import NamedTemporaryFile
-from typing import Any, Callable, Coroutine, Iterable, List, Optional, Set, TypeVar
+from typing import Any, Iterable, List, Optional, Set, TypeVar
 
 import serial_flash
 import typed_argparse as tap
 from aiohttp import ClientSession
 from bleak import BleakClient
-from bleak.backends.device import BLEDevice
+from nevermore_tool_utilities import NevermoreToolCmdLnArgs
 from nevermore_utilities import *
 from serial_flash.transport.bluetooth.spp import SppArgs
 from serial_flash.transport.tcp import TcpArgs
@@ -122,7 +122,7 @@ if typing.TYPE_CHECKING:
 else:
     _LoggerAdapter = logging.LoggerAdapter
 
-__all__ = ['CmdLnArgs', '_main']
+__all__ = ['CmdLnArgs', 'main']
 
 NEVERMORE_OTA_WIFI_SSID = 'nevermore-update-ota'
 NEVERMORE_OTA_WIFI_KEY = 'raccoons-love-floor-onions'
@@ -261,30 +261,6 @@ async def download_board_update(release: ReleaseInfo, board: str):
     return None
 
 
-async def discover_device_address(
-    display_name: str,
-    filter: Callable[[BLEDevice], Coroutine[Any, Any, bool]],
-    bt_address: Optional[str],
-):
-    print(f"discovering {display_name}...")
-    xs = await discover_bluetooth_devices(filter, bt_address)
-    if not xs:
-        logging.warning(f"no {display_name} found")
-        return None
-
-    if 1 < len(xs):
-        logging.error(
-            f"multiple {display_name} found. use `--bt-address` to disambiguate"
-        )
-        logging.error(f"{display_name} found:")
-        xs.sort(key=lambda x: x.address)
-        for x in xs:
-            logging.error(x)
-        return None
-
-    return xs[0].address
-
-
 async def hardware_board(client: BleakClient):
     char_hardware = client.services.get_characteristic(UUID_CHAR_HARDWARE_REVISION)
     if char_hardware is None:
@@ -337,7 +313,7 @@ async def reboot_into_ota_mode(client: BleakClient):
     return client.address
 
 
-def _ota_ap_visible(bt_address: str) -> bool:  # type: ignore unused
+def _ota_ap_visible(bt_address: str) -> bool:  # type: ignore
     try:
         subprocess.run(
             [
@@ -438,8 +414,7 @@ class ConnectToWifiAccessPointNetworkManager(ConnectToWifiAccessPoint):
                 raise
 
 
-class CmdLnArgs(tap.TypedArgs):
-    bt_address: Optional[str] = tap.arg(help="device's BT adddress")
+class CmdLnArgs(NevermoreToolCmdLnArgs):
     file: Optional[Path] = tap.arg(help="filepath for image")
     tag: Optional[str] = tap.arg(help="download specific release tag")
     board: Optional[str] = tap.arg(help="override/specify board (USE WITH CAUTION!)")
@@ -455,6 +430,16 @@ class CmdLnArgs(tap.TypedArgs):
     port: int = tap.arg(
         default=4242, help="port use when connecting via TCP, see `--ip`"
     )
+
+    @override
+    def validate(self):
+        ok = super().validate()
+
+        if self.file is not None and self.tag is not None:
+            logging.error("`--tag` and `--file` are mutually exclusive")
+            ok = False
+
+        return ok
 
 
 async def _update_via_tcp(args: CmdLnArgs, bssid: Optional[str]):
@@ -584,13 +569,8 @@ def guess_board(args: CmdLnArgs) -> Optional[str]:
             return board
 
 
-async def _main(args: CmdLnArgs) -> int:
-    if args.bt_address is not None and not bt_address_validate(args.bt_address):
-        logging.error("invalid address for `--bt-address`")
-        return 1
-
-    if args.file is not None and args.tag is not None:
-        logging.error("`--tag` and `--file` are mutually exclusive")
+async def main(args: CmdLnArgs) -> int:
+    if not args.validate():
         return 1
 
     release: Optional[ReleaseInfo] = None
@@ -610,14 +590,7 @@ async def _main(args: CmdLnArgs) -> int:
         if not args.unattended:
             input("PRESS ENTER TO CONTINUE")
 
-    address_found = await discover_device_address(
-        "Nevermore controllers",
-        device_is_likely_a_nevermore,
-        args.bt_address,
-    )
-    if args.bt_address is None:
-        args.bt_address = address_found
-
+    address_found = await args.bt_address_discover()
     prev_version = "<unknown>"
 
     if address_found is not None:
@@ -692,12 +665,9 @@ async def _main(args: CmdLnArgs) -> int:
     return 0
 
 
-def main():
+if __name__ == "__main__":
+
     def go(args: CmdLnArgs):
-        exit(asyncio.run(_main(args)))
+        exit(asyncio.run(main(args)))
 
     tap.Parser(CmdLnArgs).bind(go).run()
-
-
-if __name__ == "__main__":
-    main()
