@@ -162,7 +162,7 @@ Configured MCU 'mcu' (283 moves)
 
 . If you've flashed a OTA-capable UF2 to your controller (v0.3+) you can update it wirelessly.
 
-. Calibrate your sensors. xref:doc/voc.adoc#baseline-calibration[See the calibration section in the VOC Guide.]
+. **Calibrate your sensors.** xref:doc/voc.adoc#baseline-calibration[See the calibration section in the VOC Guide.]
 
 [#guide-updating]
 == Updating Guide For Dummies
