@@ -494,7 +494,7 @@ async def _report_new_version(args: CmdLnArgs, prev_version: str):
     print(f"connecting to {args.bt_address} to get installed version")
     print("(this may take longer than usual)")
     print(
-        "NOTE: Ignore logged exceptions about `A message handler raised an exception: 'org.bluez.Device1'.`"
+        "NOTE: Ignore logged exceptions about `A message handler raised an exception: 'org.bluez.Device1'` or `org.bluez.GattService1`."
     )
     print(
         "      This is caused by a bug in `bleak` but should be benign for this application."
