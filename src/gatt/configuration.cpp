@@ -156,7 +156,7 @@ optional<int> attr_write(
 
     case HANDLE_ATTR(CONFIG_PINS, VALUE): {
         g_pins_config_error = "Incorrect `Pins` struct size.";
-        Pins value = consume;
+        Pins value = consume.exactly<Pins>();
         try {
             value.validate_or_throw();
         } catch (char const* msg) {
