@@ -67,6 +67,7 @@ void bind_spi_hw(Pins::BusSPI const& bus, uint8_t const hw) {
 
     char const* kind = "";
     switch (bus.kind) {
+    case Pins::BusSPI::Kind::generic: kind = "generic"; break;
     case Pins::BusSPI::Kind::display: kind = "display"; break;
     }
 

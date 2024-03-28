@@ -102,7 +102,8 @@ struct Pins {
     // reserve for future expansion where you can use PIO-driven pins
     struct [[gnu::packed]] BusI2C {
         // generic buses can run faster, but we don't verify that it'll support all sensors.
-        static constexpr uint32_t BAUD_RATE_GENERIC_MAX = 1'000'000;
+        static constexpr uint32_t BAUD_RATE_MAX = 1'000'000;
+        static constexpr uint32_t BAUD_RATE_GENERIC_MAX = BAUD_RATE_MAX;
         static constexpr uint32_t BAUD_RATE_SENSOR_MAX = I2C_BAUD_RATE_SENSOR_MAX;
 
         enum class Kind : uint8_t { generic = 0, intake = 1, exhaust = 2 };
@@ -129,8 +130,8 @@ struct Pins {
     // reserve for future expansion where you can use PIO-driven pins
     struct [[gnu::packed]] BusSPI {
         static constexpr uint32_t BAUD_RATE_MAX = SYS_CLK_KHZ * 1000;
-        enum class Kind : uint8_t { display = 0 };
-
+        enum class Kind : uint8_t { generic = 0, display = 1 };
+        static constexpr uint32_t x = 1 << 5;
         Kind kind;
         GPIO clock;
         GPIO send;
@@ -258,6 +259,9 @@ private:
     static constexpr void validate_or_throw(BusI2C const& bus) {
         // no pins defined for bus -> not in use
         if (!bus) return;
+        if (bus.baud_rate <= 0) throw "Config uses an I2C bus with a baud-rate <= 0.";
+        if (BusI2C::BAUD_RATE_MAX < bus.baud_rate)
+            throw "Config uses an SPI bus with a baud rate exceeding system max.";
         // currently HW bus is required. future work to support PIO buses
         if (!bus.hardware_bus_num()) throw "Config uses an I2C bus with GPIOs that cannot map to a HW bus.";
 
@@ -278,14 +282,16 @@ private:
         // no pins defined for bus -> not in use
         if (!bus) return;
         // clock is always required
-        if (bus.clock.not_set()) throw "Config uses an SPI bus without a clock GPIO.";
-        // currently HW bus is required. future work to support PIO buses
-        if (!bus.hardware_bus_num()) throw "Config uses an SPI bus with GPIOs that cannot map to a HW bus.";
+        if (!bus.clock) throw "Config uses an SPI bus without a clock GPIO.";
+        if (bus.baud_rate <= 0) throw "Config uses an I2C bus with a baud-rate <= 0.";
         if (BusSPI::BAUD_RATE_MAX < bus.baud_rate)
             throw "Config uses an SPI bus with a baud rate exceeding system max.";
+        // currently HW bus is required. future work to support PIO buses
+        if (!bus.hardware_bus_num()) throw "Config uses an SPI bus with GPIOs that cannot map to a HW bus.";
 
         using enum BusSPI::Kind;
         switch (bus.kind) {
+        case generic: break;  // no requirements for generic bus
         case display: {
             if (!bus.send) throw "Config uses a display SPI bus without a MOSI GPIO.";
         } break;
