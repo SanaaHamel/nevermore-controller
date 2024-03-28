@@ -18,7 +18,7 @@ namespace nevermore {
 
 constexpr uint32_t PIN_MAX = 30;
 
-struct GPIO {
+struct [[gnu::packed]] GPIO {
     static constexpr GPIO none() {
         return {};
     }
@@ -100,7 +100,7 @@ struct Pins {
     using GPIOs = std::array<GPIO, N>;
 
     // reserve for future expansion where you can use PIO-driven pins
-    struct BusI2C {
+    struct [[gnu::packed]] BusI2C {
         // generic buses can run faster, but we don't verify that it'll support all sensors.
         static constexpr uint32_t BAUD_RATE_GENERIC_MAX = 1'000'000;
         static constexpr uint32_t BAUD_RATE_SENSOR_MAX = I2C_BAUD_RATE_SENSOR_MAX;
@@ -127,7 +127,7 @@ struct Pins {
     };
 
     // reserve for future expansion where you can use PIO-driven pins
-    struct BusSPI {
+    struct [[gnu::packed]] BusSPI {
         static constexpr uint32_t BAUD_RATE_MAX = SYS_CLK_KHZ * 1000;
         enum class Kind : uint8_t { display = 0 };
 
@@ -170,7 +170,8 @@ struct Pins {
     GPIO touch_reset;
 
     // HACK: reserve for future expansion w/o disturbing peers in setting struct
-    std::array<uint8_t, 32> unused_spare_space{};
+    // +3 bytes since it's included with padding
+    std::array<uint8_t, 35> unused_spare_space{};
 
     constexpr void validate_or_throw() const;
 
@@ -291,6 +292,8 @@ private:
         }
     }
 };
+
+static_assert(sizeof(Pins) == 200, "can't resize this w/o bumping `Settings` version");
 
 }  // namespace nevermore
 
