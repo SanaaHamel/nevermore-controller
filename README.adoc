@@ -397,15 +397,30 @@ For now you can:
 
 == Controller Customisation
 
-`src/config.hpp` and `src/config/pins/custom.hpp` contains all user-customisable options.
+`src/config.hpp` contains all user-customisable options.
 These options are, for the most part, validated at compile time to prevent mistakes.
-
-For customised pin assignments, build the `Pico W (Custom Pins)` variant, and modify `src/config/pins/custom.hpp` to suit your setup.
 
 
 === Pin Assignments
 
-Pins assignments can be modified to suit your board/wiring, but are subject to hardware-related constraints. These are constraints are extensively checked at compile time, and will result in a (hopefully) useful error message if violated. If it compiles, it's a valid configuration.
+Pins assignments can be customised, but are subject to hardware-related constraints. These are constraints are extensively checked at compile time and runtime, and will result in a (hopefully) useful error message if violated. If it compiles, it's a valid configuration.
+
+
+==== Custom Assignments
+
+The recommended way to customise pin assignments is to use the `pin-config.py` tool:
+```sh
+# update the pin configuration. follow the on-screen instructions.
+~/nevermore-controller/tools/pin-config.py
+```
+
+Changes will only take effect after a reboot of the controller.
+
+You can reset the configuration to the board defaults using `--reset-default`.
+See `--help` for more options.
+
+
+==== Default Assignments
 
 WARNING: GPIO 0 and 1 are currently hardcoded for UART. They cannot be used in any pin assignments.
 
