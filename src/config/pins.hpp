@@ -259,6 +259,9 @@ private:
     static constexpr void validate_or_throw(BusI2C const& bus) {
         // no pins defined for bus -> not in use
         if (!bus) return;
+        // clock & data are always required
+        if (!bus.clock) throw "Config uses an I2C bus without a clock GPIO.";
+        if (!bus.data) throw "Config uses an I2C bus without a data GPIO.";
         if (bus.baud_rate <= 0) throw "Config uses an I2C bus with a baud-rate <= 0.";
         if (BusI2C::BAUD_RATE_MAX < bus.baud_rate)
             throw "Config uses an SPI bus with a baud rate exceeding system max.";
