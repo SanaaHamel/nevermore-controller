@@ -131,7 +131,7 @@ struct Pins {
     struct [[gnu::packed]] BusSPI {
         static constexpr uint32_t BAUD_RATE_MAX = SYS_CLK_KHZ * 1000;
         enum class Kind : uint8_t { generic = 0, display = 1 };
-        static constexpr uint32_t x = 1 << 5;
+
         Kind kind;
         GPIO clock;
         GPIO send;
