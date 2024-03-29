@@ -75,7 +75,7 @@ struct SettingsV0 {
     float display_brightness = 1.f;  // range: [0, 1]; don't edit directly, use `display::brightness`
     SaveCounter save_counter = {};
     Pins pins = PINS_DEFAULT;
-    Padding<2> _1 = {};
+    Padding<3> _1 = {};
 
     // replaces valid fields from RHS into self
     void merge_valid_fields(SettingsV0 const&);
