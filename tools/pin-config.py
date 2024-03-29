@@ -26,7 +26,7 @@ import os
 import re
 import textwrap
 from pathlib import Path
-from typing import Optional, Sequence, Set, TypeAlias, TypeVar
+from typing import Optional, Sequence, Set, TypeVar
 
 import construct as cs
 import typed_argparse as tap
@@ -51,11 +51,11 @@ ALTERNATIVES_MAX = 8
 _A = TypeVar("_A")
 _B = TypeVar("_B")
 
-GPIO: TypeAlias = Optional[int]
-GPIOs: TypeAlias = List[GPIO]
+GPIO = Optional[int]
+GPIOs = List[GPIO]
 # has to be `Any` to shut up `dataclasses_json` warning
 # (because it doesn't consider that a field of type `None` could be populated with `None`)
-Padding: TypeAlias = Any
+Padding = Any
 
 
 # customise `csfield` because the library one doesn't handle default values sanely
