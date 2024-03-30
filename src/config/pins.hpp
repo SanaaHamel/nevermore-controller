@@ -6,8 +6,7 @@
 #include "sdk/pwm.hpp"
 #include "sdk/spi.hpp"
 #include "utility/container_misc.hpp"
-#include <algorithm>
-#include <array>  // for `begin`/`end`
+#include <array>
 #include <cassert>
 #include <compare>
 #include <cstdint>
@@ -86,7 +85,7 @@ constexpr std::array<GPIO, 2> PINS_RESERVED_UART{0, 1};
 // Overkill b/c we want to reserve space for expansion.
 // This is dumped straight into persisted data, which makes changing the layout
 // a pain.
-struct Pins {
+struct [[gnu::packed]] Pins {
     // Active pin assignments. *Do not use during static initialisation.*
     // INVARIANT: Constant after reading settings from flash.
     static Pins const& active();
@@ -96,8 +95,7 @@ struct Pins {
     // Is 8 excessive? Stupidly so, and we won't have to extend it in the future.
     static constexpr size_t ALTERNATIVES_MAX = 8;
 
-    template <size_t N = ALTERNATIVES_MAX>
-    using GPIOs = std::array<GPIO, N>;
+    using GPIOs = GPIO[ALTERNATIVES_MAX];
 
     // reserve for future expansion where you can use PIO-driven pins
     struct [[gnu::packed]] BusI2C {
@@ -156,13 +154,13 @@ struct Pins {
         }
     };
 
-    std::array<BusI2C, ALTERNATIVES_MAX> i2c;
-    std::array<BusSPI, ALTERNATIVES_MAX> spi;
+    BusI2C i2c[ALTERNATIVES_MAX]{};
+    BusSPI spi[ALTERNATIVES_MAX]{};
 
-    GPIOs<> fan_pwm;             // mirrored
-    GPIOs<> fan_tachometer;      // summed in SW
-    GPIOs<> neopixel_data;       // reserve space, but disallow multiple pins
-    GPIOs<> photocatalytic_pwm;  // mirrored
+    GPIOs fan_pwm{};             // mirrored
+    GPIOs fan_tachometer{};      // summed in SW
+    GPIOs neopixel_data{};       // reserve space, but disallow multiple pins
+    GPIOs photocatalytic_pwm{};  // mirrored
 
     GPIO display_command;
     GPIO display_reset;
@@ -188,9 +186,8 @@ struct Pins {
         auto apply = [&](auto&& xs) -> bool {
             if constexpr (std::is_same_v<GPIO, std::decay_t<decltype(xs)>>)
                 return go(xs);
-            else {
-                return std::all_of(begin(xs), end(xs), go);
-            }
+            else
+                return std::ranges::all_of(xs, go);
         };
 
         for (auto&& bus : i2c) {

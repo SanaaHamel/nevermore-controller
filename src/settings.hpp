@@ -31,7 +31,7 @@ struct Header {
     uint32_t size;  // includes the CRC32 field
 };
 
-struct SaveCounter {
+struct [[gnu::packed]] SaveCounter {
     uint8_t n = 0;
     [[nodiscard]] SaveCounter next() const {
         return {.n = uint8_t((n + 1) & 0xFF)};
@@ -57,7 +57,7 @@ enum class DisplayUI : uint8_t {
 // Fields **can** be appended w/o bumping the header version.
 // Padding **must** be explicitly declared using `Padding<N>`.
 //  (initialisation of padding affects CRC and is poorly standardised)
-struct SettingsV0 {
+struct [[gnu::packed]] SettingsV0 {
     template <size_t N>
     using Padding = std::array<uint8_t, N>;
 
@@ -71,11 +71,11 @@ struct SettingsV0 {
     VOCIndex voc_gating_threshold = 240;  // not-known -> disallowed
     DisplayHW display_hw = DisplayHW::GC9A01_240_240;
     DisplayUI display_ui = DisplayUI::CIRCLE_240_CLASSIC;
-    Padding<1> _0 = {};
+    Padding<1> _0{};
     float display_brightness = 1.f;  // range: [0, 1]; don't edit directly, use `display::brightness`
     SaveCounter save_counter = {};
     Pins pins = PINS_DEFAULT;
-    Padding<3> _1 = {};
+    Padding<3> _1{};  // HACK: cannot remove, would screw with def-init of new members
 
     // replaces valid fields from RHS into self
     void merge_valid_fields(SettingsV0 const&);

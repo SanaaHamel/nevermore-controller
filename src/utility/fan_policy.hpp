@@ -7,7 +7,7 @@ namespace nevermore {
 
 using namespace std::literals::chrono_literals;
 
-struct FanPolicyEnvironmental {
+struct [[gnu::packed]] FanPolicyEnvironmental {
     using VOCIndex = nevermore::sensors::VOCIndex;
 
     // How long to keep spinning after `should_filter` returns `false`
