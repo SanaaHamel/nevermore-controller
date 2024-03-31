@@ -128,18 +128,19 @@ bool Pins::apply() const {
     bind_logical(touch_interrupt, GPIO_IN);
     bind_logical(touch_reset, GPIO_OUT);
 
-#ifndef NDEBUG
-    if (auto pin = square_wave_pwm_first_available_pin(*this))
-        square_wave_pwm_init(pin, 30);
-    else
-        printf("!! No available PWM slice for square wave generator.\n");
-#endif
-
 #if defined(PICO_DEFAULT_LED_PIN)
     bind_logical(PICO_DEFAULT_LED_PIN, GPIO_OUT);
 #elif defined(PICO_DEFAULT_WS2812_PIN)
     // FUTURE WORK: implement WS2812 LED
 #endif
+
+#ifndef NDEBUG
+    if (auto pin = square_wave_pwm_first_available_pin())
+        square_wave_pwm_init(pin, 30);
+    else
+        printf("!! No available PWM slice for square wave generator.\n");
+#endif
+
     return true;
 }
 
