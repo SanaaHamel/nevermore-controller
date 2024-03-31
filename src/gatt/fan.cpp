@@ -92,11 +92,12 @@ void fan_power_set(BLE::Percentage8 power, sensors::Sensors const& sensors = sen
 
 }  // namespace
 
-double fan_rpm() {
+float fan_rpm() {
     return g_tachometer.revolutions_per_second() * 60;
 }
 
-double fan_power() {
+float fan_power() {
+    // NOLINTNEXTLINE(bugprone-narrowing-conversions, cppcoreguidelines-narrowing-conversions)
     return g_fan_power.value_or(0);
 }
 

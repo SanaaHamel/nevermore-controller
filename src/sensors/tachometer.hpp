@@ -48,7 +48,7 @@ struct Tachometer final : SensorPeriodic {
         this->pulses_per_revolution = pulses_per_revolution;
     }
 
-    [[nodiscard]] double revolutions_per_second() const {
+    [[nodiscard]] auto revolutions_per_second() const {
         return revolutions_per_second_;
     }
 
@@ -67,7 +67,8 @@ protected:
         auto end = std::chrono::steady_clock::now();
 
         auto duration_sec =
-                std::chrono::duration_cast<std::chrono::duration<double, std::ratio<1>>>(end - begin);
+                std::chrono::duration_cast<std::chrono::duration<float, std::ratio<1>>>(end - begin);
+        // NOLINTNEXTLINE(bugprone-narrowing-conversions, cppcoreguidelines-narrowing-conversions)
         revolutions_per_second_ = pulses / duration_sec.count() / pulses_per_revolution;
 
         // printf("tachometer_measure dur=%f s cnt=%u rev-per-sec=%f rpm=%f\n", duration_sec.count(),
@@ -145,8 +146,8 @@ private:
 
     Pins::GPIOs pins;
     std::bitset<Pins::ALTERNATIVES_MAX> state;
-    uint pulses_per_revolution = 1;
-    double revolutions_per_second_ = 0;
+    uint32_t pulses_per_revolution = 1;
+    float revolutions_per_second_ = 0;
 };
 
 }  // namespace nevermore::sensors
