@@ -1,14 +1,10 @@
 #include "pins.hpp"
-#include "config.hpp"
 #include "hardware/gpio.h"
 #include "hardware/i2c.h"
 #include "hardware/spi.h"
+#include "utility/square_wave.hpp"
 #include <cassert>
 #include <cstdint>
-
-#ifndef NDEBUG
-#include "utility/square_wave.hpp"
-#endif
 
 namespace nevermore {
 
@@ -111,13 +107,26 @@ bool Pins::apply() const {
     bind_bus(i2c, bind_i2c_hw, bind_i2c_pio);
     bind_bus(spi, bind_spi_hw, bind_spi_pio);
 
-    foreach_pwm_function([](auto&& pins, bool) {
-        for (auto&& pin : pins)
-            if (pin) gpio_set_function(pin, GPIO_FUNC_PWM);
+    uint32_t pwm_slice_claimed = 0;
+    foreach_pwm_function([&](auto&& pins, bool) {
+        for (auto&& pin : pins) {
+            if (!pin) continue;
+
+            gpio_set_function(pin, GPIO_FUNC_PWM);
+            pwm_slice_claimed |= 1u << pwm_gpio_to_slice_num_(pin);
+        }
     });
 
-    for (auto&& pin : fan_tachometer)
-        if (pin) gpio_pull_up(pin);
+    for (auto&& pin : fan_tachometer) {
+        if (!pin) continue;
+
+        auto slice = pwm_gpio_to_channel(pin) == PWM_CHAN_B ? 1u << pwm_gpio_to_slice_num_(pin) : 0;
+        // FUTURE WORK: remove dbg msg once this feature matures
+        printf("tacho pin=%d mode=%s\n", (int)pin, !slice || pwm_slice_claimed & slice ? "POLL" : "PWM");
+        gpio_set_function(pin, !slice || pwm_slice_claimed & slice ? GPIO_FUNC_SIO : GPIO_FUNC_PWM);
+        gpio_pull_up(pin);
+        pwm_slice_claimed |= slice;
+    }
 
     // we're setting up the WS2812 controller on PIO0
     for (auto&& pin : neopixel_data)

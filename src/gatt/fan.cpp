@@ -44,7 +44,7 @@ constexpr uint32_t FAN_PWN_HZ = 25'000;
 
 BLE::Percentage8 g_fan_power = 0;
 BLE::Percentage8 g_fan_power_override;  // not-known -> automatic control
-array<sensors::Tachometer, Pins{}.fan_tachometer.size()> g_tachometers;
+sensors::Tachometer g_tachometer;
 
 struct [[gnu::packed]] FanPowerTachoAggregate {
     BLE::Percentage8 power = g_fan_power;
@@ -93,11 +93,7 @@ void fan_power_set(BLE::Percentage8 power, sensors::Sensors const& sensors = sen
 }  // namespace
 
 double fan_rpm() {
-    double total = 0;
-    for (auto const& t : g_tachometers)
-        total += t.revolutions_per_second() * 60;
-
-    return total;
+    return g_tachometer.revolutions_per_second() * 60;
 }
 
 double fan_power() {
@@ -129,23 +125,11 @@ bool init() {
         pwm_init(pwm_gpio_to_slice_num_(pin), &cfg, true);
     }
 
-    auto* it_tacho = begin(g_tachometers);
-    for (auto&& pin : Pins::active().fan_tachometer) {
-        if (!pin) continue;
-        assert(it_tacho != end(g_tachometers));
-        it_tacho->setup(pin, TACHOMETER_PULSE_PER_REVOLUTION);
-        it_tacho++;  // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
-
-        auto cfg = pwm_get_default_config();
-        pwm_config_set_clkdiv_mode(&cfg, PWM_DIV_B_FALLING);
-        pwm_init(pwm_gpio_to_slice_num_(pin), &cfg, false);
-    }
+    g_tachometer.setup(Pins::active().fan_tachometer, TACHOMETER_PULSE_PER_REVOLUTION);
+    g_tachometer.start();
 
     // set fan PWM level
     fan_power_set(g_fan_power);
-
-    for (auto& t : g_tachometers)
-        if (t.pin()) t.start();
 
     // HACK:  We'd like to notify on write to tachometer changes, but the code base isn't setup
     //        for that yet. Internally poll and update based on diffs for now.

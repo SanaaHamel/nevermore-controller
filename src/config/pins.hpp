@@ -175,7 +175,6 @@ struct [[gnu::packed]] Pins {
     constexpr void validate_or_throw() const;
 
     constexpr void foreach_pwm_function(auto&& go) const {
-        go(fan_tachometer, false);
         go(fan_pwm, true);
         go(photocatalytic_pwm, true);
         // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic)
@@ -345,10 +344,6 @@ inline constexpr void nevermore::Pins::validate_or_throw() const {
     for (auto&& bus : spi)
         display_buses += bus && bus.kind == BusSPI::Kind::display;
     if (1 < display_buses) throw "Config uses multiple display SPI buses.";
-
-    for (auto&& pin : fan_tachometer)
-        if (pin && pwm_gpio_to_channel_(pin) != PWM_CHAN_B)
-            throw "Config uses fan tachometer on slice A GPIO. Put it on a B GPIO (i.e odd GPIO).";
 
     uint32_t pwm_slice_claimed = 0;
     foreach_pwm_function([&](std::span<GPIO const> pins, bool allow_sharing) {
