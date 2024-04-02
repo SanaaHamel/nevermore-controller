@@ -128,7 +128,7 @@ import typed_argparse as tap
 import websockets.exceptions
 import websockets.legacy.client as WSClient
 from bleak import BleakClient
-from nevermore_tool_utilities import NevermoreToolCmdLnArgs
+from nevermore_tool_utilities import NevermoreToolCmdLnArgs, device_address_discover
 from nevermore_utilities import *
 from typing_extensions import override
 
@@ -291,7 +291,6 @@ def _extract_fields(fields: Dict[str, Any]):
 
 
 async def _main_bluetooth(log: GraphiteLogger, address: Optional[str]):
-    address = await discover_nevermore_address(address)
     if address is None:
         print(f"failed to find a nevermore")
         return
@@ -525,7 +524,7 @@ async def _main(args: CmdLnArgs):
     log_entry = graphite_connection(args.graphite, args.sampling_period)
 
     if args.moonraker is None:
-        await _main_bluetooth(log_entry, args.bt_address)
+        await _main_bluetooth(log_entry, await args.bt_address_discover())
     else:
         await _main_moonraker(log_entry, args.moonraker, args.retry_delay)
 
