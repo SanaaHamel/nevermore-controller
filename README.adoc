@@ -715,10 +715,10 @@ Set all Nevermores into a reasonable state for printing. **You should use this G
 
 This command currently performs the following series of actions for every Nevermore (currently only 1):
 
-. If `FAN_AUTOMATIC=0`, turns on fan override w/ given `FAN_SPEED`, otherwise clears any override (go into automatic mode).
+* If `FAN_AUTOMATIC=0`, turns on fan override w/ given `FAN_SPEED`, otherwise clears any override (go into automatic mode).
 +
 Overriding automatic mode starts the filter without waiting for the air to get detectably dirty and ensures the fan is always running during a print (regardless of sensor readings).
-. Disables <<NEVERMORE_VOC_CALIBRATION>>.
+* Disables <<NEVERMORE_VOC_CALIBRATION>>.
 
 
 ==== NEVERMORE_PRINT_END
@@ -732,10 +732,8 @@ Set all Nevermores into a reasonable idle state. **You should use this G-Code co
 
 This command currently performs the following series of actions for every Nevermore (currently only 1):
 
-. If `FAN_AUTOMATIC=0`, turns on fan override w/ given `FAN_SPEED`, otherwise clears any override (go into automatic mode).
-+
-Overriding automatic mode starts the filter without waiting for the air to get detectably dirty and ensures the fan is always running during a print (regardless of sensor readings).
-. Disables <<NEVERMORE_VOC_CALIBRATION>>.
+* Disables fan override.
+* Enables <<NEVERMORE_VOC_CALIBRATION>>.
 
 
 
