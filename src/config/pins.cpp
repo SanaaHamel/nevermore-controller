@@ -112,6 +112,10 @@ bool Pins::apply() const {
         for (auto&& pin : pins) {
             if (!pin) continue;
 
+            // default config should be slow slew, 4ma drive
+            // ensure slew is slow, and lower to 2ma drive
+            gpio_set_slew_rate(pin, GPIO_SLEW_RATE_SLOW);
+            gpio_set_drive_strength(pin, GPIO_DRIVE_STRENGTH_2MA);
             gpio_set_function(pin, GPIO_FUNC_PWM);
             pwm_slice_claimed |= 1u << pwm_gpio_to_slice_num_(pin);
         }
@@ -123,6 +127,8 @@ bool Pins::apply() const {
         auto slice = pwm_gpio_to_channel(pin) == PWM_CHAN_B ? 1u << pwm_gpio_to_slice_num_(pin) : 0;
         // FUTURE WORK: remove dbg msg once this feature matures
         printf("tacho pin=%d mode=%s\n", (int)pin, !slice || pwm_slice_claimed & slice ? "POLL" : "PWM");
+        // schmitt trigger should be enabled by default, but be explicit
+        gpio_set_input_hysteresis_enabled(pin, true);
         gpio_set_function(pin, !slice || pwm_slice_claimed & slice ? GPIO_FUNC_SIO : GPIO_FUNC_PWM);
         gpio_pull_up(pin);
         pwm_slice_claimed |= slice;
