@@ -16,14 +16,8 @@ FetchContent_Declare(
   GIT_TAG release/v8.3
   GIT_SHALLOW ON
 )
-FetchContent_Declare(
-  lv_drivers
-  GIT_REPOSITORY https://github.com/lvgl/lv_drivers
-  GIT_TAG release/v8.3
-  GIT_SHALLOW ON
-)
 
-FetchContent_MakeAvailable(lvgl lv_drivers)
+FetchContent_MakeAvailable(lvgl)
 
 set(FREERTOS_HEAP
     "4"
@@ -69,7 +63,6 @@ set(SRC_CONFIG_DIR ${SRC_DIR}/config/lib)
 
 # modify lvgl to add config header path & sdk dependencies
 target_include_directories(lvgl PRIVATE ${SRC_CONFIG_DIR})
-target_include_directories(lv_drivers PRIVATE ${SRC_CONFIG_DIR})
 # add `pico_time` dependency so lvgl can get a millisecond tick
 target_link_libraries(lvgl pico_time)
 
@@ -149,7 +142,6 @@ target_link_libraries(
          # Others
          FreeRTOS-Kernel
          FreeRTOS-Kernel-Heap4
-         lvgl::drivers
          lvgl::lvgl
          picowota_client
 )

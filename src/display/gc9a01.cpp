@@ -1,10 +1,10 @@
 #include "gc9a01.hpp"
 #include "FreeRTOS.h"  // IWYU pragma: keep
 #include "display.hpp"
-#include "display/GC9A01.h"
 #include "hardware/dma.h"
 #include "hardware/irq.h"
 #include "hardware/spi.h"
+#include "lv_driver_interface.hpp"
 #include "task.h"
 #include <cassert>
 #include <chrono>
