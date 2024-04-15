@@ -124,14 +124,10 @@ bool Pins::apply() const {
     for (auto&& pin : fan_tachometer) {
         if (!pin) continue;
 
-        auto slice = pwm_gpio_to_channel(pin) == PWM_CHAN_B ? 1u << pwm_gpio_to_slice_num_(pin) : 0;
-        // FUTURE WORK: remove dbg msg once this feature matures
-        printf("tacho pin=%d mode=%s\n", (int)pin, !slice || pwm_slice_claimed & slice ? "POLL" : "PWM");
         // schmitt trigger should be enabled by default, but be explicit
         gpio_set_input_hysteresis_enabled(pin, true);
-        gpio_set_function(pin, !slice || pwm_slice_claimed & slice ? GPIO_FUNC_SIO : GPIO_FUNC_PWM);
+        gpio_set_function(pin, GPIO_FUNC_SIO);
         gpio_pull_up(pin);
-        pwm_slice_claimed |= slice;
     }
 
     // we're setting up the WS2812 controller on PIO0

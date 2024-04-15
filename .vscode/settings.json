@@ -30,6 +30,8 @@
         "btstack",
         "coeff",
         "cooldown",
+        "denoise",
+        "denoising",
         "GPIO",
         "Hamel",
         "klipper",

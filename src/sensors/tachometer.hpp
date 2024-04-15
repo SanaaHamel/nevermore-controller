@@ -15,34 +15,32 @@ using namespace std::literals::chrono_literals;
 
 // 'Low' speed tachometer, intended for < 1000 pulses/sec.
 // DELTA BFB0712H spec sheet says an RPM of 2900 -> ~49 rev/s
-// PWM counter wraps at 2^16-1 -> if a fan is spinning that fast you've a problem.
 struct Tachometer final : SensorPeriodic {
     // need at least 100ms for a reasonable read and no point sampling longer than 1s
     constexpr static auto TACHOMETER_READ_PERIOD =
             std::clamp<std::chrono::milliseconds>(SENSOR_UPDATE_PERIOD, 100ms, 1s);
 
+    // WORKAROUND:  There's EMI from the PWM wire (runs adjacent to tacho).
+    // Proper fix:  Add a 2.2k pull-up & 0.2nF capacitor-to-0v to tachometer.
+    //    Our fix:  Denoise the signal in software. Just wait for consensus
+    //              over multiple samples before considering the state changed.
+    //              Downside is that we need to do this in software instead of
+    //              using the PWM hardware.
+    // Credit to @Mario1up on Discord for confirming the EMI issue and proposing
+    // and testing the hardware fix.
+    using ConsensusSet = uint8_t;  // bigger type -> longer consensus period
+
     // hz_max_pulse = hz_sample / 2
-    // sample at 10 kHz, that'll support up to 150'000 RPM w/ 2 pulses per rev
-    constexpr static auto PIN_SAMPLING_PERIOD = 0.1ms;
+    // sample at 1 kHz, that'll support up to 15'000 RPM w/ 2 pulses per rev
+    constexpr static auto PIN_SAMPLING_PERIOD = 1.0ms / (sizeof(ConsensusSet) * CHAR_BIT);
 
     Tachometer() = default;
 
     void setup(Pins::GPIOs const& pins, uint32_t pulses_per_revolution = 1) {
         assert(0 < pulses_per_revolution);
 
-        for (auto&& pin : pins) {
-            if (!pin) continue;
-
-            switch (gpio_get_function(pin)) {
-            default: assert(false); break;
-            case GPIO_FUNC_SIO: break;
-            case GPIO_FUNC_PWM: {
-                auto cfg = pwm_get_default_config();
-                pwm_config_set_clkdiv_mode(&cfg, PWM_DIV_B_FALLING);
-                pwm_init(pwm_gpio_to_slice_num_(pin), &cfg, false);
-            } break;
-            }
-        }
+        for (auto&& pin : pins)
+            assert(!pin || gpio_get_function(pin) == GPIO_FUNC_SIO);
 
         std::copy(std::begin(pins), std::end(pins), this->pins);
         this->pulses_per_revolution = pulses_per_revolution;
@@ -79,65 +77,45 @@ private:
     // we're nowhere near high precision stuff
     uint32_t pulse_count(std::chrono::steady_clock::time_point const begin) {
         uint32_t pulses = 0;
-        if (pulse_start()) {  // polling required, we've non-PWM tacho pins
-            for (auto now = begin; (now - begin) < TACHOMETER_READ_PERIOD;
-                    now = std::chrono::steady_clock::now()) {
-                pulses += pulse_poll();
-                task_delay(PIN_SAMPLING_PERIOD);
-            }
-        } else  // everything is handled by PWM slices, just nap for a bit
-            task_delay(TACHOMETER_READ_PERIOD);
 
-        pulses += pulse_end();  // add pulses from PWM counters
+        pulse_start();
+
+        for (auto now = begin; (now - begin) < TACHOMETER_READ_PERIOD;
+                now = std::chrono::steady_clock::now()) {
+            pulses += pulse_poll();
+            task_delay(PIN_SAMPLING_PERIOD);
+        }
+
         return pulses;
     }
 
-    bool pulse_start() {
-        bool do_polling = false;
-
+    void pulse_start() {
         for (auto&& pin : pins) {
             if (!pin) continue;
 
-            switch (gpio_get_function(pin)) {
-            default: break;
-            case GPIO_FUNC_SIO: {
-                do_polling = true;
-                state.set(&pin - pins, gpio_get(pin));
-            } break;
-            case GPIO_FUNC_PWM: {
-                auto slice = pwm_gpio_to_slice_num_(pin);
-                pwm_set_counter(slice, 0);
-                pwm_set_enabled(slice, true);
-            } break;
-            }
+            // FUTURE WORK: Init from point sample susceptible to noise.
+            //              For now keep it simple instead of using trinary logic.
+            bool value = gpio_get(pin);
+            state.set(&pin - pins, value);
+            denoise.at(&pin - pins) = value ? DENOISE_ALL : 0;
         }
-
-        return do_polling;
     }
 
     uint32_t pulse_poll() {
         uint32_t pulses = 0;
 
         for (auto&& pin : pins) {
-            if (pin && gpio_get_function(pin) == GPIO_FUNC_SIO) {
-                auto curr = gpio_get(pin);
-                auto prev = state.test(&pin - pins);
-                pulses += (prev != curr) && curr;  // count rising edges
+            if (!pin) continue;
+
+            auto curr = gpio_get(pin);
+            auto prev = state.test(&pin - pins);
+            auto accum = ((denoise.at(&pin - pins) << 1) | curr) & DENOISE_ALL;
+            auto consensus = curr ? DENOISE_ALL : 0;
+            denoise.at(&pin - pins) = accum;
+
+            if (accum == consensus && prev != curr) {
+                pulses += curr;  // count rising edges
                 state.set(&pin - pins, curr);
-            }
-        }
-
-        return pulses;
-    }
-
-    uint32_t pulse_end() {
-        uint32_t pulses = 0;
-
-        for (auto&& pin : pins) {
-            if (pin && gpio_get_function(pin) == GPIO_FUNC_PWM) {
-                auto slice = pwm_gpio_to_slice_num_(pin);
-                pwm_set_enabled(slice, false);
-                pulses += pwm_get_counter(slice);
             }
         }
 
@@ -146,8 +124,11 @@ private:
 
     Pins::GPIOs pins;
     std::bitset<Pins::ALTERNATIVES_MAX> state;
+    std::array<ConsensusSet, Pins::ALTERNATIVES_MAX> denoise{};
     uint32_t pulses_per_revolution = 1;
     float revolutions_per_second_ = 0;
+
+    static constexpr auto DENOISE_ALL = std::numeric_limits<ConsensusSet>::max();
 };
 
 }  // namespace nevermore::sensors
