@@ -113,3 +113,23 @@ The system will take longer to assume current conditions are clean air if there 
 The system should now have a good baseline for the sensors.
 
 *Remember to reinstall any carbon basket(s), clear the fan override, and to keep the controller powered on for at least 24 hours to ensure the calibration is saved.*
+
+
+=== Hints & Tips
+
+* Wash you printer if there's any smell.
++
+There's no point calibrating a baseline if it's dirty and off gassing.
+Use hot water & soap to scrub the panels, enclosures, print sheets, beds, etc.
+
+* You can calibrate the baseline during bench testing.
+
+=== FAQ
+
+* **When calibrating VOC readings start around 100, then rise to 400+.**
++
+Likely cause: The printer is filthy and there's something off-gassing. Wash your printer (see hints & tips).
++
+The air is steadily getting dirtier from whatever is off-gassing. The air will keep getting worse until it reaches saturation. If you were to plot the raw response, you'd see it steadily degrade over time.
++
+The initial plateau at 100 VOC Index is because the system will initially assume the (increasingly dirty) current conditions are nominal and then later switches to adjusting the expected range; this is when the VOC Index will begin to increase.
