@@ -809,6 +809,21 @@ This is intended for setups where the slicer specifies the filament type using a
 Unlike the `voc_gating_threshold`, this is setting is *not* persisted and will be lost when the controller restarts.
 
 
+==== NEVERMORE_SENSOR_CALIBRATION_CHECKPOINT
+
+Command:
+```
+NEVERMORE_SENSOR_CALIBRATION_CHECKPOINT NEVERMORE=<name>
+```
+
+Force sensors to checkpoint their calibration.
+The checkpoints will be persisted after a brief delay (under 20 seconds).
+
+Useful if you must save the current calibration immediately instead of waiting
+for the usual 24h periodic checkpoint.
+e.g. xref:doc/voc.adoc#baseline-calibration[After a short baseline calibration.]
+
+
 ==== NEVERMORE_SENSOR_CALIBRATION_RESET
 
 Command:

@@ -170,13 +170,24 @@ bool init() {
     return true;
 }
 
-void reset_calibrations() {
+void calibrations_reset() {
     vTaskSuspendAll();
     {
         printf("resetting sensor calibrations\n");
 
-        for (auto& device : g_sensor_devices)
-            device->reset_calibration();
+        for (auto&& device : g_sensor_devices)
+            device->calibration_reset();
+    }
+    xTaskResumeAll();
+}
+
+void calibrations_force_checkpoint() {
+    vTaskSuspendAll();
+    {
+        printf("checkpointing sensor calibrations\n");
+
+        for (auto&& device : g_sensor_devices)
+            device->calibration_force_checkpoint();
     }
     xTaskResumeAll();
 }

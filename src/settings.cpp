@@ -308,7 +308,7 @@ void Settings::reset(ResetFlags flags) {
     };
 
     if (flags & sensor_calibration) {
-        sensors::reset_calibrations();
+        sensors::calibrations_reset();
         voc_calibration = Settings{}.voc_calibration;
     }
 

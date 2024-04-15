@@ -67,6 +67,7 @@ extern Sensors g_sensors;
 
 // Sensors are registered as periodic workers for the context.
 bool init();
-void reset_calibrations();
+void calibrations_reset();
+void calibrations_force_checkpoint();
 
 }  // namespace nevermore::sensors

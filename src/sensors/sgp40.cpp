@@ -51,14 +51,19 @@ struct SGP40 final : SensorPeriodicEnvI2C<Cmd, "SGP40", 0xFF> {
 
         if (self_test() != SELF_TEST_OK) return false;
 
-        reset_calibration();
+        calibration_reset();
         index.restore(side.voc_calibration_blob(), i2c);
 
         return true;
     }
 
-    void reset_calibration() override {
+    void calibration_reset() override {
+        // reinit also resets the checkpoint timeout
         index = {GasIndexAlgorithm_ALGORITHM_TYPE_VOC};
+    }
+
+    void calibration_force_checkpoint() override {
+        index.checkpoint_clear();
     }
 
     void read() override {

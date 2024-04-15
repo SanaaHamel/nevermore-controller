@@ -10,7 +10,8 @@ struct Sensor {
 
     [[nodiscard]] virtual char const* name() const = 0;
 
-    virtual void reset_calibration() {};
+    virtual void calibration_reset() {};
+    virtual void calibration_force_checkpoint() {};
 };
 
 // A sensor that schedules itself for periodic updates via an async context.

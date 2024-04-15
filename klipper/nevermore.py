@@ -332,6 +332,12 @@ class CmdConfigReset(Command):
 
 
 @dataclass(frozen=True)
+class CmdConfigCheckpointSensorCalibration(Command):
+    def params(self):
+        return b""
+
+
+@dataclass(frozen=True)
 class CmdConfigResetSensorCalibration(Command):
     def params(self):
         return b""
@@ -691,6 +697,9 @@ class NevermoreBackgroundWorker:
         config_flags = require_char(service_config, UUID_CHAR_CONFIG_FLAGS64, {P.WRITE})
         config_reboot = require_char(service_config, UUID_CHAR_CONFIG_REBOOT, {P.WRITE})
         config_reset = require_char(service_config, UUID_CHAR_CONFIG_RESET, {P.WRITE})
+        config_checkpoint_sensor_calibration = require_char(
+            service_config, UUID_CHAR_CONFIG_CHECKPOINT_SENSOR_CALIBRATION, {P.WRITE}
+        )
         config_reset_sensor_calibration = require_char(
             service_config, UUID_CHAR_CONFIG_RESET_SENSOR_CALIBRATION, {P.WRITE}
         )
@@ -774,6 +783,8 @@ class NevermoreBackgroundWorker:
                 char = config_reboot
             elif isinstance(cmd, CmdConfigReset):
                 char = config_reset
+            elif isinstance(cmd, CmdConfigCheckpointSensorCalibration):
+                char = config_checkpoint_sensor_calibration
             elif isinstance(cmd, CmdConfigResetSensorCalibration):
                 char = config_reset_sensor_calibration
             elif isinstance(cmd, CmdConfigVocThreshold):
@@ -856,6 +867,9 @@ class Nevermore:
     cmd_NEVERMORE_VOC_CALIBRATION_help = "Set the automatic VOC calibration process"
     cmd_NEVERMORE_REBOOT_help = "Reboots the controller"
     cmd_NEVERMORE_STATUS_help = "Report controller status to console"
+    cmd_NEVERMORE_SENSOR_CALIBRATION_CHECKPOINT_help = (
+        "Force sensors to checkpoint their calibration"
+    )
     cmd_NEVERMORE_SENSOR_CALIBRATION_RESET_help = "Reset sensor calibration"
     cmd_NEVERMORE_RESET_help = "Reset settings. Do not use unless directed."
 
@@ -1027,6 +1041,13 @@ class Nevermore:
             desc=self.cmd_NEVERMORE_STATUS_help,
         )
         gcode.register_mux_command(
+            "NEVERMORE_SENSOR_CALIBRATION_CHECKPOINT",
+            "NEVERMORE",
+            self.name,
+            self.cmd_NEVERMORE_SENSOR_CALIBRATION_CHECKPOINT,
+            desc=self.cmd_NEVERMORE_SENSOR_CALIBRATION_CHECKPOINT_help,
+        )
+        gcode.register_mux_command(
             "NEVERMORE_SENSOR_CALIBRATION_RESET",
             "NEVERMORE",
             self.name,
@@ -1140,6 +1161,10 @@ class Nevermore:
             gcmd.respond_info("connected")
         else:
             gcmd.respond_info("not yet connected")
+
+    def cmd_NEVERMORE_SENSOR_CALIBRATION_CHECKPOINT(self, gcmd: GCodeCommand) -> None:
+        if self._interface is not None:
+            self._interface.send_command(CmdConfigCheckpointSensorCalibration())
 
     def cmd_NEVERMORE_SENSOR_CALIBRATION_RESET(self, gcmd: GCodeCommand) -> None:
         if self._interface is not None:

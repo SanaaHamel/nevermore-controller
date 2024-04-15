@@ -13,6 +13,7 @@ using namespace std;
 
 #define CONFIG_REBOOT_01 f48a18bb_e03c_4583_8006_5b54422e2045_01
 #define CONFIG_FLAGS_01 d4b66bf4_3d8f_4746_b6a2_8a59d2eac3ce_01
+#define CONFIG_CHECKPOINT_SENSOR_CALIBRATION a84b00c0_7102_4cc6_a4ea_a65050502d3f_01
 #define CONFIG_RESET_SENSOR_CALIBRATION 75bf055c_02be_466f_8c7d_6ebc72078048_01
 #define CONFIG_RESET_SETTINGS f2810b13_8cd7_4d6f_bb1b_e276db7fadbf_01
 #define CONFIG_VOC_GATING_THRESHOLD 216aa791_97d0_46ac_8752_60bbc00611e1_05
@@ -125,7 +126,15 @@ optional<int> attr_write(
         // maybe add an API for resetting specific sensors later.
         if (consume.remaining()) return ATT_ERROR_VALUE_NOT_ALLOWED;
 
-        sensors::reset_calibrations();
+        sensors::calibrations_reset();
+        return 0;
+    }
+    case HANDLE_ATTR(CONFIG_CHECKPOINT_SENSOR_CALIBRATION, VALUE): {
+        // only accept zero data write for now.
+        // maybe add an API for resetting specific sensors later.
+        if (consume.remaining()) return ATT_ERROR_VALUE_NOT_ALLOWED;
+
+        sensors::calibrations_force_checkpoint();
         return 0;
     }
     case HANDLE_ATTR(CONFIG_RESET_SETTINGS, VALUE): {

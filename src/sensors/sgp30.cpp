@@ -109,16 +109,21 @@ struct SGP30Sensor final : SensorPeriodicEnvI2C<Reg, "SGP30", 0xFF> {
         task_delay(10ms);  // spec says 10ms for IAQ init
         start = Clock::now();
 
-        reset_calibration();
+        calibration_reset();
         index.restore(side.voc_calibration_blob(), i2c);
 
         return true;
     }
 
-    void reset_calibration() override {
+    void calibration_reset() override {
+        // reinit also resets the checkpoint timeout
         index = {GasIndexAlgorithm_ALGORITHM_TYPE_VOC};
         // default VOC is 20'000, which is lower than how this sensor reacts
         index.gia.mSraw_Minimum = 10'000;
+    }
+
+    void calibration_force_checkpoint() override {
+        index.checkpoint_clear();
     }
 
     void read() override {

@@ -57,6 +57,11 @@ struct GasIndex {
         memcpy(&dst, &blob, sizeof(Blob));
     }
 
+    // Clear checkpoint timeout. Next call to `checkpoint` will always issue a checkpoint.
+    void checkpoint_clear() {
+        next_checkpoint = Clock::now();
+    }
+
     bool checkpoint(settings::SensorCalibrationBlob& blob) {
         auto const now = Clock::now();
         if (now < next_checkpoint) return false;
