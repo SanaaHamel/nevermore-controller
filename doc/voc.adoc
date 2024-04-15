@@ -106,7 +106,7 @@ Open a window for a few minutes, flap a hand towel in the doorway, whatever. The
 
 . Run the xref:../README.adoc#NEVERMORE_SENSOR_CALIBRATION_RESET[`NEVERMORE_SENSOR_CALIBRATION_RESET`] G-Code command to clear any existing calibration.
 +
-The system will take longer to assume current conditions are clean air if there is an existing calibration, and might not calibrate at all of the air is much 'dirtier' than the previous baseline.
+The system will take longer to assume current conditions are clean air if there is an existing calibration, and might not calibrate at all if the air is much 'dirtier' than the previous baseline.
 
 . Leave the printer alone for *at least* 8 hours, and up to 24 hours if you have the time.
 
