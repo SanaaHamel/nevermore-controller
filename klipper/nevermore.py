@@ -1204,6 +1204,10 @@ class NevermoreFan:
 
 
 class NevermoreSensor:
+    # Nevermore sensor state has fields that shouldn't be user-displayed in most
+    # cases. This is the subset we're typically interested in.
+    DISPLAY_FIELDS = {"temperature", "humidity", "pressure", "gas", "gas_raw"}
+
     def __init__(self, config: ConfigWrapper) -> None:
         self.name = config.get_name().split()[-1]
         self.printer: Printer = config.get_printer()
@@ -1242,7 +1246,10 @@ class NevermoreSensor:
         if self.plot_voc:
             return {"temperature": self.state.gas or 0}
 
-        return self.state.as_dict()
+        d = {k: v for k, v in self.state.as_dict().items() if k in self.DISPLAY_FIELDS}
+        if "pressure" in d:  # round it for nicer display
+            d["pressure"] = round(d["pressure"])
+        return d
 
     # required by sensors API
     def setup_minmax(self, min_temp: float, max_temp: float) -> None:
