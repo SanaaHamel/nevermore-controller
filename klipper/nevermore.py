@@ -656,8 +656,6 @@ class NevermoreBackgroundWorker:
     ):
         log.info(f"connected to controller {client.address}")
 
-        await client.get_services()  # fetch and cache services
-
         def require(id: UUID):
             x = client.services.get_service(id)
             if x is None:
