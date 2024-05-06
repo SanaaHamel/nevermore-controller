@@ -93,11 +93,10 @@ private:
         for (auto&& pin : pins) {
             if (!pin) continue;
 
-            // FUTURE WORK: Init from point sample susceptible to noise.
-            //              For now keep it simple instead of using trinary logic.
             bool value = gpio_get(pin);
             state.set(&pin - pins, value);
-            denoise.at(&pin - pins) = value ? DENOISE_ALL : 0;
+            // assume noisy sample, init w/ conflicting to force wait for consensus
+            denoise.at(&pin - pins) = 0b10;
         }
     }
 
