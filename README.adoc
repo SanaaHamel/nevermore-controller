@@ -349,11 +349,50 @@ If you've checked all of the above and you still have exceptions in your printer
 [#faq-2.4ghz-interference]
 * **I'm having trouble getting a reliable connection to the controller. Sometimes it works, sometimes it just doesn't connect.**
 +
+(This is specifically for the case where your printer log does *not* show any exceptions mentioning bluetooth characteristics; xref:bluez-bad-cache[otherwise see below].)
++
 There might be interference on the 2.4 GHz wireless band. If your Klipper host is connected via WiFi make sure it's using 5.0 GHz or try using Ethernet instead.
 +
 You can test to see if the problem is specific to your Klipper host by xref:find-the-bt-address-nrf-connect[connecting with another machine, such as your pocket supercomputer].
 +
 This can also happen in environments with absurd number of wireless devices or faulty microwave ovens.
+
+[#bluez-bad-cache]
+* **The printer log or nevermore tools show exceptions/errors mentioning missing or unknown 'characteristics' and it can't connect to the controller.**
++
+If you encounter an exception or error talking about 'characteristics', such as:
++
+```
+Exception: <UUID> (Handle: <number>): Unknown has no characteristic <UUID> with properties ...
+```
++
+Try the following, in order:
++
+. xref:guide-updating[Update your controller using OTA.] The controller might be too old for the Klipper module you're using. If you know it's up to date, or can't connect via OTA, continue to 2.
++
+. Disable and remove BlueZ GATT caches.
++
+BlueZ (Linux's Bluetooth subsystem) has a known bug where it can store corrupt BLE attribute caches. footnote:[Observed in versions up to 5.66.] You can disable and clear this cache to work around this bug:
++
+.. ** Disable Caching**
++
+Run `sudo nano /etc/bluetooth/main.conf` and in the `[GATT]` section change `#Cache = always` to `Cache = no`. If `main.conf` doesn't have a `[GATT]` section, add it and `Cache = no`. e.g.
++
+```ini
+[GATT]
+Cache = no
+```
++
+Reboot the machine to apply the change.
+.. **Remove Existing Caches**
++
+Run `sudo bluetoothctl power off`.
++
+Get the addresses of all controllers with `sudo ls /var/lib/bluetooth`. They will be of the form `xx:xx:xx:xx:xx:xx`.
++
+Run for each controller `sudo rm -rf /var/lib/bluetooth/<controller-address>/cache`. (Not all controllers will necessarily have a cache.)
++
+Reboot the machine to ensure the BlueZ doesn't persist any cache in memory.
 
 [#faq-mainsail-os]
 * **I'm using MainsailOS and I'm having trouble with BlueTooth.**
