@@ -408,6 +408,17 @@ NOTE: I intend to improve the experience for people using a wired connection ins
 Verify that your Mainsail version is at least 2.7.1 (first release w/ official support).
 If that's fine then double check there isn't any config errors.
 
+[#pin-config-update-bug]
+* **Only the intake/exhaust side shows values in Mainsail, the other side only shows `---`.**
++
+. Run `./tools/pin-config.py --reset-default`.
++
+This fixes a known bug when updating to 0.14+ from older versions that would corrupt the pin config for I2C0 (intake). If this does fix the problem and it was on the exhaust side, then your intake/exhaust I2C lines are swapped.
+. Double check your wiring.
++
+You can quickly test this by swapping your working side's sensors with the problematic one.
+If problematic side starts working then the issue is with the sensors you pulled, otherwise the wiring is the problem.
+
 * **Fluidd doesn't show sensor values other than temperature, even with the `class_name_override` hack.**
 +
 Fluidd is partially supported with regards to sensor display and visualisation.
