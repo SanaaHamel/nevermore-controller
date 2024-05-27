@@ -21,7 +21,7 @@ struct Tachometer final : SensorPeriodic {
             std::clamp<std::chrono::milliseconds>(SENSOR_UPDATE_PERIOD, 100ms, 1s);
 
     // WORKAROUND:  There's EMI from the PWM wire (runs adjacent to tacho).
-    // Proper fix:  Add a 2.2k pull-up & 0.2nF capacitor-to-0v to tachometer.
+    // Proper fix:  Add a 2.2k pull-up & 0.1uF capacitor-to-0v to tachometer.
     //    Our fix:  Denoise the signal in software. Just wait for consensus
     //              over multiple samples before considering the state changed.
     //              Downside is that we need to do this in software instead of
