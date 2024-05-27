@@ -422,7 +422,7 @@ If problematic side starts working then the issue is with the sensors you pulled
 * **Fluidd doesn't show sensor values other than temperature, even with the `class_name_override` hack.**
 +
 Fluidd is partially supported with regards to sensor display and visualisation.
-It requires using `temperature_sensor`s with `NevermoreSensor` to display state;
+It requires using `temperature_sensor` with `NevermoreSensor` to display state;
 it does not have an equivalent to Mainsail's dedicated display.
 
 == Display Support
