@@ -371,8 +371,8 @@ void save(SettingsPersisted& settings) {
 
     // HACK: `UNSAFE_save_internal` will update `g_active_slot := args.slot_dst`.
     if (auto r = flash_safe_execute(UNSAFE_save_internal, &args, UINT32_MAX); r != PICO_OK) {
-        assert(false);  // something weird went wrong, break out for debugging
         printf("ERR - settings::save - flash acquire failed %d\n", r);
+        assert(false);  // something weird went wrong, break out for debugging
     }
 }
 
