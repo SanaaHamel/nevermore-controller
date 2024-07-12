@@ -9,6 +9,7 @@
 #include "pico.h"  // IWYU pragma: keep for transitive includes (e.g. board)
 #include "pico/stdio.h"
 #include "pico/time.h"
+#include "picowota/reboot.h"
 #include "sdk/i2c.hpp"
 #include "sdk/task.hpp"
 #include "sensors.hpp"
@@ -93,7 +94,7 @@ void setup_watchdog() {
         printf("WARN - last reboot triggered by watchdog timeout\n");
     }
 
-    watchdog_enable(WATCHDOG_TIMEOUT / 1ms, true);
+    picowota_watchdog_enable_bootloader(WATCHDOG_TIMEOUT / 1ms, true);
 
     // Kinda wasteful to allocate a whole task for this.
     // Can't use a timer, they might starve/miss their deadline.
