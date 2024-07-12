@@ -14,8 +14,9 @@ enum class Priority : UBaseType_t {
     Sensors,
     Communication = CYW43_TASK_PRIORITY,  // higher priority
     Startup,
+    WatchdogUpdate,  // highest
 };
-static_assert(UBaseType_t(Priority::Startup) < configMAX_PRIORITIES);
+static_assert(UBaseType_t(Priority::WatchdogUpdate) < configMAX_PRIORITIES);
 
 struct Task {
     Task() = default;

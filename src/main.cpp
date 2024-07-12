@@ -5,10 +5,12 @@
 #include "gatt.hpp"
 #include "hardware/adc.h"
 #include "hardware/gpio.h"
+#include "hardware/watchdog.h"
 #include "pico.h"  // IWYU pragma: keep for transitive includes (e.g. board)
 #include "pico/stdio.h"
 #include "pico/time.h"
 #include "sdk/i2c.hpp"
+#include "sdk/task.hpp"
 #include "sensors.hpp"
 #include "settings.hpp"
 #include "task.h"  // IWYU pragma: keep
@@ -49,6 +51,8 @@ bool stdio_usb_connected();
 
 namespace {
 
+constexpr auto WATCHDOG_TIMEOUT = 1000ms;
+
 // Leave pins {0, 1} set to UART TX/RX.
 // Clear everything else.
 void pins_clear_user_defined() {
@@ -84,6 +88,23 @@ optional<bool> vbus_powered() {
 #endif
 }
 
+void setup_watchdog() {
+    if (watchdog_enable_caused_reboot()) {
+        printf("WARN - last reboot triggered by watchdog timeout\n");
+    }
+
+    watchdog_enable(WATCHDOG_TIMEOUT / 1ms, true);
+
+    // Kinda wasteful to allocate a whole task for this.
+    // Can't use a timer, they might starve/miss their deadline.
+    mk_task("watchdog-update", Priority::WatchdogUpdate, 128)([]() {
+        for (;;) {
+            watchdog_update();
+            task_delay(WATCHDOG_TIMEOUT / 4);
+        }
+    }).release();
+}
+
 }  // namespace
 
 void startup() {
@@ -103,6 +124,8 @@ void startup() {
         while (!stdio_usb_connected() && !time_reached(deadline))
             sleep(100ms);
     }
+
+    setup_watchdog();
 
     settings::init();
 

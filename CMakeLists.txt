@@ -101,7 +101,7 @@ target_compile_definitions(picowota PUBLIC USBD_PRODUCT="Pico Nevermore")
 # UGLY: Also defines the value of `nevermore::Priority::Communication`.
 # We want a priority above almost anything else.
 # Leaves 2 slots above
-add_compile_definitions(CYW43_TASK_PRIORITY=30)
+add_compile_definitions(CYW43_TASK_PRIORITY=29)
 
 # default is 4.
 # Current users: tinyusb w/ DCD (1), stdio w/ USB (1), CYW43 driver (1), WS2812 (1), CST816S (1), GC9A01 (1)
@@ -136,6 +136,7 @@ target_link_libraries(
          hardware_pio
          hardware_pwm
          hardware_spi
+         hardware_watchdog
          pico_btstack_ble
          pico_stdlib
          pico_time
