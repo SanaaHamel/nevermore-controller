@@ -11,6 +11,7 @@ import importlib.util
 import logging
 import os
 import os.path
+import re
 import sys
 import threading
 import weakref
@@ -449,6 +450,11 @@ class NevermoreForceReconnection(Exception):
 # HACK: This class *heavily* abuses the GIL for data synchronisation between
 # the klipper thread and the background worker thread.
 class NevermoreBackgroundWorker:
+    # HACK: Either BlueZ or Bleak is unable to handle concurrent discovery
+    #       requests. Serialise that section for now.
+    # FUTURE WORK:  Have a single thread service all BLE work?
+    scan_lock = threading.BoundedSemaphore()
+
     def __init__(self, nevermore: "Nevermore") -> None:
         # A weak ref allows us to end the worker if the nevermore instance is
         # ever GC'd without asking us to disconnect (for whatever reason).
@@ -508,7 +514,7 @@ class NevermoreBackgroundWorker:
         if nevermore is None:
             return  # Already dead and we didn't need to do anything...
 
-        self._thread.name = nevermore.name
+        self._thread.name = f"nevermore-BLE '{nevermore.name}'"
         device_address = nevermore.bt_address
         connection_initial_timeout = nevermore.connection_initial_timeout
         nevermore = None  # release reference otherwise call frame keeps it alive
@@ -562,11 +568,16 @@ class NevermoreBackgroundWorker:
                 )
 
                 while True:  # keep scanning until we find some devices...
-                    devices = await discover_bluetooth_devices(
-                        lambda x: device_is_likely_a_nevermore(x, log=LOG),
-                        device_address,
-                        scan_timeout,
-                    )
+                    try:
+                        self.scan_lock.acquire()
+                        devices = await discover_bluetooth_devices(
+                            lambda x: device_is_likely_a_nevermore(x, log=LOG),
+                            device_address,
+                            scan_timeout,
+                        )
+                    finally:
+                        self.scan_lock.release()
+
                     if not not devices:
                         break
 
@@ -861,6 +872,12 @@ class NevermoreBackgroundWorker:
 
 
 class Nevermore:
+    cmd_NEVERMORE_PRINT_START_help = (
+        "Set Nevermores to printing state. See documentation for details."
+    )
+    cmd_NEVERMORE_PRINT_END_help = (
+        "Set Nevermores to idle state. See documentation for details."
+    )
     cmd_NEVERMORE_VOC_GATING_THRESHOLD_OVERRIDE_help = "Set/clear the VOC gating threshold override (omit `THRESHOLD` to clear override)"
     cmd_NEVERMORE_VOC_CALIBRATION_help = "Set the automatic VOC calibration process"
     cmd_NEVERMORE_REBOOT_help = "Reboots the controller"
@@ -870,6 +887,15 @@ class Nevermore:
     )
     cmd_NEVERMORE_SENSOR_CALIBRATION_RESET_help = "Reset sensor calibration"
     cmd_NEVERMORE_RESET_help = "Reset settings. Do not use unless directed."
+
+    @classmethod
+    def gcode_command_names(cls):
+        CMD_HELP_PATTERN = re.compile(r"^cmd_(.+)_help$")
+        return {
+            (m.group(1), getattr(Nevermore, f"cmd_{m.group(1)}_help"))
+            for m in map(CMD_HELP_PATTERN.match, Nevermore.__dict__)
+            if m is not None
+        }
 
     def __init__(self, config: ConfigWrapper) -> None:
         self.name = config.get_name().split()[-1]
@@ -1001,55 +1027,10 @@ class Nevermore:
         )
 
         gcode: GCodeDispatch = self.printer.lookup_object("gcode")
-        gcode.register_mux_command(
-            "NEVERMORE_VOC_GATING_THRESHOLD_OVERRIDE",
-            "NEVERMORE",
-            self.name,
-            self.cmd_NEVERMORE_VOC_GATING_THRESHOLD_OVERRIDE,
-            desc=self.cmd_NEVERMORE_VOC_GATING_THRESHOLD_OVERRIDE_help,
-        )
-        gcode.register_mux_command(
-            "NEVERMORE_VOC_CALIBRATION",
-            "NEVERMORE",
-            self.name,
-            self.cmd_NEVERMORE_VOC_CALIBRATION,
-            desc=self.cmd_NEVERMORE_VOC_CALIBRATION_help,
-        )
-        gcode.register_mux_command(
-            "NEVERMORE_REBOOT",
-            "NEVERMORE",
-            self.name,
-            self.cmd_NEVERMORE_REBOOT,
-            desc=self.cmd_NEVERMORE_REBOOT_help,
-        )
-        gcode.register_mux_command(
-            "NEVERMORE_RESET",
-            "NEVERMORE",
-            self.name,
-            self.cmd_NEVERMORE_RESET,
-            desc=self.cmd_NEVERMORE_RESET_help,
-        )
-        gcode.register_mux_command(
-            "NEVERMORE_STATUS",
-            "NEVERMORE",
-            self.name,
-            self.cmd_NEVERMORE_STATUS,
-            desc=self.cmd_NEVERMORE_STATUS_help,
-        )
-        gcode.register_mux_command(
-            "NEVERMORE_SENSOR_CALIBRATION_CHECKPOINT",
-            "NEVERMORE",
-            self.name,
-            self.cmd_NEVERMORE_SENSOR_CALIBRATION_CHECKPOINT,
-            desc=self.cmd_NEVERMORE_SENSOR_CALIBRATION_CHECKPOINT_help,
-        )
-        gcode.register_mux_command(
-            "NEVERMORE_SENSOR_CALIBRATION_RESET",
-            "NEVERMORE",
-            self.name,
-            self.cmd_NEVERMORE_SENSOR_CALIBRATION_RESET,
-            desc=self.cmd_NEVERMORE_SENSOR_CALIBRATION_RESET_help,
-        )
+        for cmd, desc in Nevermore.gcode_command_names():
+            gcode.register_mux_command(
+                cmd, "NEVERMORE", self.name, getattr(self, f"cmd_{cmd}"), desc=desc
+            )
 
     def set_fan_power(self, percent: Optional[float]):
         if self._interface is not None:
@@ -1081,7 +1062,9 @@ class Nevermore:
             and not self._interface.wait_for_connection(self.connection_initial_timeout)
         ):
             self._interface.disconnect()  # the deadline was blown, it doesn't need to keep trying.
-            raise self.printer.config_error("nevermore failed to connect - timed out")
+            raise self.printer.config_error(
+                f"nevermore '{self.name}' failed to connect - timed out"
+            )
 
     def handle_controller_connect(self) -> None:
         if self._interface is None:
@@ -1118,6 +1101,20 @@ class Nevermore:
         data.update((f"{k}_max", v) for k, v in self._state_max.as_dict().items())
         return data
 
+    def cmd_NEVERMORE_PRINT_START(self, gcmd: GCodeCommand) -> None:
+        fan_speed: Optional[float] = gcmd.get_float(
+            "FAN_SPEED", default=1.0, minval=0.0, maxval=1.0
+        )
+        if gcmd.get_int("FAN_AUTOMATIC", default=0, minval=0, maxval=1) == 1:
+            fan_speed = None
+
+        self.set_fan_power(fan_speed)
+        self.cmd_NEVERMORE_VOC_CALIBRATION(False)
+
+    def cmd_NEVERMORE_PRINT_END(self, gcmd: GCodeCommand) -> None:
+        self.set_fan_power(None)
+        self.cmd_NEVERMORE_VOC_CALIBRATION(True)
+
     def cmd_NEVERMORE_VOC_GATING_THRESHOLD_OVERRIDE(self, gcmd: GCodeCommand) -> None:
         # `None` to allow explicitly clearing override by not specifying a `SPEED` arg
         self._voc_gating_threshold_override = CmdConfigVocThresholdOverride(
@@ -1144,7 +1141,7 @@ class Nevermore:
         if self._interface is not None and self._interface.wait_for_connection(0):
             self._interface.send_command(CmdConfigReboot())
         else:
-            gcmd.respond_info("not yet connected")
+            gcmd.respond_info(f"{self.name} not yet connected")
 
     def cmd_NEVERMORE_RESET(self, gcmd: GCodeCommand) -> None:
         if self._interface is not None:
@@ -1154,9 +1151,9 @@ class Nevermore:
 
     def cmd_NEVERMORE_STATUS(self, gcmd: GCodeCommand) -> None:
         if self._interface is not None and self._interface.wait_for_connection(0):
-            gcmd.respond_info("connected")
+            gcmd.respond_info(f"{self.name} connected")
         else:
-            gcmd.respond_info("not yet connected")
+            gcmd.respond_info(f"{self.name} not yet connected")
 
     def cmd_NEVERMORE_SENSOR_CALIBRATION_CHECKPOINT(self, gcmd: GCodeCommand) -> None:
         if self._interface is not None:
@@ -1220,6 +1217,7 @@ class NevermoreSensor:
             raise config.error("`class_name_override` cannot be an empty string")
 
         self.min_temp = self.max_temp = 0.0
+        self.nevermore_name: str = config.get("nevermore", "nevermore")
         self.nevermore: Optional[Nevermore] = None
         self._callback: Optional[SensorCallback] = None
         self._timer_sample = self.printer.get_reactor().register_timer(self._sample)
@@ -1261,8 +1259,14 @@ class NevermoreSensor:
         return 1  # TODO: fetch from controller, no point refreshing faster than them
 
     def _handle_connect(self) -> None:
-        self.nevermore = self.printer.lookup_object("nevermore")
-        assert isinstance(self.nevermore, Nevermore)
+        nevermore = self.printer.lookup_object(self.nevermore_name, None)
+        if not isinstance(nevermore, Nevermore):
+            raise self.printer.config_error(
+                f"`nevermore: {self.nevermore_name}` doesn't refer to a Nevermore object instance"
+            )
+
+        self.nevermore = nevermore
+
         reactor: SelectReactor = self.printer.get_reactor()
         reactor.update_timer(self._timer_sample, reactor.NOW)
 
@@ -1281,13 +1285,6 @@ class NevermoreSensor:
 
 
 class NevermoreGlobal:
-    cmd_NEVERMORE_PRINT_START_help = (
-        "Set Nevermores to printing state. See documentation for details."
-    )
-    cmd_NEVERMORE_PRINT_END_help = (
-        "Set Nevermores to idle state. See documentation for details."
-    )
-
     @staticmethod
     def get_or_create(printer: Printer) -> "NevermoreGlobal":
         obj = printer.lookup_object("NevermoreGlobal", default=None)
@@ -1303,41 +1300,29 @@ class NevermoreGlobal:
         self.printer = printer
 
         gcode: GCodeDispatch = self.printer.lookup_object("gcode")
-        gcode.register_command(
-            "NEVERMORE_PRINT_START",
-            self.cmd_NEVERMORE_PRINT_START,
-            desc=self.cmd_NEVERMORE_PRINT_START_help,
-        )
-        gcode.register_command(
-            "NEVERMORE_PRINT_END",
-            self.cmd_NEVERMORE_PRINT_END,
-            desc=self.cmd_NEVERMORE_PRINT_END_help,
-        )
+        for cmd, desc in Nevermore.gcode_command_names():
+            # python is ugly and stupid and does dynamic capture of values.
+            def go(gcmd: GCodeCommand, cmd: str = cmd):
+                for _, nevermore in self.nevermores():
+                    getattr(nevermore, f"cmd_{cmd}")(gcmd)
+
+            gcode.register_mux_command(cmd, "NEVERMORE", None, go, desc=desc)
 
     def nevermores(self) -> List[Tuple[str, Nevermore]]:
         return self.printer.lookup_objects("nevermore")
 
-    def cmd_NEVERMORE_PRINT_START(self, gcmd: GCodeCommand) -> None:
-        fan_speed: Optional[float] = gcmd.get_float(
-            "FAN_SPEED", default=1.0, minval=0.0, maxval=1.0
-        )
-        if gcmd.get_int("FAN_AUTOMATIC", default=0, minval=0, maxval=1) == 1:
-            fan_speed = None
-
-        for _, nevermore in self.nevermores():
-            nevermore.set_fan_power(fan_speed)
-            nevermore.cmd_NEVERMORE_VOC_CALIBRATION(False)
-
-    def cmd_NEVERMORE_PRINT_END(self, gcmd: GCodeCommand) -> None:
-        for _, nevermore in self.nevermores():
-            nevermore.set_fan_power(None)
-            nevermore.cmd_NEVERMORE_VOC_CALIBRATION(True)
-
 
 def load_config(config: ConfigWrapper):
+    # `add_sensor_factory` & `get_or_create` are both idempotent
     NevermoreGlobal.get_or_create(config.get_printer())
 
     heaters = config.get_printer().load_object(config, "heaters")
     heaters.add_sensor_factory("NevermoreSensor", NevermoreSensor)
 
     return Nevermore(config)
+
+
+# `load_config_prefix` must be defined to allow named objects, but in our case
+# it does the same work as `load_config`.
+def load_config_prefix(config: ConfigWrapper):
+    return load_config(config)

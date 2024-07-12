@@ -582,6 +582,7 @@ plot_voc: true
 ==== WS2812 Example (NeoPixel)
 
 WS2812 pixel strips can be used just like any other WS2812 pixel strip connected to your Klipper instance. https://github.com/julianschill/klipper-led_effect/blob/master/docs/LED_Effect.md[This includes support for LED effects.]
+See xref:klipper-object-naming[Klipper Object Naming] if you have a non-default named Nevermore.
 
 ```ini
 # led-effects are supported, here's an example:
@@ -611,7 +612,8 @@ NOTE: If you don't care about a setting, leave it unset. Suggested defaults will
 # DON'T JUST COPY PASTE THIS INTO YOUR CONFIG.
 # READ THE SETUP GUIDE.
 
-[nevermore]
+# If name is omitted, will default to just `nevermore`
+[nevermore nevermore]
 # Can omit if you have only one nevermore in range.
 # See <<Finding The BT Address>> for more info.
 # NOTE: Providing an address will make startup slightly faster.
@@ -739,6 +741,9 @@ sensor_type: NevermoreSensor # fixed, must be `NevermoreSensor`
 # valid values: `intake`, `exhaust`
 sensor_kind: <required, no defaults>
 
+# full Klipper object name of the Nevermore instance to use as a source
+nevermore: nevermore
+
 # Mainsail 2.7.1 doesn't recognise `NevermoreSensor` as sensor it should plot.
 # This hacky option allows overriding the class name with one it does recognise
 # as something that should be plotted.
@@ -751,6 +756,26 @@ class_name_override: <optional, not set by default>
 plot_voc: false
 
 ```
+
+
+[#klipper-object-naming]
+=== Klipper Object Naming
+
+Nevermore instances have two kinds of names:
+* Short names: Used by GCode commands (i.e. `NEVERMORE=<short name>`).
+* Full Klipper names: Used by the Klipper config files.
+
+NOTE: Full Klipper full names are case and whitespace sensitive.
+
+.Nevermore Object Names
+[%autowidth]
+|===
+|Klipper Config Declaration | Short Name    | Full Klipper Name   | LED Effect Name
+|`[nevermore]`              | `nevermore`   | `nevermore`         | `nevermore`
+|`[nevermore Foo_Bar]`      | `Foo_Bar`     | `nevermore Foo_Bar` | `nevermore:Foo_Bar`
+|===
+
+When referring to a Nevermore for LED effects, use the full klipper name and replace any spaces with `:`.
 
 
 [#klipper-gcode-commands]
@@ -766,10 +791,10 @@ At this time, there can only be one Nevermore controller, which is named `neverm
 
 Command:
 ```
-NEVERMORE_PRINT_START [FAN_SPEED=1.0 <float \in [0, 1]>] [FAN_AUTOMATIC=0 <int \in [0, 1]>]
+NEVERMORE_PRINT_START [NEVERMORE=<name>] [FAN_SPEED=1.0 <float \in [0, 1]>] [FAN_AUTOMATIC=0 <int \in [0, 1]>]
 ```
 
-Set all Nevermores into a reasonable state for printing. **You should use this G-Code command instead of manually issuing the equivalent commands**; it will allow future updates to automatically apply recommended print-start actions.
+Set Nevermores into a reasonable state for printing. **You should use this G-Code command instead of manually issuing the equivalent commands**; it will allow future updates to automatically apply recommended print-start actions. Applies to all Nevermores unless a specific one is named using`NEVERMORE=`.
 
 This command currently performs the following series of actions for every Nevermore (currently only 1):
 
@@ -783,10 +808,10 @@ Overriding automatic mode starts the filter without waiting for the air to get d
 
 Command:
 ```
-NEVERMORE_PRINT_END
+NEVERMORE_PRINT_END [NEVERMORE=<name>]
 ```
 
-Set all Nevermores into a reasonable idle state. **You should use this G-Code command instead of manually issuing the equivalent commands**; it will allow future updates to automatically apply recommended print-end actions.
+Set Nevermores into a reasonable idle state. **You should use this G-Code command instead of manually issuing the equivalent commands**; it will allow future updates to automatically apply recommended print-end actions. Applies to all Nevermores unless a specific one is named using`NEVERMORE=`.
 
 This command currently performs the following series of actions for every Nevermore (currently only 1):
 
@@ -799,10 +824,11 @@ This command currently performs the following series of actions for every Neverm
 
 Command:
 ```
-NEVERMORE_STATUS NEVERMORE=<name>
+NEVERMORE_STATUS [NEVERMORE=<name>]
 ```
 
-Prints the Nevermore's current status to the console.
+Prints the Nevermores' current status to the console.
+Lists all Nevermores unless a specific one is named using`NEVERMORE=`.
 Not terribly useful for most things, but helpful if you're not sure it's connected
 yet. (e.g. when used with `connection_initial_timeout: 0`)
 
@@ -810,10 +836,11 @@ yet. (e.g. when used with `connection_initial_timeout: 0`)
 
 Command:
 ```
-NEVERMORE_REBOOT NEVERMORE=<name>
+NEVERMORE_REBOOT [NEVERMORE=<name>]
 ```
 
-Reboots the Nevermore, if connected. Persistent settings will be saved.
+Reboots Nevermores, if connected. Persistent settings will be saved.
+Applies to all Nevermores unless a specific one is named using`NEVERMORE=`.
 
 Probably easier than power cycling your whole printer.
 
@@ -824,11 +851,12 @@ WARNING: *This command should not be used unless directed by Someone Who Knows W
 
 Command:
 ```
-NEVERMORE_RESET NEVERMORE=<name> FLAGS=<int>
+NEVERMORE_RESET FLAGS=<int> [NEVERMORE=<name>]
 ```
 
 Resets persistent settings to defaults.
 It is deliberately under-documented to dissuade causal use.
+Applies to all Nevermores unless a specific one is named using`NEVERMORE=`.
 
 Policy settings can can be reset to default using `FLAGS=2`.
 
@@ -837,11 +865,12 @@ Policy settings can can be reset to default using `FLAGS=2`.
 
 Command:
 ```
-NEVERMORE_VOC_CALIBRATION NEVERMORE=<name> ENABLED={0, 1}
+NEVERMORE_VOC_CALIBRATION ENABLED={0, 1} [NEVERMORE=<name>]
 ```
 
 Enables/disables the VOC sensor calibration.
 *Sensor calibration should be enabled whenever the printer isn't printing.*
+Applies to all Nevermores unless a specific one is named using`NEVERMORE=`.
 
 Sensor calibration should *only* be disabled when the printer is printing. Doing
 this prevents the VOC sensor from mistaking low VOC emissions for sensor drift
@@ -857,10 +886,11 @@ VOC sensor calibration is always enabled when the controller powers on.
 
 Command:
 ```
-NEVERMORE_VOC_GATING_THRESHOLD_OVERRIDE NEVERMORE=<name> [THRESHOLD=<int \in [175, 500]>]
+NEVERMORE_VOC_GATING_THRESHOLD_OVERRIDE [NEVERMORE=<name>] [THRESHOLD=<int \in [175, 500]>]
 ```
 
 Overrides the VOC gating threshold (see `voc_gating_threshold` in the klipper config). Omit the `THRESHOLD` parameter to clear any existing override.
+Applies to all Nevermores unless a specific one is named using`NEVERMORE=`.
 
 This is intended for setups where the slicer specifies the filament type using a user-defined G-Code macro (e.g. `SET_MATERIAL ABS`), and you would like to temporarily set the VOC gating threshold for a specific material/filament.
 
@@ -871,11 +901,12 @@ Unlike the `voc_gating_threshold`, this is setting is *not* persisted and will b
 
 Command:
 ```
-NEVERMORE_SENSOR_CALIBRATION_CHECKPOINT NEVERMORE=<name>
+NEVERMORE_SENSOR_CALIBRATION_CHECKPOINT [NEVERMORE=<name>]
 ```
 
 Force sensors to checkpoint their calibration.
 The checkpoints will be persisted after a brief delay (under 20 seconds).
+Applies to all Nevermores unless a specific one is named using`NEVERMORE=`.
 
 Useful if you must save the current calibration immediately instead of waiting
 for the usual 24h periodic checkpoint.
@@ -886,10 +917,11 @@ e.g. xref:doc/voc.adoc#baseline-calibration[After a short baseline calibration.]
 
 Command:
 ```
-NEVERMORE_SENSOR_CALIBRATION_RESET NEVERMORE=<name>
+NEVERMORE_SENSOR_CALIBRATION_RESET [NEVERMORE=<name>]
 ```
 
 Resets the sensor calibrations. Does not immediately persist this reset calibration, but it will eventually be applied when the checkpoint process triggers.
+Applies to all Nevermores unless a specific one is named using`NEVERMORE=`.
 
 Useful when moving the printer to a new environment.
 
