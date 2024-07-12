@@ -299,6 +299,15 @@ async def software_revision(client: BleakClient):
         return revision
 
 
+async def reset_setting_defaults(client: BleakClient):
+    char_reset = client.services.get_characteristic(UUID_CHAR_CONFIG_RESET)
+    if char_reset is None:
+        logging.error("device does not have a char reset characteristic")
+        return
+
+    await client.write_gatt_char(char_reset, (1 << 1).to_bytes(byteorder='little'))
+
+
 async def reboot_into_ota_mode(client: BleakClient):
     char_reboot = client.services.get_characteristic(UUID_CHAR_CONFIG_REBOOT)
     if char_reboot is None:
@@ -487,11 +496,11 @@ async def _update_via_bt_spp(args: CmdLnArgs):
             )
 
 
-async def _report_new_version(args: CmdLnArgs, prev_version: str):
+async def _post_update_actions_interactive(args: CmdLnArgs, prev_version: str):
     if args.bt_address is None:
         return
 
-    print(f"connecting to {args.bt_address} to get installed version")
+    print(f"connecting to {args.bt_address} for post-upgrade actions...")
     print("(this may take longer than usual)")
     print(
         "NOTE: Ignore logged exceptions about `A message handler raised an exception: 'org.bluez.Device1'` or `org.bluez.GattService1`."
@@ -505,19 +514,30 @@ async def _report_new_version(args: CmdLnArgs, prev_version: str):
         print(f"previous version: {prev_version}")
         print(f" current version: {curr_version}")
 
+        if input_yes_no(
+            args,
+            True,
+            "Would you like to apply any default setting changes? (Recommended!)\n"
+            + "(Anything specified by your Klipper config will be re-applied afterwards.)",
+        ):
+            print("appling new defaults for settings...")
+            await reset_setting_defaults(client)
+
     await retry_if_disconnected(args.bt_address, go, connection_timeout=None)
 
 
-def input_yes_no(args: CmdLnArgs, default: _A, msg: str) -> Union[_A, bool]:
+def input_yes_no(args: CmdLnArgs, default: bool, msg: str) -> bool:
     if args.unattended:
         return default
 
     while True:
-        response = input(f"{msg} (y/n)")
+        response = input(f"{msg} ({'Y/n' if default else 'y/N'})")
         if response == "y":
             return True
         if response == "n":
             return False
+        if response == "":
+            return default
 
 
 def address_2_board_cache_load() -> Dict[str, str]:
@@ -656,7 +676,7 @@ async def main(args: CmdLnArgs) -> int:
             print("You may safely abort if the following steps take too long [ctrl-c].")
             print(f"waiting for device to reboot ({REBOOT_DELAY} seconds)...")
             await asyncio.sleep(REBOOT_DELAY)
-            await _report_new_version(args, prev_version)
+            await _post_update_actions_interactive(args, prev_version)
     except asyncio.exceptions.CancelledError:
         pass
     except KeyboardInterrupt:
