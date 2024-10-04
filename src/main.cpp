@@ -51,7 +51,7 @@ bool stdio_usb_connected();
 
 namespace {
 
-constexpr auto WATCHDOG_TIMEOUT = 1000ms;
+constexpr auto WATCHDOG_TIMEOUT = 3000ms;
 
 // Leave pins {0, 1} set to UART TX/RX.
 // Clear everything else.
