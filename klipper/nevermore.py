@@ -931,9 +931,7 @@ class Nevermore:
             for c in colour_order
         ]
         self.led_colour_data = bytearray(len(self.led_colour_idxs))
-        self.led_helper: LEDHelper = self.printer.load_object(
-            config, "led"
-        ).setup_helper(config, self._led_update, led_chain_count)
+        self.led_helper = LEDHelper(config, self._led_update, led_chain_count)
 
         def opt(mk: Callable[[_A], _B], x: Optional[_A]):
             return mk(x) if x is not None else None
