@@ -200,10 +200,7 @@ struct [[gnu::packed]] Pins {
             if (!apply(bus.recv)) return false;
         }
 
-        for (auto&& x : fan_pwm)
-            if (!go(x)) return false;
-
-        // if (!apply(fan_pwm)) return false;
+        if (!apply(fan_pwm)) return false;
         if (!apply(fan_tachometer)) return false;
         if (!apply(neopixel_data)) return false;
         if (!apply(photocatalytic_pwm)) return false;
