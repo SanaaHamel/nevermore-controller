@@ -228,18 +228,17 @@ previous version: v0.7.0  # whatever version was installed
 ```
 
 [#usb-console-minicom]
-== Getting Console Logs Via USB
+== Getting Console Logs Via USB / UART
 
-WARNING: **Disconnect the controller from the printer's power supply before connecting via USB unless you're plugging into the printer's Raspberry Pi.** You can damage things if you connect the Pico via USB to a computer that isn't using the printer's power supply.
+If you run into any problems that look hardware related, you can plug the controller via USB or use UART (pins 0, 1) to get logs.
+In rare cases USB output might not work, but UART always should. If you have a debug build, this will also work in bootloader mode.
 
-NOTE: It is safe to plug the Pico via USB into the printer's Raspberry Pi (or equivalent) because they share the same power supply.
+WARNING: When using UART, always connect a shared ground pin between your UART adapter and the Pico _before_ connecting the UART pins. Failure to have a shared 0v can result in hardware damage.
 
-NOTE: You can do all of this using the UART pins (0, 1) instead of USB if you have a UART adapter. In rare cases USB output might not work, but UART always should.
+The following assume you're on Linux (you can use your printer's Raspberry Pi) and using USB. Using UART should be identical, just use the UART adapter's serial device instead of the Nevermore directly.
 
-If you run into any problems that look hardware related, you can plug the controller via USB to get logs. If you have a debug build, this will also work in bootloader mode. The following assume you're on Linux (you can use your printer's Raspberry Pi).
-
-. **Disconnect the controller from the printer's power supply if you are _not_ connecting to the printer's Raspberry Pi.**
-See the big warning above that you ignored.
+. **If you're using UART instead of USB then connect a shared ground pin before doing anything else.**
+See the big note/warning above that you ignored.
 
 . Plug in the controller using a USB cable.
 +
@@ -263,7 +262,7 @@ Press CTRL-A Z for help on special keys
 . Restart the controller using one of the following:
 .. Use the reset button (if your board has one).
 .. Reboot it via `<<NEVERMORE_REBOOT>>` or directly via BLE.
-.. Unplug the controller and plug it back in.
+.. Unplug the controller and plug it back in (assuming it is powered by USB only).
 
 . The `minicom` session should now look like this:
 ```
