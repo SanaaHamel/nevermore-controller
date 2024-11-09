@@ -131,9 +131,11 @@ gcode:
 
 .. Add `<<NEVERMORE_PRINT_END>>` to your `TURN_OFF_HEATERS` macro.
 +
-WARNING: This assumes your `print_end` macro calls `TURN_OFF_HEATERS`. If it doesn't you'll want to put `<<NEVERMORE_PRINT_END>>` in your `print_end` macro instead.
+WARNING: This assumes your `print_end` macro calls `TURN_OFF_HEATERS`. If it doesn't then you're doing something weird and potentially dangerous.
 +
-Easiest way would be to put this macro wrapper in your config:footnote:[Wherever you'd like.`TURN_OFF_HEATERS` is a built-in macro, and should never be overridden w/o calling the replaced macro, so it doesn't matter if another macro ends up wrapping this wrapper.]
+WARNING: Do *not* put it directly in your `print_end` macro, otherwise it won't trigger on exceptional circumstances (e.g. aborts, errors, cancels).
++
+Put this macro wrapper in your config:footnote:[Wherever you'd like.`TURN_OFF_HEATERS` is a built-in macro, and should never be overridden w/o calling the replaced macro, so it doesn't matter if another macro ends up wrapping this wrapper.]
 +
 ```ini
 # ASSUME: Your `print_end` macro calls `TURN_OFF_HEATERS`.
