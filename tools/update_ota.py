@@ -579,12 +579,13 @@ def guess_board(args: CmdLnArgs) -> Optional[str]:
             return board
 
     if args.unattended:
-        logging.error("unattended and unable to guess board")
+        logging.error("unattended and unable to guess board type")
         return None
 
-    print("Unable to connect to nevermore to query board. Please specify board.")
+    print("Failed to determine automatically board type.")
+    print("Please specify board type. e.g. pico_w")
     while True:
-        board = input("Board: ").strip()
+        board = input("Board type: ").strip()
         if board != "":
             return board
 
