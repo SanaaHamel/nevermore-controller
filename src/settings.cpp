@@ -1,6 +1,7 @@
 #include "settings.hpp"
 #include "FreeRTOS.h"  // IWYU pragma: keep
 #include "config.hpp"
+#include "led_status.hpp"
 #include "pico/flash.h"
 #include "sdk/ble_data_types.hpp"
 #include "semphr.h"  // IWYU pragma: keep [doesn't notice `SemaphoreHandle_t`]
@@ -360,6 +361,10 @@ void save(SettingsPersisted& settings) {
     //      reduce the # of flashes.
     // NOLINTNEXTLINE(bugprone-suspicious-memory-comparison)
     if (memcmp(g_active_slot, &settings, sizeof(SettingsPersisted)) == 0) return;
+
+    if (reinterpret_cast<SettingsPersisted const*>(g_active_slot.load())->voc_calibration !=
+            settings.voc_calibration)
+        led_status::voc_calibration_mark_saved();
 
     SaveParams args{
             .slot_src = g_active_slot,

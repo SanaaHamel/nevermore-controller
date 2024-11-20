@@ -6,6 +6,7 @@
 #include "hardware/adc.h"
 #include "hardware/gpio.h"
 #include "hardware/watchdog.h"
+#include "led_status.hpp"
 #include "pico.h"  // IWYU pragma: keep for transitive includes (e.g. board)
 #include "pico/stdio.h"
 #include "pico/time.h"
@@ -53,6 +54,7 @@ bool stdio_usb_connected();
 namespace {
 
 constexpr auto WATCHDOG_TIMEOUT = 3000ms;
+constexpr auto LED_UPDATE_PERIOD = 100ms;
 
 // Leave pins {0, 1} set to UART TX/RX.
 // Clear everything else.
@@ -151,24 +153,8 @@ void startup() {
     // Calling it from a BT timer seems to solve the problem. IDK why, but I'm not
     // paid to find out and I've already wasted an afternoon on this.
     static btstack_timer_source_t led_timer{.process = [](btstack_timer_source_t* timer) {
-        static bool led_on = false;
-        led_on = !led_on;
-
-#if defined(PICO_DEFAULT_LED_PIN)
-        gpio_put(PICO_DEFAULT_LED_PIN, led_on);
-#elif defined(PICO_DEFAULT_WS2812_PIN)
-        // FUTURE WORK: implement WS2812 LED
-#elif defined(CYW43_WL_GPIO_LED_PIN)
-        // HACK:  `cyw43_arch_gpio_put` w/o having the HCI powered on
-        //        kills the timer task when it enters `cyw43_ensure_up`.
-        //        Root cause unknown. This hack should be benign since
-        //        Pico W is typically built w/ BT enabled.
-        if constexpr (NEVERMORE_PICO_W_BT) {
-            cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, led_on);
-        }
-#endif
-
-        btstack_run_loop_set_timer(timer, SENSOR_UPDATE_PERIOD / 1ms);
+        led_status::update();
+        btstack_run_loop_set_timer(timer, LED_UPDATE_PERIOD / 1ms);
         btstack_run_loop_add_timer(timer);
     }};
     led_timer.process(&led_timer);

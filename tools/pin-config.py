@@ -235,7 +235,8 @@ class Pins(DataclassMixin, DataClassJsonMixin):
     display_brightness_pwm: GPIO = csfield_gpio()
     touch_interrupt: GPIO = csfield_gpio()
     touch_reset: GPIO = csfield_gpio()
-    _pad_tail: Padding = csfield_pad(32 + 3)
+    led_status_voc_calibration: GPIO = csfield_gpio()
+    _pad_tail: Padding = csfield_pad(32 + 2)
 
     def to_json_pretty(self):
         def transform(x: Any) -> Any:

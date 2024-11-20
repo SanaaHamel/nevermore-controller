@@ -168,9 +168,11 @@ struct [[gnu::packed]] Pins {
     GPIO touch_interrupt;
     GPIO touch_reset;
 
+    GPIO led_status_voc_calibration;
+
     // HACK: reserve for future expansion w/o disturbing peers in setting struct
     // +3 bytes since it's included with padding
-    std::array<uint8_t, 35> unused_spare_space{};
+    std::array<uint8_t, 34> unused_spare_space{};
 
     constexpr void validate_or_throw() const;
 
@@ -210,6 +212,8 @@ struct [[gnu::packed]] Pins {
         if (!apply(display_reset)) return false;
         if (!apply(touch_interrupt)) return false;
         if (!apply(touch_reset)) return false;
+
+        if (!apply(led_status_voc_calibration)) return false;
 
         return true;
     }

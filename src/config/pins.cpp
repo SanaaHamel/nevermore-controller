@@ -145,6 +145,8 @@ bool Pins::apply() const {
     // FUTURE WORK: implement WS2812 LED
 #endif
 
+    bind_logical(led_status_voc_calibration, GPIO_OUT);
+
 #ifndef NDEBUG
     if (auto pin = square_wave_pwm_first_available_pin())
         square_wave_pwm_init(pin, 30);
