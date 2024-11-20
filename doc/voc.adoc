@@ -48,7 +48,7 @@ Each sensor independently establishes a baseline. **This baseline is expected ra
 
 If there is no saved baseline available then the controller will quickly adjust the baseline to match current conditions during the first 4 hours of operation. After that initial period, the baseline is slowly adjusted to match current conditions unless current conditions are significantly dirtier than the baseline. (See `voc_gating_threshold` in the xref:../README.adoc#klipper-config-full[main documentation].)
 
-This learning behaviour is show in <<voc-raw-signal-baseline>>, where two SGP40s are placed an idle enclosed printer for a period of 80 hours. The green/blue line are the intake/exhaust values, the dashed lines represent the learned baseline mean, and the other faint lines represent the learned expected variation bounds. (Note that the sensors were reset early on, hence the sudden constriction in the variance bounds.)
+This learning behaviour is shown in <<voc-raw-signal-baseline>>, where two SGP40s are placed an idle enclosed printer for a period of 80 hours. The green/blue line are the intake/exhaust values, the dashed lines represent the learned baseline mean, and the other faint lines represent the learned expected variation bounds. (Note that the sensors were reset early on, hence the sudden constriction in the variance bounds.)
 
 Of note:
 
@@ -119,7 +119,7 @@ You can also use the Klipper command `NEVERMORE_SENSOR_CALIBRATION_CHECKPOINT` (
 
 === Hints & Tips
 
-* Wash you printer if there's any smell.
+* Wash your printer if there's any smell.
 +
 There's no point calibrating a baseline if it's dirty and off gassing.
 Use hot water & soap to scrub the panels, enclosures, print sheets, beds, etc.
