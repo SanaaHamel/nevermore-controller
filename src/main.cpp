@@ -143,7 +143,14 @@ void startup() {
     if (!display::init_with_ui()) return;
     if (!sensors::init()) return;
 
-    mk_timer("led-blink", SENSOR_UPDATE_PERIOD)([](TimerHandle_t) {
+    // HACK: Why the hell is this a BT timer instead of a FreeRTOS timer?
+    // Because apparently you can't safely call `cyw43_arch_gpio_put` from a
+    // FreeRTOS timer without risking a deadlock. Why? IDK, that API calls
+    // `CYW43_THREAD_{ENTER/EXIT}` but apparently that's not enough to keep the
+    // peace.
+    // Calling it from a BT timer seems to solve the problem. IDK why, but I'm not
+    // paid to find out and I've already wasted an afternoon on this.
+    static btstack_timer_source_t led_timer{.process = [](btstack_timer_source_t* timer) {
         static bool led_on = false;
         led_on = !led_on;
 
@@ -160,7 +167,11 @@ void startup() {
             cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, led_on);
         }
 #endif
-    });
+
+        btstack_run_loop_set_timer(timer, SENSOR_UPDATE_PERIOD / 1ms);
+        btstack_run_loop_add_timer(timer);
+    }};
+    led_timer.process(&led_timer);
 
     if constexpr (NEVERMORE_PICO_W_BT) {
         mk_task("bluetooth", Priority::Communication, 1024)(btstack_run_loop_execute).release();
