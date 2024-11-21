@@ -4,6 +4,7 @@
 #include "bluetooth.h"
 #include "btstack_config.h"
 #include "btstack_defines.h"
+#include "btstack_run_loop.h"
 #include "hci.h"
 #include "sdk/btstack.hpp"  // IWYU pragma: keep [doesn't find overloads]
 #include <algorithm>
@@ -104,10 +105,16 @@ private:
     }
 };
 
+// Unless otherwise noted this can only be used by the btstack task.
+// NB: This object is PINNED.
 template <void (*Handler)(hci_con_handle_t)>
 struct NotifyState {
     static_assert(Handler != nullptr);
     std::array<btstack_context_callback_registration_t, MAX_NR_HCI_CONNECTIONS> callbacks{};
+    btstack_context_callback_registration_t notify_callback{
+            .callback = [](void* ctx) { reinterpret_cast<NotifyState<Handler>*>(ctx)->notify_dispatch(); },
+            .context = this,
+    };
 
     NotifyState() {
         for (auto& cb : callbacks) {
@@ -153,10 +160,9 @@ struct NotifyState {
         return false;
     }
 
+    // can be invoked by other tasks
     void notify() {
-        for (auto&& cb : callbacks)
-            if (uintptr_t(cb.context) != HCI_CON_HANDLE_INVALID)
-                att_server_request_to_send_notification(&cb, hci_con_handle_t(uintptr_t(cb.context)));
+        btstack_run_loop_execute_on_main_thread(&notify_callback);
     }
 
     [[nodiscard]] uint16_t client_configuration(hci_con_handle_t conn) const {
@@ -174,6 +180,13 @@ struct NotifyState {
             unregister(conn);
 
         return 0;
+    }
+
+private:
+    void notify_dispatch() {
+        for (auto&& cb : callbacks)
+            if (uintptr_t(cb.context) != HCI_CON_HANDLE_INVALID)
+                att_server_request_to_send_notification(&cb, hci_con_handle_t(uintptr_t(cb.context)));
     }
 };
 
