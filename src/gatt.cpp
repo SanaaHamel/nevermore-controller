@@ -10,6 +10,7 @@
 #include "gatt/fan.hpp"
 #include "gatt/handler_helpers.hpp"
 #include "gatt/photocatalytic.hpp"
+#include "gatt/servo.hpp"
 #include "gatt/ws2812.hpp"
 #include "hci_dump.h"
 #include "l2cap.h"
@@ -72,6 +73,7 @@ void hci_handler(uint8_t packet_type, [[maybe_unused]] uint16_t channel, uint8_t
         environmental::disconnected(conn);
         fan::disconnected(conn);
         photocatalytic::disconnected(conn);
+        servo::disconnected(conn);
         ws2812::disconnected(conn);
     } break;
     }
@@ -85,6 +87,7 @@ uint16_t attr_read(
             environmental::attr_read,
             fan::attr_read,
             photocatalytic::attr_read,
+            servo::attr_read,
             ws2812::attr_read,
     };
     for (auto handler : HANDLERS)
@@ -115,6 +118,7 @@ int attr_write(hci_con_handle_t conn, uint16_t attr, uint16_t transaction_mode, 
             environmental::attr_write,
             fan::attr_write,
             photocatalytic::attr_write,
+            servo::attr_write,
             ws2812::attr_write,
     };
 
@@ -147,6 +151,7 @@ bool init() {
     if (!environmental::init()) return false;
     if (!fan::init()) return false;
     if (!photocatalytic::init()) return false;
+    if (!servo::init()) return false;
     if (!ws2812::init()) return false;
 
     if constexpr (NEVERMORE_PICO_W_BT) {

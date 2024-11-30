@@ -157,10 +157,13 @@ struct [[gnu::packed]] Pins {
     BusI2C i2c[ALTERNATIVES_MAX]{};
     BusSPI spi[ALTERNATIVES_MAX]{};
 
-    GPIOs fan_pwm{};             // mirrored
-    GPIOs fan_tachometer{};      // summed in SW
-    GPIOs neopixel_data{};       // reserve space, but disallow multiple pins
-    GPIOs photocatalytic_pwm{};  // mirrored
+    GPIOs fan_pwm{};         // mirrored
+    GPIOs fan_tachometer{};  // summed in SW
+    GPIOs neopixel_data{};   // reserve space, but disallow multiple pins
+    GPIO photocatalytic_pwm;
+    GPIO vent_servo_pwm;
+    // photocatalytic used to allow multiple pins, but that's excessively wasteful.
+    std::array<uint8_t, 6> unused_spare_space_2{};
 
     GPIO display_command;
     GPIO display_reset;
@@ -176,11 +179,18 @@ struct [[gnu::packed]] Pins {
 
     constexpr void validate_or_throw() const;
 
-    constexpr void foreach_pwm_function(auto&& go) const {
+    constexpr void foreach_pwm_function(auto&& go_outer) const {
+        auto go = [&](auto&& xs, bool allow_sharing = false) {
+            if constexpr (std::is_same_v<std::decay_t<decltype(xs)>, GPIO>)
+                // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+                go_outer(std::span{&xs, &xs + 1}, true);
+            else
+                go_outer(xs, allow_sharing);
+        };
         go(fan_pwm, true);
-        go(photocatalytic_pwm, true);
-        // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic)
-        go(std::span{&display_brightness_pwm, &display_brightness_pwm + 1}, true);
+        go(photocatalytic_pwm);
+        go(vent_servo_pwm);
+        go(display_brightness_pwm);
     }
 
     [[nodiscard]] constexpr bool pins_forall(auto&& go) const {
@@ -206,6 +216,7 @@ struct [[gnu::packed]] Pins {
         if (!apply(fan_tachometer)) return false;
         if (!apply(neopixel_data)) return false;
         if (!apply(photocatalytic_pwm)) return false;
+        if (!apply(vent_servo_pwm)) return false;
 
         if (!apply(display_brightness_pwm)) return false;
         if (!apply(display_command)) return false;
