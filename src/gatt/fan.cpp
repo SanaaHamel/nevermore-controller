@@ -40,7 +40,7 @@ BLE_DECL_SCALAR(RPM16, uint16_t, 1, 0, 0);
 constexpr uint8_t FAN_POLICY_UPDATE_RATE_HZ = 10;
 
 constexpr uint8_t TACHOMETER_PULSE_PER_REVOLUTION = 2;
-constexpr uint32_t FAN_PWN_HZ = 25'000;
+constexpr uint32_t FAN_PWM_HZ = 25'000;
 
 BLE::Percentage8 g_fan_power = 0;
 BLE::Percentage8 g_fan_power_override;  // not-known -> automatic control
@@ -122,7 +122,7 @@ bool init() {
         if (!pin) continue;
 
         auto cfg = pwm_get_default_config();
-        pwm_config_set_freq_hz(cfg, FAN_PWN_HZ);
+        pwm_config_set_freq_hz(cfg, FAN_PWM_HZ);
         pwm_init(pwm_gpio_to_slice_num_(pin), &cfg, true);
     }
 
