@@ -1,4 +1,5 @@
 #include "photocatalytic.hpp"
+#include "characteristic_ids.hpp"
 #include "config/pins.hpp"
 #include "handler_helpers.hpp"
 #include "nevermore.h"
@@ -8,9 +9,6 @@
 #include <limits>
 
 using namespace std;
-
-#define PC_POWER 2B04_07
-#define PC_POWER_OVERRIDE 2B04_08
 
 namespace nevermore::gatt::photocatalytic {
 
@@ -55,11 +53,11 @@ void disconnected(hci_con_handle_t) {}
 optional<uint16_t> attr_read(
         hci_con_handle_t conn, uint16_t att_handle, uint16_t offset, uint8_t* buffer, uint16_t buffer_size) {
     switch (att_handle) {
-        USER_DESCRIBE(PC_POWER, "Photocatalytic %")
-        USER_DESCRIBE(PC_POWER_OVERRIDE, "Photocatalytic % - Override")
+        USER_DESCRIBE(PHOTOCATALYTIC_POWER, "Photocatalytic %")
+        USER_DESCRIBE(PHOTOCATALYTIC_POWER_OVERRIDE, "Photocatalytic % - Override")
 
-        READ_VALUE(PC_POWER, g_power_override.or_(0))
-        READ_VALUE(PC_POWER_OVERRIDE, g_power_override)
+        READ_VALUE(PHOTOCATALYTIC_POWER, g_power_override.or_(0))
+        READ_VALUE(PHOTOCATALYTIC_POWER_OVERRIDE, g_power_override)
 
     default: return {};
     }
@@ -71,7 +69,7 @@ optional<int> attr_write(hci_con_handle_t conn, uint16_t att_handle, uint16_t of
     WriteConsumer consume{offset, buffer, buffer_size};
 
     switch (att_handle) {
-    case HANDLE_ATTR(PC_POWER_OVERRIDE, VALUE): {
+    case HANDLE_ATTR(PHOTOCATALYTIC_POWER_OVERRIDE, VALUE): {
         pc_power_override((BLE::Percentage8)consume);
         return 0;
     }

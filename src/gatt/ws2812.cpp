@@ -1,5 +1,6 @@
 #include "ws2812.hpp"
 #include "../ws2812.hpp"
+#include "characteristic_ids.hpp"
 #include "handler_helpers.hpp"
 #include "nevermore.h"
 #include "sdk/ble_data_types.hpp"
@@ -19,11 +20,6 @@ using namespace std;
 
 using namespace std::literals::chrono_literals;
 #endif
-
-#define WS2812_UPDATE_SPAN_UUID 5d91b6ce_7db1_4e06_b8cb_d75e7dd49aae
-
-#define WS2812_UPDATE_SPAN_01 5d91b6ce_7db1_4e06_b8cb_d75e7dd49aae_01
-#define WS2812_TOTAL_COMPONENTS_01 2AEA_01
 
 namespace nevermore::gatt::ws2812 {
 
@@ -69,10 +65,10 @@ void disconnected(hci_con_handle_t) {}
 optional<uint16_t> attr_read(
         hci_con_handle_t, uint16_t att_handle, uint16_t offset, uint8_t* buffer, uint16_t buffer_size) {
     switch (att_handle) {
-        USER_DESCRIBE(WS2812_TOTAL_COMPONENTS_01, "Total # of components (i.e. octets) in the WS2812 chain.")
-        USER_DESCRIBE(WS2812_UPDATE_SPAN_01, "Update a span of the WS2812 chain.")
+        USER_DESCRIBE(WS2812_TOTAL_COMPONENTS, "Total # of components (i.e. octets) in the WS2812 chain.")
+        USER_DESCRIBE(WS2812_UPDATE_SPAN, "Update a span of the WS2812 chain.")
 
-        READ_VALUE(WS2812_TOTAL_COMPONENTS_01, ([]() -> uint16_t {
+        READ_VALUE(WS2812_TOTAL_COMPONENTS, ([]() -> uint16_t {
             // -1 because 0xFFFF is reserved as not-known for a BLE::Count16
             return min<size_t>(nevermore::ws2812::components_total(), UINT16_MAX - 1);
         })())
@@ -87,7 +83,7 @@ optional<int> attr_write(
     WriteConsumer consume{offset, buffer, buffer_size};
 
     switch (att_handle) {
-    case HANDLE_ATTR(WS2812_TOTAL_COMPONENTS_01, VALUE): {
+    case HANDLE_ATTR(WS2812_TOTAL_COMPONENTS, VALUE): {
         BLE::Count16 count = consume;
         if (count == BLE::NOT_KNOWN) return ATT_ERROR_VALUE_NOT_ALLOWED;
         if (!nevermore::ws2812::setup(size_t(double(count)))) return ATT_ERROR_VALUE_NOT_ALLOWED;
@@ -95,7 +91,7 @@ optional<int> attr_write(
         return 0;
     }
 
-    case HANDLE_ATTR(WS2812_UPDATE_SPAN_01, VALUE): {
+    case HANDLE_ATTR(WS2812_UPDATE_SPAN, VALUE): {
         DBG_update_rate_log();
 
         UpdateSpanHeader header = consume;

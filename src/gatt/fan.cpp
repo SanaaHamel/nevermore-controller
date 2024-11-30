@@ -1,4 +1,5 @@
 #include "fan.hpp"
+#include "characteristic_ids.hpp"
 #include "config.hpp"
 #include "handler_helpers.hpp"
 #include "nevermore.h"
@@ -15,21 +16,6 @@
 #include <limits>
 
 using namespace std;
-
-#define FAN_POWER 2B04_01
-#define FAN_POWER_OVERRIDE 2B04_02
-#define FAN_POWER_PASSIVE 2B04_03
-#define FAN_POWER_AUTOMATIC 2B04_04
-#define FAN_POWER_COEFFICIENT 2B04_05
-#define FAN_POWER_THERMAL_LIMIT 45d2e7d7_40c4_46a6_a160_43eb02d01e27_01
-#define TACHOMETER 03f61fe0_9fe7_4516_98e6_056de551687f_01
-#define FAN_POWER_TACHO_AGGREGATE 79cd747f_91af_49a6_95b2_5b597c683129_01
-// NB: Error prone, but we're the 2nd aggregation char instance in the DB
-#define FAN_AGGREGATE 75134bec_dd06_49b1_bac2_c15e05fd7199_02
-
-#define FAN_POLICY_COOLDOWN 2B16_01
-#define FAN_POLICY_VOC_PASSIVE_MAX 216aa791_97d0_46ac_8752_60bbc00611e1_03
-#define FAN_POLICY_VOC_IMPROVE_MIN 216aa791_97d0_46ac_8752_60bbc00611e1_04
 
 namespace nevermore::gatt::fan {
 
@@ -173,7 +159,7 @@ optional<uint16_t> attr_read(
         USER_DESCRIBE(FAN_POWER_PASSIVE, "Fan % - Passive")
         USER_DESCRIBE(FAN_POWER_AUTOMATIC, "Fan % - Automatic")
         USER_DESCRIBE(FAN_POWER_COEFFICIENT, "Fan % - Limiting Coefficient")
-        USER_DESCRIBE(TACHOMETER, "Fan RPM")
+        USER_DESCRIBE(FAN_TACHOMETER, "Fan RPM")
         USER_DESCRIBE(FAN_POWER_TACHO_AGGREGATE, "Aggregated Fan % and RPM")
         USER_DESCRIBE(FAN_AGGREGATE, "Aggregated Service Data")
 
@@ -187,7 +173,7 @@ optional<uint16_t> attr_read(
         READ_VALUE(FAN_POWER_PASSIVE, settings::g_active.fan_power_passive)
         READ_VALUE(FAN_POWER_AUTOMATIC, settings::g_active.fan_power_automatic)
         READ_VALUE(FAN_POWER_COEFFICIENT, settings::g_active.fan_power_coefficient)
-        READ_VALUE(TACHOMETER, FanPowerTachoAggregate{}.tachometer)
+        READ_VALUE(FAN_TACHOMETER, FanPowerTachoAggregate{}.tachometer)
         READ_VALUE(FAN_POWER_TACHO_AGGREGATE, FanPowerTachoAggregate{})
         READ_VALUE(FAN_AGGREGATE, Aggregate{});  // default init populate from global state
 

@@ -1,4 +1,5 @@
 #include "environmental.hpp"
+#include "characteristic_ids.hpp"
 #include "config.hpp"
 #include "handler_helpers.hpp"
 #include "nevermore.h"
@@ -9,15 +10,6 @@
 #include <cstdint>
 
 using namespace std;
-
-#define VOC_INDEX_UUID 216aa791_97d0_46ac_8752_60bbc00611e1
-#define ENV_AGGREGATE_UUID 75134bec_dd06_49b1_bac2_c15e05fd7199
-
-#define VOC_INDEX_01 216aa791_97d0_46ac_8752_60bbc00611e1_01
-#define VOC_INDEX_02 216aa791_97d0_46ac_8752_60bbc00611e1_02
-#define VOC_RAW_01 c3acb286_8071_427b_bbed_d64987373f23_01
-#define VOC_RAW_02 c3acb286_8071_427b_bbed_d64987373f23_02
-#define ENV_AGGREGATE_01 75134bec_dd06_49b1_bac2_c15e05fd7199_01
 
 namespace nevermore::gatt::environmental {
 
@@ -73,7 +65,7 @@ const BLE::ValidRange<nevermore::sensors::VOCIndex> VALID_RANGE_VOC_INDEX{.min =
 // NOLINTNEXTLINE(cppcoreguidelines-interfaces-global-init)
 auto g_notify_aggregate = NotifyState<[](hci_con_handle_t conn) {
     att_server_notify(
-            conn, HANDLE_ATTR(ENV_AGGREGATE_01, VALUE), nevermore::sensors::g_sensors.with_fallbacks());
+            conn, HANDLE_ATTR(ENV_AGGREGATE, VALUE), nevermore::sensors::g_sensors.with_fallbacks());
 }>();
 
 }  // namespace
@@ -110,11 +102,11 @@ optional<uint16_t> attr_read(
         USER_DESCRIBE(BT(HUMIDITY_02), "Exhaust Humidity")
         USER_DESCRIBE(BT(PRESSURE_01), "Intake Pressure")
         USER_DESCRIBE(BT(PRESSURE_02), "Exhaust Pressure")
-        USER_DESCRIBE(VOC_INDEX_01, "Intake VOC Index")
-        USER_DESCRIBE(VOC_INDEX_02, "Exhaust VOC Index")
-        USER_DESCRIBE(VOC_RAW_01, "Intake VOC Raw")
-        USER_DESCRIBE(VOC_RAW_02, "Exhaust VOC Raw")
-        USER_DESCRIBE(ENV_AGGREGATE_01, "Aggregated Service Data")
+        USER_DESCRIBE(ENV_VOC_INDEX_INTAKE, "Intake VOC Index")
+        USER_DESCRIBE(ENV_VOC_INDEX_EXHAUST, "Exhaust VOC Index")
+        USER_DESCRIBE(ENV_VOC_RAW_INTAKE, "Intake VOC Raw")
+        USER_DESCRIBE(ENV_VOC_RAW_EXHAUST, "Exhaust VOC Raw")
+        USER_DESCRIBE(ENV_AGGREGATE, "Aggregated Service Data")
 
         ESM_DESCRIBE(BT(TEMPERATURE_01), ESM_TEMPERATURE)
         ESM_DESCRIBE(BT(TEMPERATURE_02), ESM_TEMPERATURE)
@@ -123,13 +115,13 @@ optional<uint16_t> attr_read(
         ESM_DESCRIBE(BT(HUMIDITY_02), ESM_HUMIDITY)
         ESM_DESCRIBE(BT(PRESSURE_01), ESM_PRESSURE)
         ESM_DESCRIBE(BT(PRESSURE_02), ESM_PRESSURE)
-        ESM_DESCRIBE(VOC_INDEX_01, ESM_VOC_INDEX)
-        ESM_DESCRIBE(VOC_INDEX_02, ESM_VOC_INDEX)
-        ESM_DESCRIBE(VOC_RAW_01, ESM_VOC_RAW)
-        ESM_DESCRIBE(VOC_RAW_02, ESM_VOC_RAW)
+        ESM_DESCRIBE(ENV_VOC_INDEX_INTAKE, ESM_VOC_INDEX)
+        ESM_DESCRIBE(ENV_VOC_INDEX_EXHAUST, ESM_VOC_INDEX)
+        ESM_DESCRIBE(ENV_VOC_RAW_INTAKE, ESM_VOC_RAW)
+        ESM_DESCRIBE(ENV_VOC_RAW_EXHAUST, ESM_VOC_RAW)
 
-        HANDLE_READ_BLOB(VOC_INDEX_01, VALID_RANGE, VALID_RANGE_VOC_INDEX)
-        HANDLE_READ_BLOB(VOC_INDEX_02, VALID_RANGE, VALID_RANGE_VOC_INDEX)
+        HANDLE_READ_BLOB(ENV_VOC_INDEX_INTAKE, VALID_RANGE, VALID_RANGE_VOC_INDEX)
+        HANDLE_READ_BLOB(ENV_VOC_INDEX_EXHAUST, VALID_RANGE, VALID_RANGE_VOC_INDEX)
         // NOLINTEND(bugprone-branch-clone)
 
         READ_VALUE(BT(TEMPERATURE_01), sensors().temperature_intake)
@@ -139,13 +131,13 @@ optional<uint16_t> attr_read(
         READ_VALUE(BT(HUMIDITY_02), sensors().humidity_exhaust)
         READ_VALUE(BT(PRESSURE_01), sensors().pressure_intake)
         READ_VALUE(BT(PRESSURE_02), sensors().pressure_exhaust)
-        READ_VALUE(VOC_INDEX_01, sensors().voc_index_intake)
-        READ_VALUE(VOC_INDEX_02, sensors().voc_index_exhaust)
-        READ_VALUE(VOC_RAW_01, sensors().voc_raw_intake)
-        READ_VALUE(VOC_RAW_02, sensors().voc_raw_exhaust)
-        READ_VALUE(ENV_AGGREGATE_01, sensors())
+        READ_VALUE(ENV_VOC_INDEX_INTAKE, sensors().voc_index_intake)
+        READ_VALUE(ENV_VOC_INDEX_EXHAUST, sensors().voc_index_exhaust)
+        READ_VALUE(ENV_VOC_RAW_INTAKE, sensors().voc_raw_intake)
+        READ_VALUE(ENV_VOC_RAW_EXHAUST, sensors().voc_raw_exhaust)
+        READ_VALUE(ENV_AGGREGATE, sensors())
 
-        READ_CLIENT_CFG(ENV_AGGREGATE_01, g_notify_aggregate)
+        READ_CLIENT_CFG(ENV_AGGREGATE, g_notify_aggregate)
 
     default: return {};
     }
@@ -158,7 +150,7 @@ optional<int> attr_write(hci_con_handle_t conn, uint16_t att_handle, uint16_t of
     WriteConsumer consume{offset, buffer, buffer_size};
 
     switch (att_handle) {
-        WRITE_CLIENT_CFG(ENV_AGGREGATE_01, g_notify_aggregate)
+        WRITE_CLIENT_CFG(ENV_AGGREGATE, g_notify_aggregate)
 
     default: return {};
     }

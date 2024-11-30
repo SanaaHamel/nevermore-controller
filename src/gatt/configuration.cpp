@@ -1,4 +1,5 @@
 #include "configuration.hpp"
+#include "characteristic_ids.hpp"
 #include "handler_helpers.hpp"
 #include "nevermore.h"
 #include "picowota/reboot.h"
@@ -10,18 +11,6 @@
 #include <cstdio>
 
 using namespace std;
-
-#define CONFIG_REBOOT_01 f48a18bb_e03c_4583_8006_5b54422e2045_01
-#define CONFIG_FLAGS_01 d4b66bf4_3d8f_4746_b6a2_8a59d2eac3ce_01
-#define CONFIG_CHECKPOINT_SENSOR_CALIBRATION a84b00c0_7102_4cc6_a4ea_a65050502d3f_01
-#define CONFIG_RESET_SENSOR_CALIBRATION 75bf055c_02be_466f_8c7d_6ebc72078048_01
-#define CONFIG_RESET_SETTINGS f2810b13_8cd7_4d6f_bb1b_e276db7fadbf_01
-#define CONFIG_VOC_GATING_THRESHOLD 216aa791_97d0_46ac_8752_60bbc00611e1_05
-#define CONFIG_VOC_GATING_THRESHOLD_OVERRIDE 216aa791_97d0_46ac_8752_60bbc00611e1_06
-#define CONFIG_VOC_CALIBRATE_ENABLED ee786ac0_7700_47dd_b7de_9958f96303f2_01
-#define CONFIG_PINS_DEFAULT 5b1dc210_6a51_4cf9_bda7_085604199856_01
-#define CONFIG_PINS 2e9410cb_30fd_4b2c_8c95_934226a9ba29_01
-#define CONFIG_PINS_ERROR 0f6d7c4b_c30c_45b2_b32a_0e5b130429f0_01
 
 namespace nevermore::gatt::configuration {
 
@@ -63,8 +52,8 @@ void disconnected(hci_con_handle_t) {}
 optional<uint16_t> attr_read(
         hci_con_handle_t, uint16_t att_handle, uint16_t offset, uint8_t* buffer, uint16_t buffer_size) {
     switch (att_handle) {
-        USER_DESCRIBE(CONFIG_REBOOT_01, "Reboot")
-        USER_DESCRIBE(CONFIG_FLAGS_01, "Configuration Flags (bitset)")
+        USER_DESCRIBE(CONFIG_REBOOT, "Reboot")
+        USER_DESCRIBE(CONFIG_FLAGS, "Configuration Flags (bitset)")
         USER_DESCRIBE(CONFIG_RESET_SENSOR_CALIBRATION, "Reset sensor calibration")
         USER_DESCRIBE(CONFIG_RESET_SETTINGS, "Reset settings (bitset)")
         USER_DESCRIBE(CONFIG_VOC_GATING_THRESHOLD, "VOC Gating Threshold")
@@ -78,7 +67,7 @@ optional<uint16_t> attr_read(
         HANDLE_READ_BLOB(CONFIG_VOC_GATING_THRESHOLD, VALID_RANGE, VOC_GATING_THRESHOLD_RANGE)
         HANDLE_READ_BLOB(CONFIG_VOC_GATING_THRESHOLD_OVERRIDE, VALID_RANGE, VOC_GATING_THRESHOLD_RANGE)
 
-        READ_VALUE(CONFIG_FLAGS_01, ([]() -> uint16_t {
+        READ_VALUE(CONFIG_FLAGS, ([]() -> uint16_t {
             uint64_t flags = 0;
             for (size_t i = 0; i < FLAGS.size(); ++i)
                 flags |= uint64_t(*FLAGS.at(i)) << i;
@@ -105,14 +94,14 @@ optional<int> attr_write(
     WriteConsumer consume{offset, buffer, buffer_size};
 
     switch (att_handle) {
-    case HANDLE_ATTR(CONFIG_REBOOT_01, VALUE): {
+    case HANDLE_ATTR(CONFIG_REBOOT, VALUE): {
         switch (uint8_t(consume)) {
         case 0: reboot_delayed(false); return 0;
         case 1: reboot_delayed(true); return 0;
         default: return ATT_ERROR_VALUE_NOT_ALLOWED;
         }
     }
-    case HANDLE_ATTR(CONFIG_FLAGS_01, VALUE): {
+    case HANDLE_ATTR(CONFIG_FLAGS, VALUE): {
         uint64_t const flags = consume;
         uint64_t const mask = consume.or_default(std::numeric_limits<uint64_t>::max());
         for (size_t i = 0; i < FLAGS.size(); ++i)

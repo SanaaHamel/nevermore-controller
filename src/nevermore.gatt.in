@@ -28,6 +28,7 @@
 // uint16, PPB w/ resolution of 1, sadly we can't really use it since SGP40 gives us an arbitrary index in 0 to 500
 // #define ORG_BLUETOOTH_CHARACTERISTIC_VOC_CONCENTRATION 0x2BE7
 // #define ORG_BLUETOOTH_CHARACTERISTIC_PERCENTAGE_8 2B04
+// #define ORG_BLUETOOTH_CHARACTERISTIC_COUNT_16 2AEA
 
 PRIMARY_SERVICE, GAP_SERVICE
 CHARACTERISTIC, GAP_DEVICE_NAME, READ, "Nevermore Controller"
