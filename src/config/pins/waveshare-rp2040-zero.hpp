@@ -25,10 +25,11 @@ constexpr Pins PINS_DEFAULT{
                 Pins::BusSPI{.kind = Pins::BusSPI::Kind::display, .clock = 2, .send = 3, .recv = 4},
         },
 
-        .fan_pwm = {14},
-        .fan_tachometer = {13},
+        .fan_pwm = {15},
+        .fan_tachometer = {14},
         .neopixel_data = {12},
-        .photocatalytic_pwm = {10},
+        .photocatalytic_pwm = {11},
+        .vent_servo_pwm = 13,
 
         .display_command = 5,
         .display_reset = 6,

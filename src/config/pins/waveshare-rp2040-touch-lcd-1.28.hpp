@@ -41,6 +41,7 @@ constexpr Pins PINS_DEFAULT{
         .fan_tachometer = {27},
         .neopixel_data = {26},
         .photocatalytic_pwm = {},
+        .vent_servo_pwm = {},
 
         .display_command = WAVESHARE_RP2040_LCD_DC_PIN,
         .display_reset = 13,  // unlike non-touch which has it on 12

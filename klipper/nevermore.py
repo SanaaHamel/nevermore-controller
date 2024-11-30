@@ -15,7 +15,7 @@ import re
 import sys
 import threading
 import weakref
-from abc import abstractmethod
+from abc import ABCMeta, abstractmethod
 from dataclasses import dataclass
 from enum import Enum
 from threading import Thread
@@ -307,6 +307,56 @@ class CmdWs2812Length(Command):
 
     def params(self):
         return int(self.n_total_components).to_bytes(2, "little")
+
+
+@dataclass(frozen=True)
+class CmdServoRange(Command, metaclass=ABCMeta):
+    start: Optional[float]
+    end: Optional[float]
+
+    def params(self):
+        return (
+            BleAttrWriter()
+            .percentage16_10(None if self.start is None else self.start * 100)
+            .percentage16_10(None if self.end is None else self.end * 100)
+            .value
+        )
+
+
+class CmdServoPWM(Command, metaclass=ABCMeta):
+    percent: Optional[float]
+
+    def params(self):
+        return (
+            BleAttrWriter()
+            .percentage16_10(None if self.percent is None else self.percent * 100)
+            .value
+        )
+
+
+class CmdServoRangeFromCfg(CmdServoRange, metaclass=ABCMeta):
+    def __init__(self, prefix: str, config: ConfigWrapper) -> None:
+        def cfg(key: str, default: float) -> Optional[float]:
+            pulse_sec = config.getfloat(
+                f"{prefix}_{key}",
+                default=default,
+                above=0,
+                below=NEVERMORE_SERVO_PERIOD,
+            )
+            return pulse_sec / NEVERMORE_SERVO_PERIOD
+
+        super().__init__(cfg("pulse_width_min", 0.001), cfg("pulse_width_max", 0.002))
+
+
+class CmdServoVentRange(CmdServoRangeFromCfg):
+    def __init__(self, config: ConfigWrapper) -> None:
+        super().__init__("vent_servo", config)
+
+
+@dataclass(frozen=True)
+class CmdServoVentPWM(CmdServoPWM):
+    percent: Optional[float]
+    pass
 
 
 @dataclass(frozen=True)
@@ -679,6 +729,7 @@ class NevermoreBackgroundWorker:
         service_fan_policy = require(UUID_SERVICE_FAN_POLICY)
         service_ws2812 = require(UUID_SERVICE_WS2812)
         service_display = require(UUID_SERVICE_DISPLAY)
+        service_servo = require(UUID_SERVICE_SERVO)
 
         P = CharacteristicProperty
         aggregate_env = require_char(service_env, UUID_CHAR_DATA_AGGREGATE, {P.NOTIFY})
@@ -722,6 +773,8 @@ class NevermoreBackgroundWorker:
             service_display, UUID_CHAR_PERCENT8, {P.WRITE}
         )
         display_ui = require_char(service_display, UUID_CHAR_DISPLAY_UI, {P.WRITE})
+        servo_vent_range = require_char(service_servo, UUID_CHAR_SERVO_RANGE, {P.WRITE})
+        servo_vent_pwm = require_char(service_servo, UUID_CHAR_PERCENT16_8, {P.WRITE})
 
         self._connected.set()
 
@@ -786,6 +839,10 @@ class NevermoreBackgroundWorker:
                 char = fan_thermal_limit
             elif isinstance(cmd, CmdWs2812Length):
                 char = ws2812_length
+            elif isinstance(cmd, CmdServoVentRange):
+                char = servo_vent_range
+            elif isinstance(cmd, CmdServoVentPWM):
+                char = servo_vent_pwm
             elif isinstance(cmd, CmdConfigFlags):
                 char = config_flags
             elif isinstance(cmd, CmdConfigReboot):
@@ -877,6 +934,9 @@ class Nevermore:
     )
     cmd_NEVERMORE_PRINT_END_help = (
         "Set Nevermores to idle state. See documentation for details."
+    )
+    cmd_NEVERMORE_VENT_SERVO_SET_help = (
+        "Set the PWM for the vent servo. Omit `PWM` to disable the servo."
     )
     cmd_NEVERMORE_VOC_GATING_THRESHOLD_OVERRIDE_help = "Set/clear the VOC gating threshold override (omit `THRESHOLD` to clear override)"
     cmd_NEVERMORE_VOC_CALIBRATION_help = "Set the automatic VOC calibration process"
@@ -978,6 +1038,7 @@ class Nevermore:
         # who end up in a strange state due to a klipper reset
         self._voc_calibrate_enabled = CmdConfigVocCalibrateEnabled(True)
         self._configuration = CmdConfiguration(config)
+        self._vent_servo_range = CmdServoVentRange(config)
         self._fan_policy = CmdFanPolicy(config)
         self._fan_power_passive = cfg_fan_power(CmdFanPowerPassive, "fan_power_passive")
         self._fan_power_auto = cfg_fan_power(CmdFanPowerAuto, "fan_power_automatic")
@@ -1036,6 +1097,13 @@ class Nevermore:
         if self._interface is not None:
             self._interface.send_command(CmdFanPowerOverride(percent))
 
+    def set_vent_servo_pwm(self, percent: Optional[float]):
+        if percent is not None:
+            percent = max(min(percent, 1), 0)
+
+        if self._interface is not None:
+            self._interface.send_command(CmdServoVentPWM(percent))
+
     def state_stats_update(self):
         self._state_min = self._state_min.min(self.state)
         self._state_max = self._state_max.max(self.state)
@@ -1083,6 +1151,7 @@ class Nevermore:
         self._interface.send_command(self._display_ui)
         self._interface.send_command(CmdWs2812Length(len(self.led_colour_idxs)))
         self._interface.send_command(CmdWs2812MarkDirty())
+        self._interface.send_command(self._vent_servo_range)
 
     def _handle_request_restart(self, print_time: Optional[float]):
         self._handle_shutdown()
@@ -1114,6 +1183,9 @@ class Nevermore:
     def cmd_NEVERMORE_PRINT_END(self, gcmd: GCodeCommand) -> None:
         self.set_fan_power(None)
         self.cmd_NEVERMORE_VOC_CALIBRATION(True)
+
+    def cmd_NEVERMORE_VENT_SERVO_SET(self, gcmd: GCodeCommand) -> None:
+        self.set_vent_servo_pwm(gcmd.get_float("PWM", None, 0, 1))
 
     def cmd_NEVERMORE_VOC_GATING_THRESHOLD_OVERRIDE(self, gcmd: GCodeCommand) -> None:
         # `None` to allow explicitly clearing override by not specifying a `SPEED` arg

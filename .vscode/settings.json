@@ -102,6 +102,7 @@
         "fstream": "cpp",
         "sstream": "cpp",
         "stop_token": "cpp",
-        "streambuf": "cpp"
+        "streambuf": "cpp",
+        "span": "cpp"
     },
 }

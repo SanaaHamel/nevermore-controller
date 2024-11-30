@@ -4,6 +4,7 @@
 // 260a0845-e62f-48c6-aef9-04f62ff8bffd Service - Fan Control Policy
 // f62918ab-33b7-4f47-9fba-8ce9de9fecbb Service - NeoPixel
 // de44dd71-2400-4cd1-a3f3-9fb00c4697d7 Service - Photocatalytic
+// 8959bb3e-3063-4a46-9b9a-69fdbc327f1c Service - Servos
 
 // 216aa791-97d0-46ac-8752-60bbc00611e1 VOC Indexed
 // c3acb286-8071-427b-bbed-d64987373f23 VOC Sensor Raw
@@ -14,6 +15,7 @@
 // 3886216a-d971-4c71-afc4-19f8fba8fb92 WS2812 Config
 // 5d91b6ce-7db1-4e06-b8cb-d75e7dd49aae WS2812 Update Span
 // 86a25d55-1893-4d01-8ea8-8970f622c243 Display - UI
+// 9c327c7f-188f-4345-950f-bd586f13f324 Servo  - Start/End PWM % struct
 // f48a18bb-e03c-4583-8006-5b54422e2045 Config - Reboot
 // d4b66bf4-3d8f-4746-b6a2-8a59d2eac3ce Config - Flags
 // a84b00c0-7102-4cc6-a4ea-a65050502d3f Config - Checkpoint Sensor Calibration
@@ -29,6 +31,7 @@
 // #define ORG_BLUETOOTH_CHARACTERISTIC_VOC_CONCENTRATION 0x2BE7
 // #define ORG_BLUETOOTH_CHARACTERISTIC_PERCENTAGE_8 2B04
 // #define ORG_BLUETOOTH_CHARACTERISTIC_COUNT_16 2AEA
+// #define Percentage16_10 0543a134-244f-405b-9d43-0351a5336ef7
 
 PRIMARY_SERVICE, GAP_SERVICE
 CHARACTERISTIC, GAP_DEVICE_NAME, READ, "Nevermore Controller"
@@ -198,6 +201,19 @@ CHARACTERISTIC, 2B04, READ | DYNAMIC
 CHARACTERISTIC_USER_DESCRIPTION, READ | DYNAMIC
 // Photocatalytic PWM % - Override (not-known -> automatic control)
 CHARACTERISTIC, 2B04, READ | WRITE | DYNAMIC
+CHARACTERISTIC_USER_DESCRIPTION, READ | DYNAMIC
+
+/////////////////////////////
+// Servo Service
+/////////////////////////////
+
+PRIMARY_SERVICE, 8959bb3e-3063-4a46-9b9a-69fdbc327f1c
+// Vent Servo - Start/End PWM %, use `Percentage16_10` b/c we need more precision than PERC_8
+CHARACTERISTIC, 9c327c7f-188f-4345-950f-bd586f13f324, READ | WRITE | DYNAMIC
+CHARACTERISTIC_USER_DESCRIPTION, READ | DYNAMIC
+CHARACTERISTIC_AGGREGATE_FORMAT, percentage16_10, percentage16_10
+// Vent Servo - Actuator %
+CHARACTERISTIC, 0543a134-244f-405b-9d43-0351a5336ef7, READ | WRITE | DYNAMIC
 CHARACTERISTIC_USER_DESCRIPTION, READ | DYNAMIC
 
 /////////////////////////////

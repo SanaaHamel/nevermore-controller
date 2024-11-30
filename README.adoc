@@ -716,6 +716,15 @@ display_brightness: 1
 display_ui: GC9A01_CLASSIC
 
 
+# Vent Servo
+# NOTE: To reverse direction set `vent_servo_pulse_width_max` < `vent_servo_pulse_width_min`
+
+# seconds \in (0, 0.02), duration of pulse when requested 0%
+#vent_servo_pulse_width_min: 0.001
+# seconds \in (0, 0.02), duration of pulse when requesting 100%
+#vent_servo_pulse_width_max: 0.002
+
+
 # Misc. Sensor Options
 
 # If temperature, humidity, etc, is unavailable on one side of the filter then
@@ -819,6 +828,15 @@ This command currently performs the following series of actions for every Neverm
 * Disables fan override.
 * Enables <<NEVERMORE_VOC_CALIBRATION>>.
 
+
+==== NEVERMORE_VENT_SERVO_SET
+
+Command:
+```
+NEVERMORE_VENT_SERVO_SET [NEVERMORE=<name>] [PERCENT=<float \in [0, 1]>]
+```
+
+Set the vent's servo pulse to the specified % between . Omitting `PERCENT` disables the servo.
 
 
 ==== NEVERMORE_STATUS
