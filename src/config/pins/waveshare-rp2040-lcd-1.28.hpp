@@ -33,10 +33,11 @@ constexpr Pins PINS_DEFAULT{
                 },
         },
 
-        .fan_pwm = {14},
-        .fan_tachometer = {13},
-        .neopixel_data = {15},
+        .fan_pwm = {15},
+        .fan_tachometer = {14},
+        .neopixel_data = {3},
         .photocatalytic_pwm = {2},
+        .vent_servo_pwm = 13,
 
         .display_command = WAVESHARE_RP2040_LCD_DC_PIN,
         .display_reset = WAVESHARE_RP2040_LCD_RST_PIN,

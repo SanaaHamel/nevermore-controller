@@ -4,6 +4,7 @@
 #include "utility/crc.hpp"
 #include "utility/fan_policy.hpp"
 #include "utility/fan_policy_thermal.hpp"
+#include "utility/servo.hpp"
 #include <array>
 
 namespace nevermore::settings {
@@ -75,6 +76,7 @@ struct [[gnu::packed]] SettingsV0 {
     float display_brightness = 1.f;  // range: [0, 1]; don't edit directly, use `display::brightness`
     SaveCounter save_counter = {};
     Pins pins = PINS_DEFAULT;
+    ServoRange servo_vent;
     Padding<3> _1{};  // HACK: cannot remove, would screw with def-init of new members
 
     // replaces valid fields from RHS into self

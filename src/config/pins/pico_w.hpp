@@ -28,6 +28,7 @@ constexpr Pins PINS_DEFAULT{
         .fan_tachometer = {15},
         .neopixel_data = {12},
         .photocatalytic_pwm = {10},
+        .vent_servo_pwm = 14,
 
         .display_command = 5,
         .display_reset = 6,
