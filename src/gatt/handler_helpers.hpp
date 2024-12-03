@@ -24,7 +24,7 @@ constexpr uint16_t GATT_CLIENT_CFG_NOTIFY_FLAG = 0b0000'0001;
 #define HANDLE_ATTR(attr, kind) HANDLE_ATTR_(attr, kind)
 
 #define HANDLE_READ_BLOB(attr, kind, expr) \
-    case HANDLE_ATTR(attr, kind): return att_read_callback_handle_blob(expr, offset, buffer, buffer_size);
+    case HANDLE_ATTR(attr, kind): return att_read_callback_handle_blob(expr, buffer);
 #define HANDLE_WRITE_EXPR(attr, kind, expr) \
     case HANDLE_ATTR(attr, kind): return expr;
 
@@ -46,9 +46,7 @@ struct AttrWriteException {
 struct WriteConsumer {
     struct NotEnoughException {};
 
-    uint16_t offset;
-    uint8_t const* buffer;
-    uint16_t buffer_size;
+    std::span<uint8_t const> buffer;
 
     template <typename A>
         requires(std::is_standard_layout_v<A> && !std::is_pointer_v<A> && !std::is_reference_v<A>)
@@ -59,8 +57,8 @@ struct WriteConsumer {
         // ARM has stricter alignment requirements than x86's *ANYTHING-GOES!* approach.
         A value;
         // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic)
-        memcpy((void*)&value, buffer + offset, sizeof(value));
-        offset += sizeof(A);
+        memcpy((void*)&value, buffer.data(), sizeof(value));
+        buffer = {buffer.begin() + sizeof(value), buffer.end()};
         return value;
     }
 
@@ -83,25 +81,18 @@ struct WriteConsumer {
             throw AttrWriteException(ATT_ERROR_INVALID_ATTRIBUTE_VALUE_LENGTH);
 
         // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic)
-        auto const* ptr = buffer + offset;
-        offset += sizeof(uint8_t) * length;
+        auto const* ptr = buffer.data();
+        buffer = {buffer.begin() + int(length), buffer.end()};
         return {ptr, ptr + length};  // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
     }
 
     [[nodiscard]] uint16_t remaining() const {
-        if (buffer_size < offset) return 0;
-
-        return buffer_size - offset;
+        return buffer.size();
     }
 
 private:
     [[nodiscard]] constexpr bool has_available(size_t n) const {
-        // Always return false, even for 0 byte reads, if beyond end of buffer.
-        // This prevents creating pointers beyond the last of an array + 1 (which is UB).
-        if (buffer_size < offset) return false;
-
-        auto const available = size_t(buffer_size) - offset;
-        return n <= available;
+        return n <= buffer.size();
     }
 };
 
@@ -128,7 +119,8 @@ struct NotifyState {
     }
 
     bool register_(hci_con_handle_t conn) {
-        if (registered(conn)) return false;  // no-op
+        if (registered(conn)) return false;                // no-op
+        if (conn == HCI_CON_HANDLE_INVALID) return false;  // no-op
 
         for (auto&& cb : callbacks) {
             if (uintptr_t(cb.context) != HCI_CON_HANDLE_INVALID) continue;
@@ -142,6 +134,8 @@ struct NotifyState {
     }
 
     bool unregister(hci_con_handle_t const conn) {
+        if (conn == HCI_CON_HANDLE_INVALID) return false;
+
         // btstack only releases HCI connection info after registered event handlers
         // finish *and* no one triggered a reconnect
         auto* hci_connection = hci_connection_for_handle(conn);

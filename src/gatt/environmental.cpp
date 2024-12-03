@@ -89,11 +89,10 @@ void disconnected(hci_con_handle_t conn) {
     g_notify_aggregate.unregister(conn);
 }
 
-optional<uint16_t> attr_read(
-        hci_con_handle_t conn, uint16_t att_handle, uint16_t offset, uint8_t* buffer, uint16_t buffer_size) {
+optional<uint16_t> attr_read(hci_con_handle_t conn, uint16_t attr, span<uint8_t> buffer) {
     auto sensors = []() { return nevermore::sensors::g_sensors.with_fallbacks(); };
 
-    switch (att_handle) {
+    switch (attr) {
         // NOLINTBEGIN(bugprone-branch-clone)
         USER_DESCRIBE(BT(TEMPERATURE_01), "Intake Temperature")
         USER_DESCRIBE(BT(TEMPERATURE_02), "Exhaust Temperature")
@@ -144,12 +143,10 @@ optional<uint16_t> attr_read(
 }
 
 // No attrs are writable.
-optional<int> attr_write(hci_con_handle_t conn, uint16_t att_handle, uint16_t offset, uint8_t const* buffer,
-        uint16_t buffer_size) {
-    if (buffer_size < offset) return ATT_ERROR_INVALID_OFFSET;
-    WriteConsumer consume{offset, buffer, buffer_size};
+optional<int> attr_write(hci_con_handle_t conn, uint16_t attr, span<uint8_t const> buffer) {
+    WriteConsumer consume{buffer};
 
-    switch (att_handle) {
+    switch (attr) {
         WRITE_CLIENT_CFG(ENV_AGGREGATE, g_notify_aggregate)
 
     default: return {};
