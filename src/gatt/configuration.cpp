@@ -1,5 +1,6 @@
 #include "configuration.hpp"
 #include "characteristic_ids.hpp"
+#include "gatt.hpp"
 #include "handler_helpers.hpp"
 #include "nevermore.h"
 #include "picowota/reboot.h"
@@ -49,9 +50,8 @@ bool init() {
 
 void disconnected(hci_con_handle_t) {}
 
-optional<uint16_t> attr_read(
-        hci_con_handle_t, uint16_t att_handle, uint16_t offset, uint8_t* buffer, uint16_t buffer_size) {
-    switch (att_handle) {
+optional<uint16_t> attr_read(hci_con_handle_t conn, uint16_t attr, span<uint8_t> buffer) {
+    switch (attr) {
         USER_DESCRIBE(CONFIG_REBOOT, "Reboot")
         USER_DESCRIBE(CONFIG_FLAGS, "Configuration Flags (bitset)")
         USER_DESCRIBE(CONFIG_RESET_SENSOR_CALIBRATION, "Reset sensor calibration")
@@ -81,19 +81,17 @@ optional<uint16_t> attr_read(
         READ_VALUE(CONFIG_PINS_DEFAULT, PINS_DEFAULT)
 
     case HANDLE_ATTR(CONFIG_PINS_ERROR, VALUE):
-        return ::att_read_callback_handle_blob(reinterpret_cast<uint8_t const*>(g_pins_config_error),
-                strlen(g_pins_config_error), offset, buffer, buffer_size);
+        return att_read_callback_handle_blob(
+                reinterpret_cast<uint8_t const*>(g_pins_config_error), strlen(g_pins_config_error), buffer);
 
     default: return {};
     }
 }
 
-optional<int> attr_write(
-        hci_con_handle_t, uint16_t att_handle, uint16_t offset, uint8_t const* buffer, uint16_t buffer_size) {
-    if (buffer_size < offset) return ATT_ERROR_INVALID_OFFSET;
-    WriteConsumer consume{offset, buffer, buffer_size};
+optional<int> attr_write(hci_con_handle_t conn, uint16_t attr, span<uint8_t const> buffer) {
+    WriteConsumer consume{buffer};
 
-    switch (att_handle) {
+    switch (attr) {
     case HANDLE_ATTR(CONFIG_REBOOT, VALUE): {
         switch (uint8_t(consume)) {
         case 0: reboot_delayed(false); return 0;
