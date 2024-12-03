@@ -151,9 +151,8 @@ void disconnected(hci_con_handle_t conn) {
     g_notify_aggregate.unregister(conn);
 }
 
-optional<uint16_t> attr_read(
-        hci_con_handle_t conn, uint16_t att_handle, uint16_t offset, uint8_t* buffer, uint16_t buffer_size) {
-    switch (att_handle) {
+optional<uint16_t> attr_read(hci_con_handle_t conn, uint16_t attr, span<uint8_t> buffer) {
+    switch (attr) {
         USER_DESCRIBE(FAN_POWER, "Fan %")
         USER_DESCRIBE(FAN_POWER_OVERRIDE, "Fan % - Override")
         USER_DESCRIBE(FAN_POWER_PASSIVE, "Fan % - Passive")
@@ -189,12 +188,10 @@ optional<uint16_t> attr_read(
     }
 }
 
-optional<int> attr_write(hci_con_handle_t conn, uint16_t att_handle, uint16_t offset, uint8_t const* buffer,
-        uint16_t buffer_size) {
-    if (buffer_size < offset) return ATT_ERROR_INVALID_OFFSET;
-    WriteConsumer consume{offset, buffer, buffer_size};
+optional<int> attr_write(hci_con_handle_t conn, uint16_t attr, span<uint8_t const> buffer) {
+    WriteConsumer consume{buffer};
 
-    switch (att_handle) {
+    switch (attr) {
         WRITE_VALUE(FAN_POLICY_COOLDOWN, settings::g_active.fan_policy_env.cooldown)
         WRITE_VALUE(FAN_POLICY_VOC_PASSIVE_MAX, settings::g_active.fan_policy_env.voc_passive_max)
         WRITE_VALUE(FAN_POLICY_VOC_IMPROVE_MIN, settings::g_active.fan_policy_env.voc_improve_min)

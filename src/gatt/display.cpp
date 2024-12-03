@@ -19,9 +19,8 @@ bool init() {
 
 void disconnected(hci_con_handle_t) {}
 
-optional<uint16_t> attr_read(
-        hci_con_handle_t conn, uint16_t att_handle, uint16_t offset, uint8_t* buffer, uint16_t buffer_size) {
-    switch (att_handle) {
+optional<uint16_t> attr_read(hci_con_handle_t conn, uint16_t attr, span<uint8_t> buffer) {
+    switch (attr) {
         USER_DESCRIBE(DISPLAY_BRIGHTNESS, "Display Brightness %")
         USER_DESCRIBE(DISPLAY_UI, "Display UI")
         READ_VALUE(DISPLAY_BRIGHTNESS, Percentage8(nevermore::display::brightness() * 100));
@@ -31,12 +30,10 @@ optional<uint16_t> attr_read(
     }
 }
 
-optional<int> attr_write(hci_con_handle_t conn, uint16_t att_handle, uint16_t offset, uint8_t const* buffer,
-        uint16_t buffer_size) {
-    if (buffer_size < offset) return ATT_ERROR_INVALID_OFFSET;
-    WriteConsumer consume{offset, buffer, buffer_size};
+optional<int> attr_write(hci_con_handle_t conn, uint16_t attr, span<uint8_t const> buffer) {
+    WriteConsumer consume{buffer};
 
-    switch (att_handle) {
+    switch (attr) {
     case HANDLE_ATTR(DISPLAY_BRIGHTNESS, VALUE): {
         Percentage8 const power = consume;
         if (power == BLE::NOT_KNOWN) throw AttrWriteException(ATT_ERROR_VALUE_NOT_ALLOWED);

@@ -49,9 +49,8 @@ bool init() {
 
 void disconnected(hci_con_handle_t) {}
 
-optional<uint16_t> attr_read(
-        hci_con_handle_t conn, uint16_t att_handle, uint16_t offset, uint8_t* buffer, uint16_t buffer_size) {
-    switch (att_handle) {
+optional<uint16_t> attr_read(hci_con_handle_t conn, uint16_t attr, span<uint8_t> buffer) {
+    switch (attr) {
         USER_DESCRIBE(PHOTOCATALYTIC_POWER, "Photocatalytic %")
         USER_DESCRIBE(PHOTOCATALYTIC_POWER_OVERRIDE, "Photocatalytic % - Override")
 
@@ -62,12 +61,10 @@ optional<uint16_t> attr_read(
     }
 }
 
-optional<int> attr_write(hci_con_handle_t conn, uint16_t att_handle, uint16_t offset, uint8_t const* buffer,
-        uint16_t buffer_size) {
-    if (buffer_size < offset) return ATT_ERROR_INVALID_OFFSET;
-    WriteConsumer consume{offset, buffer, buffer_size};
+optional<int> attr_write(hci_con_handle_t conn, uint16_t attr, span<uint8_t const> buffer) {
+    WriteConsumer consume{buffer};
 
-    switch (att_handle) {
+    switch (attr) {
     case HANDLE_ATTR(PHOTOCATALYTIC_POWER_OVERRIDE, VALUE): {
         pc_power_override((BLE::Percentage8)consume);
         return 0;

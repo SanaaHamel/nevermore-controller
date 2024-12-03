@@ -20,6 +20,7 @@
 #include <array>
 #include <cstdint>
 #include <cstdio>
+#include <span>
 #include <tuple>
 
 using namespace std;
@@ -79,8 +80,7 @@ void hci_handler(uint8_t packet_type, [[maybe_unused]] uint16_t channel, uint8_t
     }
 }
 
-uint16_t attr_read(
-        hci_con_handle_t conn, uint16_t attr, uint16_t offset, uint8_t* buffer, uint16_t buffer_size) {
+optional<uint16_t> attr_read(hci_con_handle_t conn, uint16_t attr, span<uint8_t> buffer) {
     constexpr array HANDLERS{
             configuration::attr_read,
             display::attr_read,
@@ -91,27 +91,13 @@ uint16_t attr_read(
             ws2812::attr_read,
     };
     for (auto handler : HANDLERS)
-        if (auto r = handler(conn, attr, offset, buffer, buffer_size)) return *r;
+        if (auto r = handler(conn, attr, buffer)) return r;
 
     printf("WARN - BLE GATT - attr_read unhandled attr 0x%04x\n", int(attr));
-    return 0;
+    return {};
 }
 
-int attr_write(hci_con_handle_t conn, uint16_t attr, uint16_t transaction_mode, uint16_t offset,
-        uint8_t* buffer, uint16_t buffer_size) {
-    // `attr == 0` is an invalid handle, but the combination of `attr == 0` and a cancel transaction means
-    // 'drop everything pending, the other side has disconnected'.
-    // For us, this means a no-op; we don't support transactions so there's nothing to cancel.
-    if (attr == 0 && transaction_mode == ATT_TRANSACTION_MODE_CANCEL) return 0;
-    if (buffer_size < offset) return ATT_ERROR_INVALID_OFFSET;
-
-    // We don't support any kind of transaction modes.
-    if (transaction_mode != ATT_TRANSACTION_MODE_NONE) {
-        printf("WARN - BLE GATT - attr_write unhandled transaction mode 0x%04x w/ attr=%d (conn=%d)\n",
-                transaction_mode, attr, conn);
-        return 0;
-    }
-
+int attr_write(hci_con_handle_t conn, uint16_t attr, span<uint8_t const> buffer) {
     constexpr array HANDLERS{
             configuration::attr_write,
             display::attr_write,
@@ -124,13 +110,46 @@ int attr_write(hci_con_handle_t conn, uint16_t attr, uint16_t transaction_mode, 
 
     try {
         for (auto handler : HANDLERS)
-            if (auto r = handler(conn, attr, offset, buffer, buffer_size)) return *r;
+            if (auto r = handler(conn, attr, buffer)) return *r;
     } catch (AttrWriteException const& e) {
         return e.error;
     }
 
     printf("WARN - BLE GATT - attr_write unhandled attr 0x%04x\n", int(attr));
-    return 0;
+    return ATT_ERROR_INVALID_HANDLE;
+}
+
+// This API sucks.
+// To query length: call w/ `buffer == null` (`offset` and `buffer_size` should both be 0)
+// To return an error code: return `err + ATT_READ_ERROR_CODE_OFFSET`
+// Otherwise: return how many bytes were written to the buffer.
+uint16_t attr_read(
+        hci_con_handle_t conn, uint16_t attr, uint16_t offset, uint8_t* buffer, uint16_t buffer_size) {
+    assert(offset <= buffer_size);
+    assert(buffer || (offset == 0 && buffer_size == 0));
+    auto result = attr_read(
+            // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+            conn, attr, buffer ? span<uint8_t>{buffer + offset, buffer + buffer_size} : span<uint8_t>{});
+    return result.value_or(ATT_READ_ERROR_CODE_OFFSET + ATT_ERROR_INVALID_HANDLE);
+}
+
+int attr_write(hci_con_handle_t conn, uint16_t attr, uint16_t transaction_mode, uint16_t offset,
+        uint8_t* buffer, uint16_t buffer_size) {
+    if (buffer_size < offset) return ATT_ERROR_INVALID_OFFSET;
+    // `attr == 0` is an invalid handle, but the combination of `attr == 0` and a cancel transaction means
+    // 'drop everything pending, the other side has disconnected'.
+    // For us, this means a no-op; we don't support prepared writes so there's nothing to cancel.
+    if (attr == 0 && transaction_mode == ATT_TRANSACTION_MODE_CANCEL) return 0;
+
+    // We don't support prepared writes.
+    if (transaction_mode != ATT_TRANSACTION_MODE_NONE) {
+        printf("WARN - BLE GATT - attr_write unhandled transaction mode 0x%04x w/ attr=%d (conn=%d)\n",
+                transaction_mode, attr, conn);
+        return transaction_mode == ATT_TRANSACTION_MODE_CANCEL ? 0 : ATT_ERROR_WRITE_REQUEST_REJECTED;
+    }
+
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+    return attr_write(conn, attr, {buffer + offset, buffer + buffer_size});
 }
 
 btstack_packet_callback_registration_t g_hci_handler{.callback = &hci_handler};

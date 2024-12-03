@@ -62,9 +62,8 @@ bool init() {
 
 void disconnected(hci_con_handle_t) {}
 
-optional<uint16_t> attr_read(
-        hci_con_handle_t, uint16_t att_handle, uint16_t offset, uint8_t* buffer, uint16_t buffer_size) {
-    switch (att_handle) {
+optional<uint16_t> attr_read(hci_con_handle_t conn, uint16_t attr, span<uint8_t> buffer) {
+    switch (attr) {
         USER_DESCRIBE(WS2812_TOTAL_COMPONENTS, "Total # of components (i.e. octets) in the WS2812 chain.")
         USER_DESCRIBE(WS2812_UPDATE_SPAN, "Update a span of the WS2812 chain.")
 
@@ -77,12 +76,10 @@ optional<uint16_t> attr_read(
     }
 }
 
-optional<int> attr_write(
-        hci_con_handle_t, uint16_t att_handle, uint16_t offset, uint8_t const* buffer, uint16_t buffer_size) {
-    if (buffer_size < offset) return ATT_ERROR_INVALID_OFFSET;
-    WriteConsumer consume{offset, buffer, buffer_size};
+optional<int> attr_write(hci_con_handle_t conn, uint16_t attr, span<uint8_t const> buffer) {
+    WriteConsumer consume{buffer};
 
-    switch (att_handle) {
+    switch (attr) {
     case HANDLE_ATTR(WS2812_TOTAL_COMPONENTS, VALUE): {
         BLE::Count16 count = consume;
         if (count == BLE::NOT_KNOWN) return ATT_ERROR_VALUE_NOT_ALLOWED;
