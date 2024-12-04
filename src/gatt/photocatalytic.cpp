@@ -1,11 +1,8 @@
 #include "photocatalytic.hpp"
-#include "characteristic_ids.hpp"
 #include "config/pins.hpp"
 #include "handler_helpers.hpp"
-#include "nevermore.h"
 #include "sdk/ble_data_types.hpp"
 #include "sdk/pwm.hpp"
-#include <cstdint>
 #include <limits>
 
 using namespace std;

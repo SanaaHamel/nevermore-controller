@@ -1,14 +1,10 @@
 #include "configuration.hpp"
-#include "characteristic_ids.hpp"
-#include "gatt.hpp"
 #include "handler_helpers.hpp"
-#include "nevermore.h"
 #include "picowota/reboot.h"
 #include "sensors.hpp"
 #include "settings.hpp"
 #include "utility/timer.hpp"
 #include <array>
-#include <cstdint>
 #include <cstdio>
 
 using namespace std;

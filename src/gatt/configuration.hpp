@@ -1,7 +1,6 @@
 #pragma once
 
 #include "bluetooth.h"
-#include "gatt.hpp"
 #include <cstdint>
 #include <optional>
 #include <span>

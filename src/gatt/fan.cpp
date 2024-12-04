@@ -1,8 +1,6 @@
 #include "fan.hpp"
-#include "characteristic_ids.hpp"
 #include "config.hpp"
 #include "handler_helpers.hpp"
-#include "nevermore.h"
 #include "sdk/ble_data_types.hpp"
 #include "sdk/btstack.hpp"
 #include "sdk/pwm.hpp"
@@ -12,7 +10,6 @@
 #include "utility/fan_policy.hpp"
 #include "utility/fan_policy_thermal.hpp"
 #include "utility/timer.hpp"
-#include <cstdint>
 #include <limits>
 
 using namespace std;
