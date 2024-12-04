@@ -350,10 +350,7 @@ class MoonrakerMalformedResponse(Exception):
         return f"malformed moonraker response: `{self.response:r}`"
 
 
-async def _main_moonraker(
-    log: GraphiteLogger, moonraker: Ip4Port, retry_delay: Optional[float] = None
-):
-    assert retry_delay is None or 0 <= retry_delay
+async def _main_moonraker(log: GraphiteLogger, moonraker: Ip4Port):
     uri = f"ws://{moonraker.addr}:{moonraker.port}/websocket"
 
     async def go(ws: WSClient.WebSocketClientProtocol):
@@ -433,33 +430,9 @@ async def _main_moonraker(
             await log(await snapshot())
 
     while True:
-        try:
-            print(f"connecting to moonraker: {uri}")
-            async with WSClient.connect(uri) as ws:
-                await go(ws)
-        except MoonrakerMalformedResponse as e:
-            if retry_delay is not None:
-                logging.exception(
-                    "malformed/unexpected response, retrying...", exc_info=e
-                )
-                print(f"reconnecting in {retry_delay} seconds")
-                await asyncio.sleep(retry_delay)
-            else:
-                raise
-        except Exception as e:
-            if retry_delay is not None and isinstance(
-                e,
-                (
-                    OSError,
-                    websockets.exceptions.ConnectionClosedError,
-                    websockets.exceptions.ConnectionClosedOK,
-                ),
-            ):
-                logging.exception("connection error, retrying...", exc_info=e)
-                print(f"retrying connection in {retry_delay} seconds")
-                await asyncio.sleep(retry_delay)
-            else:
-                raise
+        print(f"connecting to moonraker: {uri}")
+        async with WSClient.connect(uri) as ws:
+            await go(ws)
 
 
 class CmdLnArgs(NevermoreToolCmdLnArgs):
@@ -477,9 +450,6 @@ class CmdLnArgs(NevermoreToolCmdLnArgs):
         help=f"ip4:port for graphite instance",
         default=Ip4Port("localhost", GRAPHITE_DEFAULT_PICKLE_PORT),
         type=Ip4Port.parse("localhost", GRAPHITE_DEFAULT_PICKLE_PORT),
-    )
-    retry_delay: Optional[float] = tap.arg(
-        help="wait n seconds before re-connecting (moonraker only for now)"
     )
     install_systemd_service: bool = tap.arg(
         default=False, help="install a systemd startup service using current arguments"
@@ -526,7 +496,7 @@ async def _main(args: CmdLnArgs):
     if args.moonraker is None:
         await _main_bluetooth(log_entry, await args.bt_address_discover())
     else:
-        await _main_moonraker(log_entry, args.moonraker, args.retry_delay)
+        await _main_moonraker(log_entry, args.moonraker)
 
 
 def main():
