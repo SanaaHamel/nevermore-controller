@@ -3,6 +3,9 @@
 // The BTStack GATT compiler doesn't offer a good way to have stable char IDs.
 // Handle this by defining stable IDs in one place.
 
+// Device Info
+#define DEVICE_INFO_SERIAL ORG_BLUETOOTH_CHARACTERISTIC_SERIAL_NUMBER_STRING_01
+
 // Environmental
 #define ENV_VOC_INDEX_INTAKE 216aa791_97d0_46ac_8752_60bbc00611e1_01
 #define ENV_VOC_INDEX_EXHAUST 216aa791_97d0_46ac_8752_60bbc00611e1_02

@@ -5,6 +5,7 @@
 #include "btstack_event.h"
 #include "config.hpp"
 #include "gatt/configuration.hpp"
+#include "gatt/device_info.hpp"
 #include "gatt/display.hpp"
 #include "gatt/environmental.hpp"
 #include "gatt/fan.hpp"
@@ -23,6 +24,16 @@
 
 using namespace std;
 using namespace bt::advert;
+
+#define FOREACH_SERVICE()                  \
+    FOREACH_SERVICE_ACTION(configuration)  \
+    FOREACH_SERVICE_ACTION(device_info)    \
+    FOREACH_SERVICE_ACTION(display)        \
+    FOREACH_SERVICE_ACTION(environmental)  \
+    FOREACH_SERVICE_ACTION(fan)            \
+    FOREACH_SERVICE_ACTION(photocatalytic) \
+    FOREACH_SERVICE_ACTION(servo)          \
+    FOREACH_SERVICE_ACTION(ws2812)
 
 namespace nevermore::gatt {
 
@@ -67,26 +78,18 @@ void hci_handler(uint8_t packet_type, [[maybe_unused]] uint16_t channel, uint8_t
         auto const conn = att_event_disconnected_get_handle(packet);
         printf("BLE GATT - disconnected conn=%d\n", conn);
 
-        configuration::disconnected(conn);
-        display::disconnected(conn);
-        environmental::disconnected(conn);
-        fan::disconnected(conn);
-        photocatalytic::disconnected(conn);
-        servo::disconnected(conn);
-        ws2812::disconnected(conn);
+#define FOREACH_SERVICE_ACTION(x) x::disconnected(conn);
+        FOREACH_SERVICE()
+#undef FOREACH_SERVICE_ACTION
     } break;
     }
 }
 
 optional<uint16_t> attr_read(hci_con_handle_t conn, uint16_t attr, span<uint8_t> buffer) {
     constexpr array HANDLERS{
-            configuration::attr_read,
-            display::attr_read,
-            environmental::attr_read,
-            fan::attr_read,
-            photocatalytic::attr_read,
-            servo::attr_read,
-            ws2812::attr_read,
+#define FOREACH_SERVICE_ACTION(x) x::attr_read,
+            FOREACH_SERVICE()
+#undef FOREACH_SERVICE_ACTION
     };
     for (auto handler : HANDLERS)
         if (auto r = handler(conn, attr, buffer)) return r;
@@ -97,13 +100,9 @@ optional<uint16_t> attr_read(hci_con_handle_t conn, uint16_t attr, span<uint8_t>
 
 int attr_write(hci_con_handle_t conn, uint16_t attr, span<uint8_t const> buffer) {
     constexpr array HANDLERS{
-            configuration::attr_write,
-            display::attr_write,
-            environmental::attr_write,
-            fan::attr_write,
-            photocatalytic::attr_write,
-            servo::attr_write,
-            ws2812::attr_write,
+#define FOREACH_SERVICE_ACTION(x) x::attr_write,
+            FOREACH_SERVICE()
+#undef FOREACH_SERVICE_ACTION
     };
 
     try {
@@ -164,12 +163,10 @@ bool init() {
         sm_init();  // FUTURE WORK: do we even need a security manager? can we ditch this?
     }
 
-    if (!display::init()) return false;
-    if (!environmental::init()) return false;
-    if (!fan::init()) return false;
-    if (!photocatalytic::init()) return false;
-    if (!servo::init()) return false;
-    if (!ws2812::init()) return false;
+#define FOREACH_SERVICE_ACTION(x) \
+    if (!x::init()) return false;
+    FOREACH_SERVICE()
+#undef FOREACH_SERVICE_ACTION
 
     if constexpr (NEVERMORE_PICO_W_BT) {
         hci_add_event_handler(&g_hci_handler);
