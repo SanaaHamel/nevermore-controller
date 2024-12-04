@@ -140,6 +140,7 @@ target_link_libraries(
          pico_btstack_ble
          pico_stdlib
          pico_time
+         pico_unique_id
          # Others
          FreeRTOS-Kernel
          FreeRTOS-Kernel-Heap4
