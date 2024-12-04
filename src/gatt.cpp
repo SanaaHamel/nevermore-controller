@@ -14,11 +14,9 @@
 #include "gatt/ws2812.hpp"
 #include "hci_dump.h"
 #include "l2cap.h"
-#include "nevermore.h"
 #include "sdk/gap.hpp"
 #include "utility/bt_advert.hpp"
 #include <array>
-#include <cstdint>
 #include <cstdio>
 #include <span>
 #include <tuple>

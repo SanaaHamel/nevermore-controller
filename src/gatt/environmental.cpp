@@ -1,13 +1,10 @@
 #include "environmental.hpp"
-#include "characteristic_ids.hpp"
 #include "config.hpp"
 #include "handler_helpers.hpp"
-#include "nevermore.h"
 #include "sdk/ble_data_types.hpp"
 #include "sdk/btstack.hpp"
 #include "sensors.hpp"
 #include "utility/timer.hpp"
-#include <cstdint>
 
 using namespace std;
 

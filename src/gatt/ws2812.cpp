@@ -1,12 +1,8 @@
 #include "ws2812.hpp"
 #include "../ws2812.hpp"
-#include "characteristic_ids.hpp"
 #include "handler_helpers.hpp"
-#include "nevermore.h"
 #include "sdk/ble_data_types.hpp"
 #include "sdk/btstack.hpp"
-#include <cstdint>
-#include <span>
 
 using namespace std;
 
