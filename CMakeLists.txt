@@ -52,10 +52,12 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(PICO_CXX_ENABLE_EXCEPTIONS 1)
 pico_sdk_init()
 
-set(PICOWOTA_TCP 0)
-set(PICOWOTA_BT_SPP 1)
-set(PICOWOTA_APP_STORE_SIZE "16") # each slot is 4 KiB (== erase sector size), want 4 slots to cycle
 add_subdirectory(picowota)
+add_picowota(picowota)
+set_property(TARGET picowota PROPERTY PICOWOTA_TCP false)
+set_property(TARGET picowota PROPERTY PICOWOTA_BT_SPP true)
+# each slot is 4 KiB (== erase sector size), want 4 slots to cycle
+set_property(TARGET picowota PROPERTY PICOWOTA_APP_STORE_SIZE 16)
 
 set(SRC_DIR ${CMAKE_SOURCE_DIR}/src)
 # HACK: libs often include a config header (e.g. lvgl, btstack, etc)
@@ -175,7 +177,7 @@ pico_enable_stdio_usb(picowota 1)
 pico_btstack_make_gatt_header(nevermore-controller PRIVATE ${SRC_DIR}/nevermore.gatt)
 pico_generate_pio_header(nevermore-controller ${SRC_DIR}/lib/pio_i2c.pio)
 pico_generate_pio_header(nevermore-controller ${SRC_DIR}/ws2812.pio)
-picowota_app_store_declare(nevermore-controller)
+picowota_app_store_declare(picowota nevermore-controller)
 
 add_executable(nevermore-controller-no-bootloader)
 set_target_properties(
@@ -186,7 +188,7 @@ target_link_libraries(nevermore-controller-no-bootloader PRIVATE nevermore-contr
 pico_enable_stdio_usb(nevermore-controller-no-bootloader 1)
 pico_enable_stdio_uart(nevermore-controller-no-bootloader 1)
 pico_add_extra_outputs(nevermore-controller-no-bootloader)
-picowota_build_no_bootloader_with_app_store(nevermore-controller-no-bootloader)
+picowota_build_no_bootloader_with_app_store(picowota nevermore-controller-no-bootloader)
 
 if(NEVERMORE_PICO_W_BT)
   target_link_libraries(nevermore-controller PUBLIC pico_btstack_cyw43 pico_cyw43_arch_sys_freertos)
@@ -201,7 +203,7 @@ if(NEVERMORE_PICO_W_BT)
   pico_add_extra_outputs(nevermore-controller-ota)
 
   picowota_share_cyw43_firmware(nevermore-controller)
-  picowota_build_combined(nevermore-controller-ota)
+  picowota_build_combined(picowota nevermore-controller-ota)
 else()
   set_target_properties(picowota PROPERTIES EXCLUDE_FROM_ALL TRUE)
 endif()
