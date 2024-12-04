@@ -5,7 +5,9 @@
 #include "btstack_config.h"
 #include "btstack_defines.h"
 #include "btstack_run_loop.h"
+#include "characteristic_ids.hpp"  // IWYU pragma: keep [almost everyone needs this]
 #include "hci.h"
+#include "nevermore.h"
 #include "sdk/btstack.hpp"  // IWYU pragma: keep [doesn't find overloads]
 #include <algorithm>
 #include <array>

@@ -1,12 +1,8 @@
 #include "display.hpp"
 #include "../display.hpp"
-#include "bluetooth.h"
-#include "characteristic_ids.hpp"
 #include "handler_helpers.hpp"
-#include "nevermore.h"
 #include "sdk/ble_data_types.hpp"
 #include "settings.hpp"
-#include <cstdint>
 
 using namespace std;
 using namespace BLE;
