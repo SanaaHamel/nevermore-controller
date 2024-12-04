@@ -1,5 +1,6 @@
 #include "led_status.hpp"
 #include "config.hpp"
+#include "hardware/gpio.h"
 #include "pico.h"  // IWYU pragma: keep for transitive includes (e.g. board)
 #include "settings.hpp"
 #include "utility/periodic_waves.hpp"
