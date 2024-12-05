@@ -84,7 +84,7 @@ private:
         for (auto now = begin; (now - begin) < TACHOMETER_READ_PERIOD;
                 now = std::chrono::steady_clock::now()) {
             pulses += pulse_poll();
-            task_delay(PIN_SAMPLING_PERIOD);
+            task_delay<PIN_SAMPLING_PERIOD>();
         }
 
         return pulses;

@@ -43,9 +43,7 @@ void update_voc_calibration() {
     //        kills the timer task when it enters `cyw43_ensure_up`.
     //        Root cause unknown. This hack should be benign since
     //        Pico W is typically built w/ BT enabled.
-    if constexpr (NEVERMORE_PICO_W_BT) {
-        cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, led_on);
-    }
+    cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, led_on);
 #endif
 }
 
