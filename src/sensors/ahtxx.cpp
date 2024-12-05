@@ -74,14 +74,14 @@ struct AHTxxSensor final : SensorPeriodicEnvI2C<Reg, "AHTxx"> {
     bool setup() {  // NOLINT(readability-make-member-function-const)
         if (!i2c.write(Reg::Init_1x, CMD_PAYLOAD_INIT)) return false;
 
-        task_delay(DELAY_KLIPPER_INIT);
+        task_delay<DELAY_KLIPPER_INIT>();
         return true;
     }
 
     bool reset() {  // NOLINT(readability-make-member-function-const)
         if (!i2c.write(Reg::Reset, CMD_PAYLOAD_RESET)) return false;
 
-        task_delay(DELAY_RESET);
+        task_delay<DELAY_RESET>();
         return true;
     }
 
@@ -103,7 +103,7 @@ struct AHTxxSensor final : SensorPeriodicEnvI2C<Reg, "AHTxx"> {
     optional<State> measure() {
         if (i2c.write(Reg::StartMeasurement, CMD_PAYLOAD_MEASURE)) {
             for (unsigned i = MEASURE_READ_RETRIES; 0 < i; --i) {
-                task_delay(DELAY_MEASURE);
+                task_delay<DELAY_MEASURE>();
 
                 // AHT21 has a CRC at the end, but AHT10 (haven't checked AHT20)
                 auto result = i2c.read<State>();

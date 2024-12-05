@@ -95,17 +95,13 @@ constexpr auto mk_task(char const* name, Priority priority, uint32_t stack_depth
     return [=](auto go) { return Task(go, name, priority, stack_depth, affinity_set); };
 }
 
-template <typename A, typename Period>
-consteval auto periodic(std::chrono::duration<A, Period> delay) {
-    auto delay_ticks = to_ticks_safe(delay);
-
-    return [=](auto&& go) {
-        auto last_wake = xTaskGetTickCount();
-        for (;;) {
-            go();
-            xTaskDelayUntil(&last_wake, delay_ticks);
-        }
-    };
+template <NonZeroTickDuration period>
+[[noreturn]] auto periodic(auto&& go) {
+    auto last_wake = xTaskGetTickCount();
+    for (;;) {
+        go();
+        xTaskDelayUntil(&last_wake, period);
+    }
 }
 
 }  // namespace nevermore

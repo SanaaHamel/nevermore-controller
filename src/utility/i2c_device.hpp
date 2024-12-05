@@ -56,36 +56,22 @@ struct I2CDevice {
 
     template <typename A>
     std::optional<A> read_crc() const {
-        auto result = bus.read_crc<CRC_Init, A>(name, address);
-        if (!result) return {};
-        return *result;
+        return bus.read_crc<CRC_Init, A>(name, address);
     }
 
-    template <typename A>
+    template <typename A, TaskDelayArg delay = {}>
     std::optional<A> read(Register reg) const {
         if (!touch(reg)) return {};
+
+        task_delay<delay>();
         return read<A>();
     }
 
-    template <typename A>
+    template <typename A, TaskDelayArg delay = {}>
     std::optional<A> read_crc(Register reg) const {
         if (!touch(reg)) return {};
-        return read_crc<A>();
-    }
 
-    template <typename A, typename Delay>
-    std::optional<A> read(Register reg, Delay&& delay) const {
-        if (!touch(reg)) return {};
-
-        task_delay(std::forward<Delay>(delay));
-        return read<A>();
-    }
-
-    template <typename A, typename Delay>
-    std::optional<A> read_crc(Register reg, Delay&& delay) const {
-        if (!touch(reg)) return {};
-
-        task_delay(std::forward<Delay>(delay));
+        task_delay<delay>();
         return read_crc<A>();
     }
 

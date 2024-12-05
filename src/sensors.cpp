@@ -153,7 +153,7 @@ bool init() {
     CST816S::register_isr();
 
     printf("Waiting %u ms for sensor init\n", unsigned(SENSOR_POWER_ON_DELAY / 1ms));
-    task_delay(SENSOR_POWER_ON_DELAY);
+    task_delay<SENSOR_POWER_ON_DELAY>();
 
     foreach_sensor_bus([](auto&& bus, auto&& kind) {
         auto xs = sensors_init_bus(bus, kind);
@@ -165,7 +165,7 @@ bool init() {
     g_sensor_devices.shrink_to_fit();
 
     // wait again b/c probing might be implemented by sending a reset command to the sensor
-    task_delay(SENSOR_POWER_ON_DELAY);
+    task_delay<SENSOR_POWER_ON_DELAY>();
 
     return true;
 }

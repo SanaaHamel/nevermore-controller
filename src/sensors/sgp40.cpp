@@ -69,7 +69,7 @@ struct SGP40 final : SensorPeriodicEnvI2C<Cmd, "SGP40", 0xFF> {
     void read() override {
         if (!measure(side.compensation_temperature(), side.compensation_humidity())) return;
 
-        task_delay(320ms);
+        task_delay<320ms>();
 
         auto response = i2c.read_crc<uint16_t>();
         if (!response) return;
@@ -90,13 +90,13 @@ struct SGP40 final : SensorPeriodicEnvI2C<Cmd, "SGP40", 0xFF> {
                 humidity_tick, crc8(humidity_tick, 0xFF), temperature_tick, crc8(temperature_tick, 0xFF)};
         if (!i2c.write(Cmd::SGP40_MEASURE, params)) return false;
 
-        task_delay(320ms);
+        task_delay<320ms>();
         return true;
     }
 
     [[nodiscard]] optional<uint16_t> self_test() const {
         // spec says max delay of 320ms
-        auto const result = i2c.read_crc<uint16_t>(Cmd::SGP40_SELF_TEST, 320ms);
+        auto const result = i2c.read_crc<uint16_t, 320ms>(Cmd::SGP40_SELF_TEST);
         if (!result) {
             i2c.log_error("self-test request failed");
         } else if (*result != SELF_TEST_OK) {

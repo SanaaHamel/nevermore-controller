@@ -16,9 +16,9 @@
 #include "sensors.hpp"
 #include "settings.hpp"
 #include "task.h"  // IWYU pragma: keep
+#include "utility/cyw43_timer.hpp"
 #include "utility/i2c.hpp"
 #include "utility/task.hpp"
-#include "utility/timer.hpp"
 #include "ws2812.hpp"
 #include <cassert>
 #include <cstdio>
@@ -103,7 +103,7 @@ void setup_watchdog() {
     mk_task("watchdog-update", Priority::WatchdogUpdate, 128)([]() {
         for (;;) {
             watchdog_update();
-            task_delay(WATCHDOG_TIMEOUT / 4);
+            task_delay<WATCHDOG_TIMEOUT / 4>();
         }
     }).release();
 }
@@ -152,12 +152,9 @@ void startup() {
     // peace.
     // Calling it from a BT timer seems to solve the problem. IDK why, but I'm not
     // paid to find out and I've already wasted an afternoon on this.
-    static btstack_timer_source_t led_timer{.process = [](btstack_timer_source_t* timer) {
-        led_status::update();
-        btstack_run_loop_set_timer(timer, LED_UPDATE_PERIOD / 1ms);
-        btstack_run_loop_add_timer(timer);
-    }};
-    led_timer.process(&led_timer);
+    static auto led_timer =
+            mk_cyw43_timer<LED_UPDATE_PERIOD>("led-update")([](auto*) { led_status::update(); });
+    led_timer.start();
 
     if constexpr (NEVERMORE_PICO_W_BT) {
         mk_task("bluetooth", Priority::Communication, 1024)(btstack_run_loop_execute).release();

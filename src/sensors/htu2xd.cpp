@@ -2,6 +2,7 @@
 #include "config.hpp"
 #include "sdk/ble_data_types.hpp"
 #include "sdk/i2c.hpp"
+#include "sdk/task.hpp"
 #include <bit>
 #include <cassert>
 #include <cstdint>
@@ -110,7 +111,7 @@ struct HTU2xDSensor final : SensorPeriodic {
     }
 
     void read() override {
-        auto htu2xd_fetch = [&](auto kind, auto delay) {
+        auto htu2xd_fetch = [&](auto kind, TaskDelayArg delay) {
             if (!htu2xd_issue(bus, kind)) return;
             task_delay(delay);
 

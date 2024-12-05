@@ -218,9 +218,9 @@ void CST816S::register_isr() {
 void CST816S::reset_all() {
     if (auto pin = Pins::active().touch_reset) {
         gpio_put(pin, false);  // trigger on low
-        task_delay(5ms);
+        task_delay<5ms>();
         gpio_put(pin, true);
-        task_delay(50ms);
+        task_delay<50ms>();
     }
 }
 
