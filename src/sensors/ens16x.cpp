@@ -238,7 +238,7 @@ struct ENS16xSensor final : SensorPeriodicEnvI2C<Reg, "ENS16x"> {
         // HACK:  Give the device a moment to switch.
         //        If you don't, the checksum read can fail, and without that
         //        you can't read the status.
-        task_delay(ENS16x_POWER_ON_DELAY);
+        task_delay<ENS16x_POWER_ON_DELAY>();
 
         // Reset does *NOT* clear/set MISR. Have to query the current state from the device.
         // Might as well do this now when we're changing modes.

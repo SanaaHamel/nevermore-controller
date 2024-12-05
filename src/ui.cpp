@@ -490,7 +490,7 @@ bool init() {
 
 #define DISPLAY_TASK(name, period, stack_size, go)                \
     mk_task(name, Priority::Display, stack_size)([]() {           \
-        periodic(period)([] { using_semaphore(g_ui_lock)(go); }); \
+        periodic<period>([] { using_semaphore(g_ui_lock)(go); }); \
     }).release()
 
     // must finish init-ing the UI *before* we start `lv_timer_handler` (which could otherwise interrupt)

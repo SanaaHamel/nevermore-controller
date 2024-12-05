@@ -1,6 +1,7 @@
 #include "sgp30.hpp"
 #include "config.hpp"
 #include "environmental_i2c.hpp"
+#include "sdk/task.hpp"
 #include "sensors/gas_index.hpp"
 #include "utility/crc.hpp"
 #include "utility/humidity.hpp"
@@ -106,7 +107,7 @@ struct SGP30Sensor final : SensorPeriodicEnvI2C<Reg, "SGP30", 0xFF> {
             i2c.log_error("failed to init IAQ");
             return false;
         }
-        task_delay(10ms);  // spec says 10ms for IAQ init
+        task_delay<10ms>();  // spec says 10ms for IAQ init
         start = Clock::now();
 
         calibration_reset();
@@ -138,7 +139,7 @@ struct SGP30Sensor final : SensorPeriodicEnvI2C<Reg, "SGP30", 0xFF> {
             return;
         }
 
-        auto raw = measure(Reg::RawMeasure, 25ms);
+        auto raw = measure<25ms>(Reg::RawMeasure);
         if (!raw) return;
 
         side.set(VOCRaw(raw->tvoc_ppb));
@@ -149,8 +150,8 @@ struct SGP30Sensor final : SensorPeriodicEnvI2C<Reg, "SGP30", 0xFF> {
         index.checkpoint(side.voc_calibration_blob(), i2c);
 
         /*
-        auto baseline = measure(Reg::IAQ_Baseline, 10ms);  // spec says 10ms
-        auto result = measure(Reg::IAQ_Measure, 12ms);  // spec says 12ms max wait
+        auto baseline = measure<10ms>(Reg::IAQ_Baseline);  // spec says 10ms
+        auto result = measure<12ms>(Reg::IAQ_Measure);  // spec says 12ms max wait
         if (!(baseline && result)) return;
 
         auto idx = voc_index(*result);
@@ -174,11 +175,11 @@ struct SGP30Sensor final : SensorPeriodicEnvI2C<Reg, "SGP30", 0xFF> {
     }
 
     [[nodiscard]] optional<FeatureSet> feature_set() const {
-        return i2c.read_crc<FeatureSet>(Reg::FeatureSet, 10ms);  // spec says max 2ms
+        return i2c.read_crc<FeatureSet, 10ms>(Reg::FeatureSet);  // spec says max 2ms
     }
 
     [[nodiscard]] optional<uint16_t> self_test() const {
-        auto result = i2c.read_crc<uint16_t>(Reg::SelfTest, 220ms);
+        auto result = i2c.read_crc<uint16_t, 220ms>(Reg::SelfTest);
         if (!result) {
             i2c.log_error("self-test request failed");
         } else if (*result != SGP30_SELF_TEST_OK) {
@@ -201,7 +202,7 @@ struct SGP30Sensor final : SensorPeriodicEnvI2C<Reg, "SGP30", 0xFF> {
                                              }))
             return false;
 
-        task_delay(10ms);  // spec says 10ms
+        task_delay<10ms>();  // spec says 10ms
         return true;
     }
 
@@ -217,12 +218,13 @@ struct SGP30Sensor final : SensorPeriodicEnvI2C<Reg, "SGP30", 0xFF> {
         };
         if (!i2c.write(Reg::HumiditySet, Payload{scaled, crc(scaled)})) return false;
 
-        task_delay(10ms);
+        task_delay<10ms>();
         return true;
     }
 
-    optional<Measurement> measure(Reg reg, std::chrono::milliseconds delay) {
-        auto result = i2c.read<Measurement>(reg, delay);
+    template <TaskDelayArg delay>
+    optional<Measurement> measure(Reg reg) {
+        auto result = i2c.read<Measurement, delay>(reg);
         if (!result) return {};
         if (!crc(result->co2_eq_ppm, result->co2_crc)) return {};
         if (!crc(result->tvoc_ppb, result->tvoc_crc)) return {};
