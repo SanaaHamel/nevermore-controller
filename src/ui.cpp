@@ -30,7 +30,11 @@ constexpr uint8_t CHART_SERIES_ENTIRES_MAX = display::RESOLUTION.width / 3;
 
 constexpr auto DISPLAY_TIMER_PLOT_INTERVAL = CHART_X_AXIS_LENGTH / CHART_SERIES_ENTIRES_MAX;
 constexpr auto DISPLAY_TIMER_LABELS_INTERVAL = 1s;
-constexpr auto DISPLAY_REFRESH_INTERVAL = 5ms;
+// no need to run timers faster than 2x the device or refresh period
+constexpr auto DISPLAY_LVGL_TIMER_INTERVAL =
+        chrono::milliseconds(min(LV_DISP_DEF_REFR_PERIOD, LV_INDEV_DEF_READ_PERIOD)) / 2.f;
+
+constexpr UBaseType_t DISPLAY_TASK_STACK_SIZE = 1024;
 
 struct ChartDivY {
     uint8_t min;
@@ -150,7 +154,7 @@ void fan_power_arc_colour_update() {
             LV_PART_INDICATOR | int(LV_STATE_DEFAULT));
 }
 
-void display_update_labels() {
+void display_update_labels(auto*) {
     auto const& state = nevermore::sensors::g_sensors.with_fallbacks();
 
     label_set(ui.pressure_in, "--- hPa", "%.1f hPa", state.pressure_intake, 1e2);
@@ -172,7 +176,7 @@ void display_update_labels() {
     }
 }
 
-void display_update_plot() {
+void display_update_plot(auto*) {
     if (!ui.chart) return;
 
     auto const& state = nevermore::sensors::g_sensors.with_fallbacks();
@@ -488,15 +492,20 @@ bool init() {
     }
 #endif
 
-#define DISPLAY_TASK(name, period, stack_size, go)                \
-    mk_task(name, Priority::Display, stack_size)([]() {           \
-        periodic<period>([] { using_semaphore(g_ui_lock)(go); }); \
-    }).release()
+    // make LVGL timers before creating the LVGL-timer-handler task; avoids concurrency issues
+    auto mk_timer = [](lv_timer_cb_t fn, auto period) {
+        assert(10ms < period && "doesn't need to be this frequent");
+        lv_timer_create(fn, chrono::duration_cast<chrono::milliseconds>(period).count(), nullptr);
+    };
+    mk_timer(display_update_labels, DISPLAY_TIMER_LABELS_INTERVAL);
+    mk_timer(display_update_plot, DISPLAY_TIMER_PLOT_INTERVAL);
+    // clear the axis label until we get our first sample
+    if (ui.chart_x_axis_scale) lv_label_set_text(ui.chart_x_axis_scale, "");
 
-    // must finish init-ing the UI *before* we start `lv_timer_handler` (which could otherwise interrupt)
-    DISPLAY_TASK("display", DISPLAY_REFRESH_INTERVAL, 1024, lv_timer_handler);
-    DISPLAY_TASK("display-label", DISPLAY_TIMER_LABELS_INTERVAL, 1024, display_update_labels);
-    DISPLAY_TASK("display-plot", DISPLAY_TIMER_PLOT_INTERVAL, 1024, display_update_plot);
+    mk_task("display-lvgl-tasks", Priority::Display, DISPLAY_TASK_STACK_SIZE)([]() {
+        periodic<DISPLAY_LVGL_TIMER_INTERVAL>(lv_timer_handler);
+    }).release();
+
     return true;
 }
 
