@@ -20,6 +20,13 @@ board:
         PICO_BOARD: pico_w
         NEVERMORE_BOARD: pico_w
         NEVERMORE_PICO_W_BT: "true"
+    pico_w_no_bt:
+      short: Pico W w/ BT Disabled
+      long: Classic Pico W w/ BT Disabled
+      settings:
+        PICO_BOARD: pico_w
+        NEVERMORE_BOARD: pico_w
+        NEVERMORE_PICO_W_BT: "false"
     waveshare-rp2040-lcd-1.28:
       short: Waveshare RP2040 LCD-1.28
       long: Waveshare RP2040 LCD-1.28 (w/o wireless)
