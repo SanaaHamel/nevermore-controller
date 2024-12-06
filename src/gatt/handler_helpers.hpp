@@ -158,7 +158,9 @@ struct NotifyState {
 
     // can be invoked by other tasks
     void notify() {
+#if NEVERMORE_PICO_W_BT
         btstack_run_loop_execute_on_main_thread(&notify_callback);
+#endif
     }
 
     [[nodiscard]] uint16_t client_configuration(hci_con_handle_t conn) const {

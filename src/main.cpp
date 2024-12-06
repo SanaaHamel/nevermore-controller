@@ -15,7 +15,10 @@
 #include "sdk/task.hpp"
 #include "sensors.hpp"
 #include "settings.hpp"
+#include "stdio_usb.h"
 #include "task.h"  // IWYU pragma: keep
+#include "tusb.h"
+#include "usb_cdc_gatt.hpp"
 #include "utility/cyw43_timer.hpp"
 #include "utility/i2c.hpp"
 #include "utility/task.hpp"
@@ -46,15 +49,15 @@ void vApplicationStackOverflowHook(TaskHandle_t Task, char* pcTaskName) {
 void vApplicationMallocFailedHook() {
     panic("PANIC - heap alloc failed\n");
 }
-
-// declared/defined by `pico_stdio_usb`
-bool stdio_usb_connected();
 }
 
 namespace {
 
 constexpr auto WATCHDOG_TIMEOUT = 3000ms;
 constexpr auto LED_UPDATE_PERIOD = 100ms;
+
+constexpr uint32_t USB_CDC_GATT_STACK_SIZE = 512 + 32;
+static_assert(nevermore::gatt::ATTR_SIZE_MAX + configMINIMAL_STACK_SIZE <= USB_CDC_GATT_STACK_SIZE);
 
 // Leave pins {0, 1} set to UART TX/RX.
 // Clear everything else.
@@ -111,8 +114,19 @@ void setup_watchdog() {
 }  // namespace
 
 void startup() {
+    tusb_init();
     stdio_init_all();
     adc_init();
+
+    constexpr auto USBD_STACK_SIZE = (3 * configMINIMAL_STACK_SIZE / 2) * (CFG_TUSB_DEBUG ? 2 : 1);
+    mk_task("usbd", Priority::USBD, USBD_STACK_SIZE)([]() {
+        for (;;) {
+            // does not return & waits for events using FreeRTOS primitives (if built w/ FreeRTOS)
+            // (if built with pico os it'll return when it runs out of events & starve other tasks)
+            tud_task();
+        }
+    }).release();
+    stdio_usb_init();  // init after launching the USBD task
 
 #if CYW43_IN_USE
     // need the CYW43 up to access the LED, even if we don't have BT enabled
@@ -159,6 +173,10 @@ void startup() {
     if constexpr (NEVERMORE_PICO_W_BT) {
         mk_task("bluetooth", Priority::Communication, 1024)(btstack_run_loop_execute).release();
     }
+
+    // also runs
+    mk_task("usb-cdc-gatt", Priority::Communication, USB_CDC_GATT_STACK_SIZE)(nevermore::usb_cdc_gatt_task)
+            .release();
 }
 
 int main() {
