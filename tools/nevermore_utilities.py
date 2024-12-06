@@ -9,16 +9,20 @@ import dataclasses
 import enum
 import logging
 import typing
+from abc import ABCMeta, abstractmethod
 from dataclasses import dataclass
 from typing import (
     Any,
     Callable,
     Coroutine,
     Dict,
+    Iterable,
     List,
     MutableMapping,
     Optional,
+    Set,
     Tuple,
+    Type,
     TypeVar,
     Union,
     overload,
@@ -26,8 +30,12 @@ from typing import (
 from uuid import UUID
 
 import bleak
+import serial
 from bleak import BleakClient, BleakScanner
+from bleak.backends.characteristic import BleakGATTCharacteristic
 from bleak.backends.device import BLEDevice
+from bleak.backends.service import BleakGATTService
+from typing_extensions import override
 
 if typing.TYPE_CHECKING:
     LoggerAdapter = logging.LoggerAdapter[logging.Logger]
@@ -35,6 +43,7 @@ else:
     LoggerAdapter = logging.LoggerAdapter
 
 _A = TypeVar("_A")
+_Float = TypeVar("_Float", bound=float)
 
 
 NEVERMORE_CONTROLLER_NAMES = {"Nevermore", "Nevermore Controller"}
@@ -51,6 +60,7 @@ VOC_GATING_THRESHOLD_MIN = 175
 # Non-configurable constants
 CONTROLLER_ADVERTISEMENT_PERIOD = 0.5  # seconds, upper bound on adverts
 CONTROLLER_CONNECTION_DELAY = 5  # seconds, expected upper bound based on tests
+NEVERMORE_SERIAL_BAUDRATE_DEFAULT = 115200
 
 NEVERMORE_SERVO_PERIOD = 1 / 50
 
@@ -67,7 +77,7 @@ class CharacteristicProperty(enum.Enum):
     NOTIFY = "notify"
     READ = "read"
     WRITE = "write"
-    WRITE_NO_RESPONSE = "write-without-response"
+    WRITE_WITHOUT_RESPONSE = "write-without-response"
 
 
 class LogPrefixed(LoggerAdapter):
@@ -89,6 +99,7 @@ def short_uuid(x: int):
 
 
 UUID_SERVICE_GAP = short_uuid(0x1801)
+UUID_SERVICE_PRIMARY = short_uuid(0x2800)
 UUID_SERVICE_ENVIRONMENTAL_SENSING = short_uuid(0x181A)
 UUID_SERVICE_CONFIGURATION = UUID("b5078b20-aea3-4c37-a18f-b370c03f02a6")
 UUID_SERVICE_FAN = UUID("4553d138-1d00-4b6f-bc42-955a89cf8c36")
@@ -98,9 +109,11 @@ UUID_SERVICE_DISPLAY = UUID("7be8ac4b-7eb4-4e09-b134-91a46b622832")
 UUID_SERVICE_PHOTOCATALYTIC = UUID("de44dd71-2400-4cd1-a3f3-9fb00c4697d7")
 UUID_SERVICE_SERVO = UUID("8959bb3e-3063-4a46-9b9a-69fdbc327f1c")
 
+UUID_CHAR_GATT = short_uuid(0x2803)
 UUID_CHAR_PERCENT8 = short_uuid(0x2B04)
 UUID_CHAR_COUNT16 = short_uuid(0x2AEA)
 UUID_CHAR_TIMESEC16 = short_uuid(0x2B16)
+UUID_CHAR_SERIAL_NUMBER = short_uuid(0x2A25)
 UUID_CHAR_HARDWARE_REVISION = short_uuid(0x2A27)
 UUID_CHAR_SOFTWARE_REVISION = short_uuid(0x2A28)
 UUID_CHAR_PERCENT16_8 = UUID("0543a134-244f-405b-9d43-0351a5336ef7")
@@ -130,6 +143,666 @@ class DisplayUI(enum.Enum):
     GC9A01_CLASSIC = 0
     GC9A01_SMALL_PLOT = 1
     GC9A01_NO_PLOT = 2
+
+
+@dataclass(frozen=True)
+class BtstackDatabaseAttr:
+    # relevant subset of flags defined in `compile_gatt.py`
+    class Flags(enum.IntFlag):
+        BROADCAST = 0x01
+        READ = 0x02
+        WRITE_WITHOUT_RESPONSE = 0x04
+        WRITE = 0x08
+        NOTIFY = 0x10
+        INDICATE = 0x20
+        EXTENDED_PROPERTIES = 0x80  # FUTURE WORK: handle?
+        DYNAMIC = 0x100  # btstack custom
+        LONG_UUID = 0x200  # btstack custom
+
+        @classmethod
+        def from_prop(cls, prop: CharacteristicProperty):
+            return {
+                CharacteristicProperty.BROADCAST: cls.BROADCAST,
+                CharacteristicProperty.READ: cls.READ,
+                CharacteristicProperty.WRITE: cls.WRITE,
+                CharacteristicProperty.WRITE_WITHOUT_RESPONSE: cls.WRITE_WITHOUT_RESPONSE,
+                CharacteristicProperty.NOTIFY: cls.NOTIFY,
+                CharacteristicProperty.INDICATE: cls.INDICATE,
+            }[prop]
+
+    flags: Flags
+    handle: int
+    uuid: UUID
+    value: Optional[bytes] = None  # None IFF `flags & DYNAMIC`
+
+    @staticmethod
+    def parse(data: memoryview) -> 'BtstackDatabaseAttr':
+        if len(data) < 4:
+            raise ValueError("malformed attr missing required fields")
+
+        flags = BtstackDatabaseAttr.Flags(
+            int.from_bytes(data[:2], 'little', signed=False)
+        )
+        handle = int.from_bytes(data[2:4], 'little', signed=False)
+
+        uuid_len = 16 if flags & BtstackDatabaseAttr.Flags.LONG_UUID else 2
+        uuid_raw = data[4 : 4 + uuid_len]
+        if len(uuid_raw) != uuid_len:
+            raise ValueError(f'malformed attr too short for uuid (size {len(data)})')
+
+        if flags & BtstackDatabaseAttr.Flags.LONG_UUID:
+            uuid = UUID(bytes=bytes(reversed(uuid_raw)))
+        else:
+            uuid = short_uuid(int.from_bytes(uuid_raw, 'little', signed=False))
+
+        value_raw = data[4 + uuid_len :]
+        value = None if flags & BtstackDatabaseAttr.Flags.DYNAMIC else bytes(value_raw)
+        return BtstackDatabaseAttr(flags, handle, uuid, value)
+
+    @staticmethod
+    def parse_database(db: bytes) -> Iterable['BtstackDatabaseAttr']:
+        if len(db) < 1:
+            raise ValueError('invalid minimum length')
+        if db[0] != 1:
+            raise ValueError(f'unhandled db version {db[0]}')
+
+        data = memoryview(db)[1:]
+        while True:
+            if len(data) < 2:
+                raise ValueError('data too short for valid entry')
+
+            size = int.from_bytes(data[:2], 'little', signed=False)
+            if size == 0:
+                return
+
+            subset = data[2:size]
+            data = data[size:]
+            if len(subset) < size - 2:
+                raise ValueError(
+                    f"truncated attr w/ size {size - 2} ({len(subset)} avail)"
+                )
+
+            yield BtstackDatabaseAttr.parse(subset)
+
+
+class Transport:
+    class AttrNotFound(Exception):
+        def __init__(self, num: int, uuid: UUID, props: Set[CharacteristicProperty]):
+            super().__init__(
+                f"doesn't have exactly {num} characteristic(s) {uuid} w/ properties {props}"
+            )
+            self.num = num
+            self.uuid = uuid
+            self.props = props
+
+    class ServiceNotFound(Exception):
+        def __init__(self, uuid: UUID):
+            super().__init__(f"doesn't have exactly 1 service for {uuid}")
+            self.uuid = uuid
+
+    class Attribute:
+        @abstractmethod
+        async def write(self, blob: bytes) -> None:
+            raise NotImplemented
+
+        @abstractmethod
+        async def read(self) -> bytes:
+            raise NotImplemented
+
+        @abstractmethod
+        def has_property(self, prop: CharacteristicProperty) -> bool:
+            raise NotImplemented
+
+        @property
+        @abstractmethod
+        def handle(self) -> int:
+            raise NotImplemented
+
+    class Service:
+        # POST CONDITION: ordered by handle #
+        @abstractmethod
+        def all(self, uuid: Optional[UUID] = None) -> Iterable['Transport.Attribute']:
+            raise NotImplemented
+
+        def many(
+            self,
+            uuid: UUID,
+            num: Optional[int] = None,
+            props: Set[CharacteristicProperty] = {CharacteristicProperty.READ},
+        ) -> List['Transport.Attribute']:
+            xs = [x for x in self.all(uuid) if all(x.has_property(p) for p in props)]
+
+            if num is not None and len(xs) != num:
+                raise Transport.AttrNotFound(num, uuid, props)
+
+            return xs
+
+        def __call__(
+            self,
+            uuid: UUID,
+            props: Set[CharacteristicProperty] = {CharacteristicProperty.READ},
+        ) -> 'Transport.Attribute':
+            return self.many(uuid, 1, props)[0]
+
+    # May only be used if this instance owns the underlying transport mechanism
+    @abstractmethod
+    async def close(self) -> None:
+        raise NotImplemented
+
+    @property
+    @abstractmethod
+    def all(self) -> Iterable['Transport.Service']:
+        raise NotImplemented
+
+    @abstractmethod
+    def service(self, uuid: UUID) -> Service:
+        raise NotImplemented
+
+    def __call__(
+        self,
+        uuid: UUID,
+        props: Set[CharacteristicProperty] = {CharacteristicProperty.READ},
+    ) -> 'Transport.Attribute':
+        xs = [attr for service in self.all for attr in service.many(uuid, None, props)]
+        if len(xs) != 1:
+            raise Transport.AttrNotFound(1, uuid, props)
+
+        return xs[0]
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        await self.close()
+
+
+@dataclass(frozen=True)
+class TransportBLE(Transport):
+    client: BleakClient
+
+    @dataclass(frozen=True)
+    class Attribute(Transport.Attribute):
+        client: BleakClient
+        inner: BleakGATTCharacteristic
+
+        async def write(self, blob: bytes):
+            await self.client.write_gatt_char(self.inner, blob)
+
+        async def read(self):
+            return bytes(await self.client.read_gatt_char(self.inner))
+
+        @property
+        def uuid(self):
+            return self.inner.uuid
+
+        def has_property(self, prop: CharacteristicProperty) -> bool:
+            return prop.value in self.inner.properties
+
+        @property
+        @override
+        def handle(self):
+            return self.inner.handle
+
+    @dataclass(frozen=True)
+    class Service(Transport.Service):
+        client: BleakClient
+        inner: BleakGATTService
+
+        @override
+        def all(self, uuid: Optional[UUID] = None):
+            # FUTURE WORK: O(n) for UUID lookup, which goes O(n^2) in total work
+            uuid_str = None if uuid is None else str(uuid)
+            return sorted(
+                (
+                    TransportBLE.Attribute(self.client, x)
+                    for x in self.inner.characteristics
+                    if uuid is None or x.uuid == uuid_str
+                ),
+                key=lambda x: x.handle,
+            )
+
+    @property
+    @override
+    def all(self):
+        for x in self.client.services:
+            yield TransportBLE.Service(self.client, x)
+
+    @override
+    def service(self, uuid: UUID) -> 'Service':
+        x = self.client.services.get_service(uuid)
+        if x is None:
+            raise Transport.ServiceNotFound(uuid)
+
+        return TransportBLE.Service(self.client, x)
+
+    @override
+    async def close(self) -> None:
+        await self.client.disconnect()
+
+
+class TransportSerial(Transport):
+
+    CMD_DB_READ = 0xFA
+    CMD_ATTR_READ = 0xFB
+    CMD_ATTR_WRITE = 0xFC
+
+    class TimeoutException(Exception):
+        def __init__(self, *, read: bool):
+            super().__init__(f"{'read' if read else 'write'} timed out")
+            self.read = read
+
+    @dataclass(frozen=True)
+    class Attribute(Transport.Attribute):
+        transport: 'TransportSerial'
+        attr: BtstackDatabaseAttr
+
+        async def write(self, blob: bytes):
+            if 0xFFFF < len(blob):
+                raise ValueError(f"payload too big size={len(blob)}")
+
+            self.transport._read_clear()
+            self.transport._write(
+                bytes([TransportSerial.CMD_ATTR_WRITE])
+                + self.attr.handle.to_bytes(2, 'little')
+                + len(blob).to_bytes(2, 'little')
+                + blob
+            )
+
+            self.transport._read_until(TransportSerial.CMD_ATTR_WRITE)
+            handle = self.transport._read_uint(2)
+            okay = self.transport._read_uint(1)
+
+            if handle != self.handle:
+                raise Exception(f"replied w/ handle {handle}, expected {self.handle}")
+            if not okay:
+                raise Exception(f"write failed w/ handle {handle}")
+
+        async def read(self):
+            if not self.attr.flags & BtstackDatabaseAttr.Flags.DYNAMIC:
+                assert self.attr.value is not None
+                return self.attr.value
+
+            self.transport._read_clear()
+            self.transport._write(
+                bytes([TransportSerial.CMD_ATTR_READ])
+                + self.attr.handle.to_bytes(2, 'little')
+            )
+
+            self.transport._read_until(TransportSerial.CMD_ATTR_READ)
+            handle = self.transport._read_uint(2)
+            okay = self.transport._read_uint(1)
+            data = self.transport._read_payload()
+            if handle != self.handle:
+                raise Exception(f"replied w/ handle {handle}, expected {self.handle}")
+            if not okay:
+                raise Exception(f"read failed w/ handle {handle}")
+
+            return data
+
+        def has_property(self, prop: CharacteristicProperty):
+            return (self.attr.flags & self.attr.flags.from_prop(prop)) != 0
+
+        @property
+        @override
+        def handle(self):
+            return self.attr.handle
+
+    @dataclass(frozen=True)
+    class Service(Transport.Service):
+        attr: BtstackDatabaseAttr
+        children: List['TransportSerial.Attribute']
+
+        @property
+        def uuid(self):
+            assert self.attr.value is not None
+            if len(self.attr.value) == 2:
+                return short_uuid(int.from_bytes(self.attr.value, 'little'))
+            else:
+                assert len(self.attr.value) == 16
+                return UUID(bytes=bytes(reversed(self.attr.value)))
+
+        @override
+        def all(self, uuid: Optional[UUID] = None):
+            # FUTURE WORK: O(n) for UUID lookup, which goes O(n^2) in total work
+            return sorted(
+                (x for x in self.children if uuid is None or x.attr.uuid == uuid),
+                key=lambda x: x.handle,
+            )
+
+    def __init__(self, serial: serial.Serial):
+        self.services: List[TransportSerial.Service] = []
+        self.serial = serial
+
+        self._read_clear()  # drop everything that might be cached by the OS
+
+        # fetch DB
+        self._write(bytes([self.CMD_DB_READ]))
+        self._read_until(self.CMD_DB_READ)
+        database = self._read_payload()
+
+        attrs = list(BtstackDatabaseAttr.parse_database(database))
+        handle_2_index = {attrs[i].handle: i for i in range(len(attrs))}
+        # decorate everything with GATT information, not just attr info
+        for attr in attrs:
+            if attr.uuid == UUID_CHAR_GATT:
+                # flags (1), handle (2), uuid (2 or 16)
+                assert attr.value is not None and len(attr.value) - 3 in [2, 16]
+                gatt_flags = BtstackDatabaseAttr.Flags(attr.value[0])
+                handle = int.from_bytes(attr.value[1:2], 'little')
+                assert (
+                    handle in handle_2_index
+                ), f"malformed attr db references unknown handle {handle}"
+                index = handle_2_index[handle]
+                attrs[index] = dataclasses.replace(
+                    attrs[index], flags=attrs[index].flags | gatt_flags
+                )
+
+        # partition into services
+        for attr in attrs:
+            if attr.uuid == UUID_SERVICE_PRIMARY:
+                self.services.append(TransportSerial.Service(attr, []))
+            elif not self.services:
+                continue  # ignore attrib, it isn't part of a primary service
+            else:
+                self.services[-1].children.append(TransportSerial.Attribute(self, attr))
+
+    @property
+    @override
+    def all(self):
+        return self.services
+
+    @override
+    def service(self, uuid: UUID):
+        xs = [x for x in self.services if x.uuid == uuid]
+        if len(xs) != 1:
+            raise Transport.ServiceNotFound(uuid)
+
+        return xs[0]
+
+    @override
+    async def close(self) -> None:
+        self.serial.close()
+
+    def _write(self, data: bytes):
+        if self.serial.write(data) != len(data):  # timed out / failed
+            raise TransportSerial.TimeoutException(read=False)
+
+    def _read_uint(self, n) -> int:
+        data = self.serial.read(n)
+        if len(data) < n:  # timed out / failed
+            raise TransportSerial.TimeoutException(read=True)
+
+        return int.from_bytes(data, 'little', signed=False)
+
+    def _read_until(self, cmd: int):
+        # incorrect type annotation. `serial.Timeout` can be construct w/ `None`
+        timeout = serial.Timeout(self.serial.timeout)
+        cmd_bytes = bytes([cmd])
+        while True:
+            if self.serial.read(1) == cmd_bytes:
+                break
+
+            if timeout.expired():
+                raise TransportSerial.TimeoutException(read=True)
+
+    def _read_payload(self) -> bytes:
+        size = self._read_uint(2)
+        data = self.serial.read(size)
+        if len(data) != size:
+            raise TransportSerial.TimeoutException(read=True)
+
+        return data
+
+    def _read_clear(self) -> None:
+        self.serial.read_all()  # flush any pending junk
+
+
+class CommBindings:
+    def __init__(self, transport: Transport):
+        P = CharacteristicProperty
+
+        self.config = transport.service(UUID_SERVICE_CONFIGURATION)
+        self.env = transport.service(UUID_SERVICE_ENVIRONMENTAL_SENSING)
+        self.fan = transport.service(UUID_SERVICE_FAN)
+        self.fan_policy = transport.service(UUID_SERVICE_FAN_POLICY)
+        self.ws2812 = transport.service(UUID_SERVICE_WS2812)
+        self.display = transport.service(UUID_SERVICE_DISPLAY)
+        self.servo = transport.service(UUID_SERVICE_SERVO)
+
+        self.aggregate_env = self.env(UUID_CHAR_DATA_AGGREGATE, {P.READ, P.NOTIFY})
+        self.aggregate_fan = self.fan(UUID_CHAR_FAN_AGGREGATE, {P.READ, P.NOTIFY})
+        # HACK: it's the first one in the list (ordered by handle #). this is brittle.
+        (
+            self.fan_power_override,
+            self.fan_power_passive,
+            self.fan_power_auto,
+            self.fan_power_coeff,
+        ) = self.fan.many(UUID_CHAR_PERCENT8, 4, {P.WRITE})
+        self.ws2812_length = self.ws2812(UUID_CHAR_COUNT16, {P.WRITE})
+        self.ws2812_update = self.ws2812(
+            UUID_CHAR_WS2812_UPDATE, {P.WRITE_WITHOUT_RESPONSE}
+        )
+        self.fan_policy_cooldown = self.fan_policy(UUID_CHAR_TIMESEC16, {P.WRITE})
+        self.fan_policy_voc_passive_max, self.fan_policy_voc_improve_min = (
+            self.fan_policy.many(UUID_CHAR_VOC_INDEX, 2, {P.WRITE})
+        )
+        self.fan_thermal_limit = self.fan_policy(UUID_CHAR_FAN_THERMAL, {P.WRITE})
+        self.config_flags = self.config(UUID_CHAR_CONFIG_FLAGS64, {P.WRITE})
+        self.config_reboot = self.config(UUID_CHAR_CONFIG_REBOOT, {P.WRITE})
+        self.config_reset = self.config(UUID_CHAR_CONFIG_RESET, {P.WRITE})
+        self.config_checkpoint_sensor_calibration = self.config(
+            UUID_CHAR_CONFIG_CHECKPOINT_SENSOR_CALIBRATION, {P.WRITE}
+        )
+        self.config_reset_sensor_calibration = self.config(
+            UUID_CHAR_CONFIG_RESET_SENSOR_CALIBRATION, {P.WRITE}
+        )
+        self.config_voc_threshold, self.config_voc_threshold_override = (
+            self.config.many(UUID_CHAR_VOC_INDEX, 2, {P.WRITE})
+        )
+        self.config_voc_calibrate_enabled = self.config(
+            UUID_CHAR_CONFIG_VOC_CALIBRATE_ENABLED, {P.WRITE}
+        )
+        self.display_brightness = self.display(UUID_CHAR_PERCENT8, {P.WRITE})
+        self.display_ui = self.display(UUID_CHAR_DISPLAY_UI, {P.WRITE})
+        self.servo_vent_range = self.servo(UUID_CHAR_SERVO_RANGE, {P.WRITE})
+        self.servo_vent_pwm = self.servo(UUID_CHAR_PERCENT16_8, {P.WRITE})
+
+
+def _clamp(x: _Float, min: _Float, max: _Float) -> _Float:
+    if x < min:
+        return min
+    if max < x:
+        return max
+    return x
+
+
+class Command:
+    @abstractmethod
+    async def dispatch(self, comm: CommBindings):
+        raise NotImplemented
+
+
+class CommandSimple(Command):
+    @abstractmethod
+    def params(self) -> bytes:
+        raise NotImplemented
+
+
+class CommandSimplePercent(CommandSimple):
+    percent: Optional[float]
+
+    @override
+    def params(self) -> bytes:
+        if self.percent is None:
+            return bytes([0xFF])  # 0xFF -> percent8 special value: not-known
+
+        p = _clamp(self.percent, 0, 1) * 100
+        return int(p * 2).to_bytes(1, "little")
+
+
+def cmd_simple(dispatcher: Callable[[CommBindings], Transport.Attribute]):
+    def wrap(cls: Type[CommandSimple]):
+        class Derived(dataclass(frozen=True)(cls)):
+            async def dispatch(self, comm: CommBindings):
+                await dispatcher(comm).write(self.params())
+
+        return Derived
+
+    return wrap
+
+
+@cmd_simple(lambda x: x.fan_power_override)
+class CmdFanPowerOverride(CommandSimplePercent):
+    percent: Optional[float]
+
+
+@cmd_simple(lambda x: x.fan_power_passive)
+class CmdFanPowerPassive(CommandSimplePercent):
+    percent: float
+
+
+@cmd_simple(lambda x: x.fan_power_auto)
+class CmdFanPowerAuto(CommandSimplePercent):
+    percent: float
+
+
+@cmd_simple(lambda x: x.fan_power_coeff)
+class CmdFanPowerCoeff(CommandSimplePercent):
+    percent: float
+
+
+@cmd_simple(lambda x: x.fan_thermal_limit)
+class CmdFanPolicyThermalLimit(CommandSimple):
+    min: Optional[float]
+    max: Optional[float]
+    percent: Optional[float]
+
+    @override
+    def params(self) -> bytes:
+        return (
+            BleAttrWriter()
+            .temperature(self.min)
+            .temperature(self.max)
+            .percentage16_10(None if self.percent is None else self.percent * 100)
+            .value
+        )
+
+
+@cmd_simple(lambda x: x.ws2812_length)
+class CmdWs2812Length(CommandSimple):
+    n_total_components: int
+
+    @override
+    def params(self):
+        return int(self.n_total_components).to_bytes(2, "little")
+
+
+@dataclass(frozen=True)
+class CmdServoRange(CommandSimple, metaclass=ABCMeta):
+    start: Optional[float]
+    end: Optional[float]
+
+    @override
+    def params(self):
+        return (
+            BleAttrWriter()
+            .percentage16_10(None if self.start is None else self.start * 100)
+            .percentage16_10(None if self.end is None else self.end * 100)
+            .value
+        )
+
+
+class CmdServoPWM(CommandSimple, metaclass=ABCMeta):
+    percent: Optional[float]
+
+    @override
+    def params(self):
+        return (
+            BleAttrWriter()
+            .percentage16_10(None if self.percent is None else self.percent * 100)
+            .value
+        )
+
+
+@cmd_simple(lambda x: x.servo_vent_pwm)
+class CmdServoVentPWM(CmdServoPWM):
+    percent: Optional[float]
+
+
+@cmd_simple(lambda x: x.config_reboot)
+class CmdConfigReboot(CommandSimple):
+    @override
+    def params(self):
+        return (0).to_bytes(1, "little")
+
+
+@cmd_simple(lambda x: x.config_reset)
+class CmdConfigReset(CommandSimple):
+    flags: int
+
+    @override
+    def params(self):
+        return self.flags.to_bytes(1, "little")
+
+
+@cmd_simple(lambda x: x.config_checkpoint_sensor_calibration)
+class CmdConfigCheckpointSensorCalibration(CommandSimple):
+    @override
+    def params(self):
+        return b""
+
+
+@cmd_simple(lambda x: x.config_reset_sensor_calibration)
+class CmdConfigResetSensorCalibration(CommandSimple):
+    @override
+    def params(self):
+        return b""
+
+
+@cmd_simple(lambda x: x.config_voc_threshold)
+class CmdConfigVocThreshold(CommandSimple):
+    value: int
+
+    @override
+    def params(self):
+        return _clamp(self.value, 0, VOC_INDEX_MAX).to_bytes(2, "little")
+
+
+@cmd_simple(lambda x: x.config_voc_threshold_override)
+class CmdConfigVocThresholdOverride(CommandSimple):
+    value: int
+
+    @override
+    def params(self):
+        return _clamp(self.value, 0, VOC_INDEX_MAX).to_bytes(2, "little")
+
+
+@cmd_simple(lambda x: x.config_voc_calibrate_enabled)
+class CmdConfigVocCalibrateEnabled(CommandSimple):
+    value: bool
+
+    @override
+    def params(self):
+        return int(self.value).to_bytes(1, "little")
+
+
+@cmd_simple(lambda x: x.display_brightness)
+class CmdDisplayBrightness(CommandSimple):
+    percent: float
+
+    @override
+    def params(self):
+        p = _clamp(self.percent, 0, 1) * 100
+        return int(p * 2).to_bytes(1, "little")
+
+
+@cmd_simple(lambda x: x.display_ui)
+class CmdDisplayUI(CommandSimple):
+    value: int
+
+    @override
+    def params(self):
+        return self.value.to_bytes(1, "little")
 
 
 # must be of the form `xx:xx:xx:xx:xx:xx`, where `x` is a hex digit (uppercase)
@@ -303,7 +976,7 @@ class BleAttrReaderNotEnoughData(Exception):
 
 
 class BleAttrReader:
-    def __init__(self, raw: bytearray):
+    def __init__(self, raw: bytes):
         self.remaining = raw
 
     def humidity(self):

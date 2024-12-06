@@ -4,9 +4,8 @@
 
 https://www.buymeacoffee.com/sanaahamel[image:https://img.shields.io/badge/Support%20This%20Project%20-Buy%20me%20a%20coffee-purple.svg?style=flat-square[Support This Project - Buy me a coffee]] https://discord.gg/hWJWkc9HA7[image:https://img.shields.io/discord/1017933489779245137?color=%235865F2&label=discord&logo=discord&logoColor=white&style=flat-square[Discord]]
 
-A Pi Pico W based controller for the https://github.com/nevermore3d[Nevermore] family of 3D printer filters (including https://github.com/nevermore3d/StealthMax[StealthMax (S)], https://github.com/nevermore3d/Nevermore_Max[Max], and https://github.com/nevermore3d/Nevermore_Mini[Mini] variants).
-This controller is BlueTooth LE enabled, minimising required wiring and allowing multiple clients
-to interact with the controller.
+A RP2040 controller for the https://github.com/nevermore3d[Nevermore] family of 3D printer filters (including https://github.com/nevermore3d/StealthMax[StealthMax (S)], https://github.com/nevermore3d/Nevermore_Max[Max], and https://github.com/nevermore3d/Nevermore_Mini[Mini] variants).
+This controller is BlueTooth LE enabled (on Pico W boards), minimising required wiring and allowing multiple clients to interact with the controller. Serial over USB is also supported.
 
 xref:guide-setup[A setup guide is available.]
 
@@ -18,6 +17,7 @@ toc::[]
 
 * [x] xref:klipper[Klipper Module]
 * [x] BLE - Multiple Connections Supported
+* [x] USB Serial Connections Supported
 * [x] Fan - Tachometer & xref:fan-control[Automatic Control]
 * [x] xref:supported-sensors[Multiple Sensors]
 * [x] xref:supported-displays[Custom Display]
@@ -242,11 +242,11 @@ See the big note/warning above that you ignored.
 
 . Plug in the controller using a USB cable.
 +
-The controller should now be visible as a serial device at `/dev/serial/by-id/usb-Raspberry_Pi_Pico_
-Nevermore_<device-specific-id>`.
+The controller should now be visible as a serial device at `/dev/serial/by-id/usb-Nevermore_Filter_<board>_<device-id>_if00`.
 
-. Open a terminal and run `minicom -c on -b 115200 -D /dev/serial/by-id/usb-Raspberry_Pi_Pico_
-Nevermore_<device-specific-id>`.
+NOTE: You want the first interface (ends with `_if00`), *not* the second (ends with `_if02`).
+
+. Open a terminal and run `minicom -c on -b 115200 -D /dev/serial/by-id/usb-Nevermore_Filter_<board>_<device-id>_if00`.
 +
 You will probably get a screen that looks like this:
 +
@@ -428,7 +428,7 @@ it does not have an equivalent to Mainsail's dedicated display.
 
 == Display Support
 
-There are a handful of UIs available. You can select them using the xref:klipper-config-full[`display_ui` klipper option].
+There are a handful of UIs available. You can select them using the xref:klipper-config-full[`display_ui` Klipper option].
 
 .Supported Display UIs
 image::doc/README-display-UIs.png[Supported Display UI,512]
@@ -544,6 +544,10 @@ TL;DR: If you installed everything using https://github.com/th33xitus/kiauh[KIAU
 
 === Configuration
 
+Configuration is typically done using a Klipper instance (e.g. the one on your printer) connected to the controller. Changes to settings are then persisted to flash after ~10 seconds.
+
+NOTE: If you have a non-Klipper printer then you can use a temporary Klipper instance to configure your controller, disconnect it from Klipper, and use it in your non-Klipper printer.
+
 [#klipper-config-minimal]
 ==== Minimal Example
 
@@ -553,6 +557,10 @@ Check out the full documentation section (just after this) after you've tested e
 
 ```ini
 [nevermore]
+# If you're using USB instead of BT, uncomment and specify the correct serial device.
+# WARNING: Make sure it's the `-if02` interface, not `-if00`.
+#serial: /dev/serial/by-id/usb-Nevermore_Filter_<board>_<device-id>-if02
+
 # BOM specifies a 16 pixel ring.
 # If you don't have LEDs, you can omit the two `led_*` lines entirely
 led_colour_order: GBR
@@ -623,9 +631,16 @@ NOTE: If you don't care about a setting, leave it unset. Suggested defaults will
 # example - `bt_address: 43:43:A2:12:1F:AC`
 bt_address: <optional, omitted by default>
 
+# Use a serial connection instead of BLE.
+# Mutually exclusive w/ `bt_address`.
+# WARNING:  Make sure you're using the 2nd interface (path ends with '-if02'),
+#           *not* one which ends w/ `-if00`.
+serial: <device path>
+
 # seconds, 0 to disable, how long to wait before reporting that the Nevermore is missing.
 # If disabled (set to 0) the module will keep trying to connect in the background.
 # Disabling this requires that `bt_address` is set.
+# Cannot be used w/ `serial`.
 #
 # WARNING:  Do not disable unless you've already tested that it can connect to the Nevermore.
 # WARNING:  If you set this < 10 you will likely have trouble connecting to the Nevermore.
@@ -785,7 +800,7 @@ NOTE: Full Klipper full names are case and whitespace sensitive.
 |`[nevermore Foo_Bar]`      | `Foo_Bar`     | `nevermore Foo_Bar` | `nevermore:Foo_Bar`
 |===
 
-When referring to a Nevermore for LED effects, use the full klipper name and replace any spaces with `:`.
+When referring to a Nevermore for LED effects, use the full Klipper name and replace any spaces with `:`.
 
 
 [#klipper-gcode-commands]
@@ -908,7 +923,7 @@ Command:
 NEVERMORE_VOC_GATING_THRESHOLD_OVERRIDE [NEVERMORE=<name>] [THRESHOLD=<int \in [175, 500]>]
 ```
 
-Overrides the VOC gating threshold (see `voc_gating_threshold` in the klipper config). Omit the `THRESHOLD` parameter to clear any existing override.
+Overrides the VOC gating threshold (see `voc_gating_threshold` in the Klipper config). Omit the `THRESHOLD` parameter to clear any existing override.
 Applies to all Nevermores unless a specific one is named using`NEVERMORE=`.
 
 This is intended for setups where the slicer specifies the filament type using a user-defined G-Code macro (e.g. `SET_MATERIAL ABS`), and you would like to temporarily set the VOC gating threshold for a specific material/filament.
@@ -970,7 +985,7 @@ For example, given this log:
 ...
 ...
 [11:06:36:535560] nevermore - multiple nevermore controllers discovered.
-specify which to use by setting `bt_address: <insert-address-here>` in your klipper config.
+specify which to use by setting `bt_address: <insert-address-here>` in your Klipper config.
 discovered controllers (ordered by signal strength):
     address           | signal strength
     -----------------------------------

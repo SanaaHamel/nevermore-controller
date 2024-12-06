@@ -1,5 +1,10 @@
+import asyncio
 import logging
 from typing import Any, Callable, Coroutine, Optional
+
+from bleak import BleakClient, BleakScanner
+import bleak
+import serial
 
 import typed_argparse as tap
 from bleak.backends.device import BLEDevice
@@ -7,6 +12,11 @@ from nevermore_utilities import (
     bt_address_validate,
     device_is_likely_a_nevermore,
     discover_bluetooth_devices,
+    Transport,
+    TransportBLE,
+    TransportSerial,
+    is_lost_connection_exception,
+    retry_if_disconnected,
 )
 
 __all__ = [
@@ -17,6 +27,8 @@ __all__ = [
 
 class NevermoreToolCmdLnArgs(tap.TypedArgs):
     bt_address: Optional[str] = tap.arg(help="device's BT address")
+    serial: Optional[str] = tap.arg(help="device's serial port")
+    baud_rate: int = tap.arg(help="baud rate (if applicable)", default=115200)
 
     def validate(self):
         ok = True
@@ -25,16 +37,74 @@ class NevermoreToolCmdLnArgs(tap.TypedArgs):
             logging.error("invalid address for `--bt-address`")
             ok = False
 
+        if self.bt_address is not None and self.serial is not None:
+            logging.error("`--bt-address` and `--serial` are mutually exclusive")
+            ok = False
+
+        if self.serial is not None and self.serial.endswith("-if00"):
+            logging.warning(
+                "!? Using interface `-if00` (typically stdio).\n"
+                + "You probably meant to specify `-if02` (GATT/Bootloader Protocol)."
+            )
+
         return ok
 
-    async def bt_address_discover(self):
-        address = await device_address_discover(
-            "Nevermore controllers", device_is_likely_a_nevermore, self.bt_address
-        )
-        if self.bt_address is None:
-            self.bt_address = address
+    async def connect(self, timeout: Optional[float] = 10) -> Optional[Transport]:
+        if self.serial:
+            print(f"connecting to `{self.serial}`")
+            try:
+                if timeout is not None:
+                    timeout /= 5  # serial connections don't need as long
 
-        return address
+                return TransportSerial(
+                    serial.Serial(
+                        self.serial,
+                        self.baud_rate,
+                        timeout=timeout,
+                        write_timeout=timeout,
+                        exclusive=True,
+                    )
+                )
+            except TransportSerial.TimeoutException as e:
+                # if read failed it might be in bootloader mode, just return `None`
+                if e.read:
+                    return None
+                raise
+        else:
+            address = await device_address_discover(
+                "Nevermore controllers", device_is_likely_a_nevermore, self.bt_address
+            )
+            if self.bt_address is None:
+                self.bt_address = address
+            if self.bt_address is None:  # no candidates found or specified
+                return None
+
+            print(f"connecting to {self.bt_address}")
+
+            async def mk_client():
+                assert self.bt_address is not None
+                try:
+                    client = BleakClient(
+                        self.bt_address, timeout=10 if timeout is None else timeout
+                    )
+                    await client.connect()
+                    return client
+                except asyncio.TimeoutError:
+                    return None
+                except bleak.exc.BleakDeviceNotFoundError:
+                    return None
+                except Exception as e:
+                    if is_lost_connection_exception(e):
+                        return None
+                    raise e
+
+            if timeout is None:
+                while (client := await mk_client()) is None:
+                    pass
+            else:
+                client = await mk_client()
+
+            return TransportBLE(client) if client is not None else None
 
 
 async def device_address_discover(

@@ -1,6 +1,6 @@
 # Nevermore Controller Interface
 #
-# Copyright (C) 2023       Sanaa Hamel
+# Copyright (C) 2024       Sanaa Hamel
 #
 # This file may be distributed under the terms of the GNU AGPLv3 license.
 
@@ -25,10 +25,12 @@ from typing import (
     Coroutine,
     Dict,
     Generator,
+    Iterable,
     List,
     Optional,
     Set,
     Tuple,
+    Type,
     TypeVar,
     Union,
 )
@@ -36,16 +38,15 @@ from uuid import UUID
 
 import bleak
 import janus
-from bleak import BleakClient, BleakScanner
+import serial
+from bleak import BleakClient
 from bleak.backends.characteristic import BleakGATTCharacteristic
-from bleak.backends.device import BLEDevice
-from bleak.backends.service import BleakGATTService
 from configfile import ConfigWrapper
 from extras.led import LEDHelper
 from gcode import GCodeCommand, GCodeDispatch
 from klippy import Printer
 from reactor import SelectReactor
-from typing_extensions import Buffer, override
+from typing_extensions import override
 
 
 # Commit war-crimes to load `/tools/nevermore_utilities.py`.
@@ -71,6 +72,8 @@ __all__ = [
     "load_config",
 ]
 
+NEVERMORE_REFRESH_DELAY = 1  # seconds, only relevant for serial connections
+
 # Non-configurable constants
 CONTROLLER_NOTIFY_TIMEOUT = 30  # seconds, reconnect if no updates found
 
@@ -79,9 +82,12 @@ CONTROLLER_CONNECTION_RETRY_DELAY_INITIAL = 1
 # be really conservative about this because we don't want to spam the logs
 CONTROLLER_CONNECTION_RETRY_DELAY_POST_CONNECT = 60
 
+# we've very little time because we're executing on the main thread and cannot
+# block w/o screwing over other processes
+NEVERMORE_SERIAL_TIMEOUT = 0.025
+
 _A = TypeVar("_A")
 _B = TypeVar("_B")
-_Float = TypeVar("_Float", bound=float)
 
 RGBW = Tuple[float, float, float, float]
 
@@ -100,65 +106,6 @@ SensorCallback = Callable[[float, float], None]
 class SensorKind(Enum):
     INTAKE = 1
     EXHAUST = 2
-
-
-def _clamp(x: _Float, min: _Float, max: _Float) -> _Float:
-    if x < min:
-        return min
-    if max < x:
-        return max
-    return x
-
-
-def require_chars(
-    service: BleakGATTService,
-    id: UUID,
-    num: Optional[int] = None,
-    props: Set[CharacteristicProperty] = {CharacteristicProperty.READ},
-):
-    xs = [
-        x
-        for x in service.characteristics
-        if x.uuid == str(id)
-        if all(prop.value in x.properties for prop in props)
-    ]
-    # chars aren't necessarily ordered. order them by handle # (as they appear in the database)
-    xs = sorted(xs, key=lambda x: x.handle)
-
-    if num is not None and len(xs) != num:
-        raise Exception(
-            f"{service} doesn't have exactly {num} characteristic(s) {id} with properties {props}"
-        )
-
-    return xs
-
-
-def require_char(
-    service: BleakGATTService,
-    id: UUID,
-    props: Set[CharacteristicProperty] = {CharacteristicProperty.READ},
-):
-    xs = require_chars(service, id, None, props)
-    if len(xs) == 1:
-        return xs[0]
-
-    raise Exception(
-        f"{service} has {'no' if not xs else 'multiple'} characteristic {id} with properties {props}"
-    )
-
-
-async def discover_controllers(
-    address: Optional[str] = None, timeout: float = BT_SCAN_GATHER_ALL_TIMEOUT
-) -> List[BLEDevice]:
-    if address is not None:
-        device = await BleakScanner.find_device_by_address(address, timeout=timeout)
-        return [device] if device is not None else []
-
-    return [
-        x
-        for x in await BleakScanner.discover(timeout=timeout)
-        if await device_is_likely_a_nevermore(x, log=LOG)
-    ]
 
 
 @dataclass
@@ -223,115 +170,8 @@ class PseudoCommand:
     pass
 
 
-# Commands which are directly forwarded to the controller.
-class Command:
-    @abstractmethod
-    def params(self) -> Buffer:
-        raise NotImplemented
-
-
-class CmdFanPowerAbstract(Command):
-    percent: Optional[float]
-
-    def params(self):
-        if self.percent is None:
-            return bytearray([0xFF])  # 0xFF -> percent8 special value: not-known
-
-        p = _clamp(self.percent, 0, 1) * 100
-        return int(p * 2).to_bytes(1, "little")
-
-
-@dataclass(frozen=True)
-class CmdFanPowerOverride(CmdFanPowerAbstract):
-    percent: Optional[float]
-
-
-@dataclass(frozen=True)
-class CmdFanPowerPassive(CmdFanPowerAbstract):
-    percent: float
-
-
-@dataclass(frozen=True)
-class CmdFanPowerAuto(CmdFanPowerAbstract):
-    percent: float
-
-
-@dataclass(frozen=True)
-class CmdFanPowerCoeff(CmdFanPowerAbstract):
-    percent: float
-
-
-@dataclass(frozen=True)
-class CmdFanPolicyCooldown(Command):
-    value: int  # seconds
-
-    def params(self):
-        return _clamp(self.value, 0, TIMESEC16_MAX).to_bytes(2, "little")
-
-
-@dataclass(frozen=True)
-class CmdFanPolicyVocPassiveMax(Command):
-    value: int
-
-    def params(self):
-        return _clamp(self.value, 0, VOC_INDEX_MAX).to_bytes(2, "little")
-
-
-@dataclass(frozen=True)
-class CmdFanPolicyVocImproveMin(Command):
-    value: int
-
-    def params(self):
-        return _clamp(self.value, 0, VOC_INDEX_MAX).to_bytes(2, "little")
-
-
-@dataclass(frozen=True)
-class CmdFanPolicyThermalLimit(Command):
-    min: Optional[float]
-    max: Optional[float]
-    percent: Optional[float]
-
-    def params(self):
-        return (
-            BleAttrWriter()
-            .temperature(self.min)
-            .temperature(self.max)
-            .percentage16_10(None if self.percent is None else self.percent * 100)
-            .value
-        )
-
-
-@dataclass(frozen=True)
-class CmdWs2812Length(Command):
-    n_total_components: int
-
-    def params(self):
-        return int(self.n_total_components).to_bytes(2, "little")
-
-
-@dataclass(frozen=True)
-class CmdServoRange(Command, metaclass=ABCMeta):
-    start: Optional[float]
-    end: Optional[float]
-
-    def params(self):
-        return (
-            BleAttrWriter()
-            .percentage16_10(None if self.start is None else self.start * 100)
-            .percentage16_10(None if self.end is None else self.end * 100)
-            .value
-        )
-
-
-class CmdServoPWM(Command, metaclass=ABCMeta):
-    percent: Optional[float]
-
-    def params(self):
-        return (
-            BleAttrWriter()
-            .percentage16_10(None if self.percent is None else self.percent * 100)
-            .value
-        )
+# Most commands are defined in `nevermore_utilities.py`, unless they're created using Klipper data
+# TODO: It's inconsistent, I know.
 
 
 class CmdServoRangeFromCfg(CmdServoRange, metaclass=ABCMeta):
@@ -339,7 +179,7 @@ class CmdServoRangeFromCfg(CmdServoRange, metaclass=ABCMeta):
         def cfg(key: str, default: float) -> Optional[float]:
             pulse_sec = config.getfloat(
                 f"{prefix}_{key}",
-                default=default,
+                default,
                 above=0,
                 below=NEVERMORE_SERVO_PERIOD,
             )
@@ -348,53 +188,13 @@ class CmdServoRangeFromCfg(CmdServoRange, metaclass=ABCMeta):
         super().__init__(cfg("pulse_width_min", 0.001), cfg("pulse_width_max", 0.002))
 
 
+@cmd_simple(lambda x: x.servo_vent_range)
 class CmdServoVentRange(CmdServoRangeFromCfg):
     def __init__(self, config: ConfigWrapper) -> None:
         super().__init__("vent_servo", config)
 
 
-@dataclass(frozen=True)
-class CmdServoVentPWM(CmdServoPWM):
-    percent: Optional[float]
-    pass
-
-
-@dataclass(frozen=True)
-class CmdConfigFlags(Command):
-    flags: int
-    mask: int
-
-    def params(self):
-        return self.flags.to_bytes(8, "little") + self.mask.to_bytes(8, "little")
-
-
-@dataclass(frozen=True)
-class CmdConfigReboot(Command):
-    def params(self):
-        return (0).to_bytes(1, "little")
-
-
-@dataclass(frozen=True)
-class CmdConfigReset(Command):
-    flags: int
-
-    def params(self):
-        return self.flags.to_bytes(1, "little")
-
-
-@dataclass(frozen=True)
-class CmdConfigCheckpointSensorCalibration(Command):
-    def params(self):
-        return b""
-
-
-@dataclass(frozen=True)
-class CmdConfigResetSensorCalibration(Command):
-    def params(self):
-        return b""
-
-
-class CmdFanPolicy(PseudoCommand):
+class CmdFanPolicy(Command):
     def __init__(self, config: ConfigWrapper) -> None:
         def cfg_int(key: str, min: int, max: int) -> Optional[int]:
             return config.getint(f"fan_policy_{key}", None, minval=min, maxval=max)
@@ -403,8 +203,18 @@ class CmdFanPolicy(PseudoCommand):
         self.voc_passive_max = cfg_int("voc_passive_max", 0, VOC_INDEX_MAX)
         self.voc_improve_min = cfg_int("voc_improve_min", 0, VOC_INDEX_MAX)
 
+    @override
+    async def dispatch(self, comm: CommBindings):
+        async def send_u16(char: Transport.Attribute, val: Optional[int]):
+            if val is not None:
+                await char.write(val.to_bytes(2, "little"))
 
-class CmdConfiguration(PseudoCommand):
+        await send_u16(comm.fan_policy_cooldown, self.cooldown)
+        await send_u16(comm.fan_policy_voc_passive_max, self.voc_passive_max)
+        await send_u16(comm.fan_policy_voc_improve_min, self.voc_improve_min)
+
+
+class CmdConfiguration(Command):
     def __init__(self, config: ConfigWrapper) -> None:
         self.flags = 0
         self.mask = 0
@@ -418,46 +228,11 @@ class CmdConfiguration(PseudoCommand):
         cfg_flag("sensors_fallback", 0)
         cfg_flag("sensors_fallback_exhaust_mcu", 1)
 
-
-@dataclass(frozen=True)
-class CmdConfigVocThreshold(Command):
-    value: int
-
-    def params(self):
-        return _clamp(self.value, 0, VOC_INDEX_MAX).to_bytes(2, "little")
-
-
-@dataclass(frozen=True)
-class CmdConfigVocThresholdOverride(Command):
-    value: int
-
-    def params(self):
-        return _clamp(self.value, 0, VOC_INDEX_MAX).to_bytes(2, "little")
-
-
-@dataclass(frozen=True)
-class CmdConfigVocCalibrateEnabled(Command):
-    value: bool
-
-    def params(self):
-        return int(self.value).to_bytes(1, "little")
-
-
-@dataclass(frozen=True)
-class CmdDisplayBrightness(Command):
-    percent: float
-
-    def params(self):
-        p = _clamp(self.percent, 0, 1) * 100
-        return int(p * 2).to_bytes(1, "little")
-
-
-@dataclass(frozen=True)
-class CmdDisplayUI(Command):
-    value: int
-
-    def params(self):
-        return self.value.to_bytes(1, "little")
+    @override
+    async def dispatch(self, comm: CommBindings):
+        await comm.config_flags.write(
+            self.flags.to_bytes(8, "little") + self.mask.to_bytes(8, "little")
+        )
 
 
 # Special pseudo command: Due to the very high frequency of these commands, we don't
@@ -497,22 +272,174 @@ class NevermoreForceReconnection(Exception):
     pass
 
 
+class NevermoreInterface:
+    def __init__(self, name: str):
+        self.name = name
+        self.log = LogPrefixed(LOG, lambda x: f"{name} - {x}")
+        self._led_colour_data_old = bytearray()
+
+    @property
+    @abstractmethod
+    def nevermore(self) -> Optional['Nevermore']:
+        raise NotImplemented
+
+    @property
+    @abstractmethod
+    def connected(self) -> bool:
+        raise NotImplemented
+
+    @abstractmethod
+    def launch(self) -> None:
+        raise NotImplemented
+
+    @abstractmethod
+    def wait_for_connection(self) -> bool:
+        raise NotImplemented
+
+    @abstractmethod
+    def disconnect(self) -> None:
+        raise NotImplemented
+
+    @abstractmethod
+    def refresh(self) -> None:
+        raise NotImplemented
+
+    # PRECONDITION: `self.connected` is True
+    @abstractmethod
+    def send_command(self, cmd: Optional[Union[Command, PseudoCommand]]) -> None:
+        raise NotImplemented
+
+    async def leds_update(self, comm: CommBindings):
+        for offset, data in self._leds_diff():
+            params = bytes([offset, len(data)]) + data
+            await comm.ws2812_update.write(params)
+
+    def _leds_diff(self) -> Generator[Tuple[int, bytearray], Any, None]:
+        nevermore = self.nevermore
+        if nevermore is None:
+            return  # frontend is dead -> nothing to do
+
+        led_colour_data = nevermore.led_colour_data
+        if self._led_colour_data_old == led_colour_data:
+            return  # fast-path bail
+
+        # resize to accommodate. change of length -> just mark everything as dirty
+        if len(self._led_colour_data_old) != len(led_colour_data):
+            self._led_colour_data_old = bytearray([x ^ 1 for x in led_colour_data])
+
+        yield from LedUpdateSpan.compute_diffs(
+            self._led_colour_data_old, led_colour_data
+        )
+
+        self._led_colour_data_old[:] = led_colour_data
+
+
+class NevermoreSerial(NevermoreInterface):
+    def __init__(self, nevermore: "Nevermore", serial: serial.Serial) -> None:
+        super().__init__(f"nevermore {nevermore.name}")
+        self._nevermore = nevermore
+        self._serial = serial
+
+        original_timeout = self._serial.timeout
+        self._serial.timeout = 1  # relax during connect, we're not in a rush
+
+        try:
+            self._comms = CommBindings(TransportSerial(serial))
+        except Exception as e:
+            self.log.exception(e, exc_info=False)
+            raise e
+        finally:
+            self._serial.timeout = original_timeout
+
+    @property
+    @override
+    def nevermore(self):
+        return self._nevermore
+
+    @property
+    @override
+    def connected(self):
+        return self._serial.is_open
+
+    @override
+    def launch(self):
+        # inform frontend it should send setup/init commands
+        self.nevermore.handle_controller_connect()
+
+    @override
+    def wait_for_connection(self) -> bool:
+        # nothing to wait for it should immediately be ready
+        return True
+
+    @override
+    def disconnect(self):
+        self._serial.close()
+
+    @override
+    def refresh(self) -> None:
+        if not self.connected:
+            return
+
+        async def go():
+            fan = BleAttrReader(await self._comms.aggregate_fan.read())
+            self.nevermore.state.fan_power = (fan.percentage8() or 0) / 100.0
+            self.nevermore.state.fan_tacho = fan.tachometer()
+
+            (intake, exhaust) = SensorState.parse(
+                BleAttrReader(await self._comms.aggregate_env.read())
+            )
+            self.nevermore.state.intake = intake
+            self.nevermore.state.exhaust = exhaust
+
+            self.nevermore.state_stats_update()
+
+        try:
+            asyncio.run(go())
+        except Exception as e:
+            self.log.exception(e)
+
+    @override
+    def send_command(self, cmd: Optional[Union[Command, PseudoCommand]]):
+        if cmd is None:
+            return
+
+        try:
+            if isinstance(cmd, Command):
+                # this is god damn hideous, but there's no way to make async-ness parametric to the type
+                # in python.
+                asyncio.run(cmd.dispatch(self._comms))
+            elif isinstance(cmd, CmdWs2812MarkDirty):
+                asyncio.run(self.leds_update(self._comms))
+            else:
+                raise Exception(f"unhandled pseudo-command {cmd}")
+        except Exception as e:
+            self.log.exception(e)
+
+
 # HACK: This class *heavily* abuses the GIL for data synchronisation between
 # the klipper thread and the background worker thread.
-class NevermoreBackgroundWorker:
+class NevermoreBLE(NevermoreInterface):
     # HACK: Either BlueZ or Bleak is unable to handle concurrent discovery
     #       requests. Serialise that section for now.
     # FUTURE WORK:  Have a single thread service all BLE work?
     scan_lock = threading.BoundedSemaphore()
 
-    def __init__(self, nevermore: "Nevermore") -> None:
+    def __init__(
+        self,
+        nevermore: "Nevermore",
+        device_address: Optional[str],
+        connection_initial_timeout: float,
+    ) -> None:
+        super().__init__(f"nevermore-BLE '{nevermore.name}'")
+
         # A weak ref allows us to end the worker if the nevermore instance is
         # ever GC'd without asking us to disconnect (for whatever reason).
         self._nevermore = weakref.ref(nevermore, lambda nevermore: self.disconnect())
+        self.device_address = device_address
+        self.connection_initial_timeout = connection_initial_timeout
+
         self._connected = threading.Event()
-        self._led_colour_data_old = bytearray()
         self._loop = asyncio.new_event_loop()
-        self._thread = Thread(target=self._worker)
         # HACK: Can't set this up yet b/c the loop isn't set.
         # It'll be available at some point before `self._connected` is set.
         self._command_queue: janus.Queue[Command] = None
@@ -522,54 +449,56 @@ class NevermoreBackgroundWorker:
         #       but everyone before that had an implicit get-current-loop in the ctor.
         self._disconnect: UNSAFE_LazyAsyncioEvent = None
         self._led_dirty: UNSAFE_LazyAsyncioEvent = None
+        self._thread = Thread(target=self._worker)
+        self._thread.name = self.name
 
+    @property
+    @override
+    def nevermore(self):
+        return self._nevermore()
+
+    @property
+    @override
+    def connected(self):
+        return self._thread.is_alive() and self._connected.is_set()
+
+    @override
+    def launch(self):
         self._thread.start()
 
-    def wait_for_connection(self, timeout: Optional[float] = None) -> bool:
+    @override
+    def wait_for_connection(self) -> bool:
         # if the thread isn't running then we're already broken, don't bother waiting
-        return self._thread.is_alive() and self._connected.wait(timeout)
+        return self._thread.is_alive() and self._connected.wait(
+            self.connection_initial_timeout
+        )
 
+    @override
     def disconnect(self):
         assert self._disconnect is not None, "pre-condition violated"
         self._disconnect.set_threadsafe(self._loop)
 
-    # PRECONDITION: `self._connected` is set
+    @override
+    def refresh(self) -> None:
+        pass  # no-op, we do everything via notify/internal monitoring
+
+    @override
     def send_command(self, cmd: Optional[Union[Command, PseudoCommand]]):
         assert self._command_queue is not None, "cannot send commands before connecting"
-        if cmd is None:  # simplify client control flow
+        if cmd is None:
             return
 
-        def send(x: Command):
-            self._command_queue.sync_q.put(x)
-
-        def send_maybe(wrapper: Callable[[_A], Command], x: Optional[_A]):
-            if x is not None:
-                send(wrapper(x))
-
         if isinstance(cmd, Command):
-            send(cmd)
-        elif isinstance(cmd, CmdFanPolicy):
-            send_maybe(CmdFanPolicyCooldown, cmd.cooldown)
-            send_maybe(CmdFanPolicyVocPassiveMax, cmd.voc_passive_max)
-            send_maybe(CmdFanPolicyVocImproveMin, cmd.voc_improve_min)
+            self._command_queue.sync_q.put(cmd)
         elif isinstance(cmd, CmdWs2812MarkDirty):
             self._led_dirty.set_threadsafe(self._loop)
-        elif isinstance(cmd, CmdConfiguration):
-            send(CmdConfigFlags(cmd.flags, cmd.mask))
         else:
             raise Exception(f"unhandled pseudo-command {cmd}")
 
     def _worker(self) -> None:
-        nevermore = self._nevermore()
-        if nevermore is None:
+        if self.nevermore is None:
             return  # Already dead and we didn't need to do anything...
 
-        self._thread.name = f"nevermore-BLE '{nevermore.name}'"
-        device_address = nevermore.bt_address
-        connection_initial_timeout = nevermore.connection_initial_timeout
-        nevermore = None  # release reference otherwise call frame keeps it alive
-
-        worker_log = LogPrefixed(LOG, lambda x: f"{self._thread.name} - {x}")
         connection_start = datetime.datetime.now()
 
         def exc_filter(e: Exception):
@@ -583,7 +512,7 @@ class NevermoreBackgroundWorker:
             #       know if there are rules/invariants about this.
             #       (e.g. only the active GCode/command may write)
             if isinstance(e, bleak.exc.BleakError) or isinstance(e, EOFError):
-                worker_log.exception("attempting reconnection...", exc_info=e)
+                self.log.exception("attempting reconnection...", exc_info=e)
                 return True
 
             # Raiser is responsible for any associated logging w/ this exception.
@@ -599,7 +528,7 @@ class NevermoreBackgroundWorker:
             delta = (datetime.datetime.now() - connection_start).total_seconds()
             await asyncio.sleep(
                 CONTROLLER_CONNECTION_RETRY_DELAY_INITIAL
-                if delta <= connection_initial_timeout
+                if delta <= self.connection_initial_timeout
                 else CONTROLLER_CONNECTION_RETRY_DELAY_POST_CONNECT
             )
 
@@ -632,7 +561,7 @@ class NevermoreBackgroundWorker:
                         break
 
                 if 1 < len(devices):  # multiple devices found
-                    worker_log.error(
+                    self.log.error(
                         f"multiple nevermore controllers discovered.\n"
                         f"specify which to use by setting `bt_address: <insert-address-here>` in your klipper config.\n"
                         f"discovered controllers (ordered by signal strength):\n"
@@ -652,7 +581,7 @@ class NevermoreBackgroundWorker:
                 if device_address is None:
                     device_address = devices[0].address
 
-                worker_log.info(f"discovered controller {devices[0].address}")
+                self.log.info(f"discovered controller {devices[0].address}")
                 return devices[0]
 
             # Attempt (re)connection. Might have to do this multiple times if we lose connection.
@@ -680,10 +609,10 @@ class NevermoreBackgroundWorker:
             try:
                 await retry_if_disconnected(
                     discover_device,
-                    lambda client: self._worker_using(worker_log, client),
+                    lambda client: self._worker_using(client),
                     connection_timeout=None,
                     exc_filter=exc_filter,
-                    log=worker_log,
+                    log=self.log,
                     retry=retry,
                 )
             except CantInferWhichNevermoreToUse:
@@ -696,7 +625,7 @@ class NevermoreBackgroundWorker:
             self._disconnect = UNSAFE_LazyAsyncioEvent()
             self._led_dirty = UNSAFE_LazyAsyncioEvent()
 
-            main = asyncio.create_task(handle_connection(device_address))
+            main = asyncio.create_task(handle_connection(self.device_address))
 
             async def canceller():
                 await self._disconnect.wait()
@@ -708,80 +637,21 @@ class NevermoreBackgroundWorker:
             asyncio.set_event_loop(self._loop)
             self._loop.run_until_complete(go())
         except asyncio.CancelledError:
-            worker_log.info("disconnecting")
+            self.log.info("disconnecting")
         except:
-            worker_log.exception("worker failed")
+            self.log.exception("worker failed")
 
-    async def _worker_using(
-        self, log: Union[logging.Logger, LoggerAdapter], client: BleakClient
-    ):
-        log.info(f"connected to controller {client.address}")
+    async def _worker_using(self, client: BleakClient):
+        self.log.info(f"connected to controller {client.address}")
 
-        def require(id: UUID):
-            x = client.services.get_service(id)
-            if x is None:
-                raise Exception(f"{client.address} doesn't have required service {id}")
-            return x
-
-        service_config = require(UUID_SERVICE_CONFIGURATION)
-        service_env = require(UUID_SERVICE_ENVIRONMENTAL_SENSING)
-        service_fan = require(UUID_SERVICE_FAN)
-        service_fan_policy = require(UUID_SERVICE_FAN_POLICY)
-        service_ws2812 = require(UUID_SERVICE_WS2812)
-        service_display = require(UUID_SERVICE_DISPLAY)
-        service_servo = require(UUID_SERVICE_SERVO)
-
-        P = CharacteristicProperty
-        aggregate_env = require_char(service_env, UUID_CHAR_DATA_AGGREGATE, {P.NOTIFY})
-        aggregate_fan = require_char(service_fan, UUID_CHAR_FAN_AGGREGATE, {P.NOTIFY})
-        # HACK: it's the first one in the list (ordered by handle #). this is brittle.
-        (
-            fan_power_override,
-            fan_power_passive,
-            fan_power_auto,
-            fan_power_coeff,
-        ) = require_chars(service_fan, UUID_CHAR_PERCENT8, 4, {P.WRITE})
-        ws2812_length = require_char(service_ws2812, UUID_CHAR_COUNT16, {P.WRITE})
-        ws2812_update = require_char(
-            service_ws2812, UUID_CHAR_WS2812_UPDATE, {P.WRITE_NO_RESPONSE}
-        )
-        fan_policy_cooldown = require_char(
-            service_fan_policy, UUID_CHAR_TIMESEC16, {P.WRITE}
-        )
-        fan_policy_voc_passive_max, fan_policy_voc_improve_min = require_chars(
-            service_fan_policy, UUID_CHAR_VOC_INDEX, 2, {P.WRITE}
-        )
-        fan_thermal_limit = require_char(
-            service_fan_policy, UUID_CHAR_FAN_THERMAL, {P.WRITE}
-        )
-        config_flags = require_char(service_config, UUID_CHAR_CONFIG_FLAGS64, {P.WRITE})
-        config_reboot = require_char(service_config, UUID_CHAR_CONFIG_REBOOT, {P.WRITE})
-        config_reset = require_char(service_config, UUID_CHAR_CONFIG_RESET, {P.WRITE})
-        config_checkpoint_sensor_calibration = require_char(
-            service_config, UUID_CHAR_CONFIG_CHECKPOINT_SENSOR_CALIBRATION, {P.WRITE}
-        )
-        config_reset_sensor_calibration = require_char(
-            service_config, UUID_CHAR_CONFIG_RESET_SENSOR_CALIBRATION, {P.WRITE}
-        )
-        config_voc_threshold, config_voc_threshold_override = require_chars(
-            service_config, UUID_CHAR_VOC_INDEX, 2, {P.WRITE}
-        )
-        config_voc_calibrate_enabled = require_char(
-            service_config, UUID_CHAR_CONFIG_VOC_CALIBRATE_ENABLED, {P.WRITE}
-        )
-        display_brightness = require_char(
-            service_display, UUID_CHAR_PERCENT8, {P.WRITE}
-        )
-        display_ui = require_char(service_display, UUID_CHAR_DISPLAY_UI, {P.WRITE})
-        servo_vent_range = require_char(service_servo, UUID_CHAR_SERVO_RANGE, {P.WRITE})
-        servo_vent_pwm = require_char(service_servo, UUID_CHAR_PERCENT16_8, {P.WRITE})
-
+        await client.get_services()  # ensure services have been pulled
+        comm = CommBindings(TransportBLE(client))
         self._connected.set()
 
         # clear WS2812 diff cache, other end is in an undefined state
         self._led_colour_data_old = bytearray()
 
-        nevermore = self._nevermore()
+        nevermore = self.nevermore
         if nevermore is None:
             return
 
@@ -792,18 +662,18 @@ class NevermoreBackgroundWorker:
         last_notify_timestamp = datetime.datetime.now()
 
         async def notify(
-            char: BleakGATTCharacteristic,
+            char: Transport.Attribute,
             callback: Callable[["Nevermore", BleAttrReader], Any],
         ):
             def go(_: BleakGATTCharacteristic, params: bytearray):
                 nonlocal last_notify_timestamp
                 last_notify_timestamp = datetime.datetime.now()
 
-                nevermore = self._nevermore()
+                nevermore = self.nevermore
                 if nevermore is not None:  # if frontend is dead -> nothing to do
-                    callback(nevermore, BleAttrReader(params))
+                    callback(nevermore, BleAttrReader(bytes(params)))
 
-            await client.start_notify(char, go)
+            await client.start_notify(char.handle, go)
 
         def notify_env(nevermore: "Nevermore", params: BleAttrReader):
             (intake, exhaust) = SensorState.parse(params)
@@ -821,53 +691,9 @@ class NevermoreBackgroundWorker:
 
         async def handle_commands():
             cmd = await self._command_queue.async_q.get()
-            if isinstance(cmd, CmdFanPowerOverride):
-                char = fan_power_override
-            elif isinstance(cmd, CmdFanPowerPassive):
-                char = fan_power_passive
-            elif isinstance(cmd, CmdFanPowerAuto):
-                char = fan_power_auto
-            elif isinstance(cmd, CmdFanPowerCoeff):
-                char = fan_power_coeff
-            elif isinstance(cmd, CmdFanPolicyCooldown):
-                char = fan_policy_cooldown
-            elif isinstance(cmd, CmdFanPolicyVocPassiveMax):
-                char = fan_policy_voc_passive_max
-            elif isinstance(cmd, CmdFanPolicyVocImproveMin):
-                char = fan_policy_voc_improve_min
-            elif isinstance(cmd, CmdFanPolicyThermalLimit):
-                char = fan_thermal_limit
-            elif isinstance(cmd, CmdWs2812Length):
-                char = ws2812_length
-            elif isinstance(cmd, CmdServoVentRange):
-                char = servo_vent_range
-            elif isinstance(cmd, CmdServoVentPWM):
-                char = servo_vent_pwm
-            elif isinstance(cmd, CmdConfigFlags):
-                char = config_flags
-            elif isinstance(cmd, CmdConfigReboot):
-                char = config_reboot
-            elif isinstance(cmd, CmdConfigReset):
-                char = config_reset
-            elif isinstance(cmd, CmdConfigCheckpointSensorCalibration):
-                char = config_checkpoint_sensor_calibration
-            elif isinstance(cmd, CmdConfigResetSensorCalibration):
-                char = config_reset_sensor_calibration
-            elif isinstance(cmd, CmdConfigVocThreshold):
-                char = config_voc_threshold
-            elif isinstance(cmd, CmdConfigVocThresholdOverride):
-                char = config_voc_threshold_override
-            elif isinstance(cmd, CmdConfigVocCalibrateEnabled):
-                char = config_voc_calibrate_enabled
-            elif isinstance(cmd, CmdDisplayBrightness):
-                char = display_brightness
-            elif isinstance(cmd, CmdDisplayUI):
-                char = display_ui
-            else:
-                raise Exception(f"unhandled command {cmd}")
 
             try:
-                await client.write_gatt_char(char, cmd.params())
+                await cmd.dispatch(comm)
             except bleak.exc.BleakError as e:
                 # special case: lost connection -> wait and attempt reconnect
                 if is_lost_connection_exception(e):
@@ -875,21 +701,20 @@ class NevermoreBackgroundWorker:
 
                 # consider non-fatal. if we're in the wrong (API error), then
                 # we can do nothing but log it and limp on...
-                log.exception(f"command failed cmd={cmd}")
+                self.log.exception(f"command failed cmd={cmd}")
 
         async def handle_led():
             await self._led_dirty.wait()
             self._led_dirty.clear()
-
-            for offset, data in self._worker_led_diffs():
-                params = bytearray([offset, len(data)]) + data
-                await client.write_gatt_char(ws2812_update, params)
+            await self.leds_update(comm)
 
         async def handle_notify_timeout():
             nonlocal last_notify_timestamp
             elapsed = (datetime.datetime.now() - last_notify_timestamp).total_seconds()
             if CONTROLLER_NOTIFY_TIMEOUT < elapsed:
-                log.warning(f"last notify was {elapsed} seconds ago. reconnecting...")
+                self.log.warning(
+                    f"last notify was {elapsed} seconds ago. reconnecting..."
+                )
                 raise NevermoreForceReconnection("notify timeout", elapsed)
 
             await asyncio.sleep(CONTROLLER_NOTIFY_TIMEOUT)
@@ -903,29 +728,62 @@ class NevermoreBackgroundWorker:
         )
 
         try:
-            await notify(aggregate_env, notify_env)
-            await notify(aggregate_fan, notify_fan)
+            await notify(comm.aggregate_env, notify_env)
+            await notify(comm.aggregate_fan, notify_fan)
             await tasks
         finally:
             tasks.cancel()  # kill off all active tasks if any fail
 
-    def _worker_led_diffs(self) -> Generator[Tuple[int, bytearray], Any, None]:
-        nm = self._nevermore()
-        if nm is None:
-            return  # frontend is dead -> nothing to do
 
-        if self._led_colour_data_old == nm.led_colour_data:
-            return  # fast-path bail
+@dataclass(frozen=True)
+class NevermoreSerialInfo:
+    path: str
+    baudrate: int = NEVERMORE_SERIAL_BAUDRATE_DEFAULT
 
-        # resize to accommodate. change of length -> just mark everything as dirty
-        if len(self._led_colour_data_old) != len(nm.led_colour_data):
-            self._led_colour_data_old = bytearray([x ^ 1 for x in nm.led_colour_data])
+    @staticmethod
+    def mk(config: ConfigWrapper) -> Optional['NevermoreSerialInfo']:
+        path: Optional[str] = config.get("serial", None)
+        if path is None:
+            return None
 
-        yield from LedUpdateSpan.compute_diffs(
-            self._led_colour_data_old, nm.led_colour_data
+        return NevermoreSerialInfo(
+            path=path,
         )
 
-        self._led_colour_data_old[:] = nm.led_colour_data
+
+class NevermoreBleInfo:
+    def __init__(self, config: ConfigWrapper):
+        self.address: Optional[str] = config.get("bt_address", None)
+        if self.address is not None:
+            self.address = self.address.upper()
+            if not bt_address_validate(self.address):
+                raise config.error(
+                    f"invalid bluetooth address for `address`, given `{self.address}`"
+                )
+
+        scan_timeout = (
+            BT_SCAN_GATHER_ALL_TIMEOUT
+            if self.address is None
+            else BT_SCAN_KNOWN_ADDRESS_TIMEOUT
+        )
+        # never gonna reliable find the controller if we don't scan long enough
+        connection_initial_min = CONTROLLER_CONNECTION_DELAY + scan_timeout
+        self.connection_initial_timeout: float = config.getfloat(
+            "connection_initial_timeout",
+            CONTROLLER_CONNECTION_DELAY + scan_timeout * 2,
+            minval=0,
+        )
+        if (
+            self.connection_initial_timeout != 0
+            and self.connection_initial_timeout < connection_initial_min
+        ):
+            raise config.error(
+                f"`connection_initial_timeout` must either be 0 or >= {connection_initial_min}."
+            )
+        if self.connection_initial_timeout == 0 and self.address is None:
+            raise config.error(
+                f"`connection_initial_timeout` cannot be 0 if `bt_address` is not specified."
+            )
 
 
 class Nevermore:
@@ -966,37 +824,9 @@ class Nevermore:
         self._state_max = ControllerState()
         self.fan = NevermoreFan(self)
 
-        self.bt_address: Optional[str] = config.get("bt_address", None)
-        if self.bt_address is not None:
-            self.bt_address = self.bt_address.upper()
-            if not bt_address_validate(self.bt_address):
-                raise config.error(
-                    f"invalid bluetooth address for `bt_address`, given `{self.bt_address}`"
-                )
-
-        bt_scan_timeout = (
-            BT_SCAN_GATHER_ALL_TIMEOUT
-            if self.bt_address is None
-            else BT_SCAN_KNOWN_ADDRESS_TIMEOUT
-        )
-        # never gonna reliable find the controller if we don't scan long enough
-        connection_initial_min = CONTROLLER_CONNECTION_DELAY + bt_scan_timeout
-        self.connection_initial_timeout: float = config.getfloat(
-            "connection_initial_timeout",
-            CONTROLLER_CONNECTION_DELAY + bt_scan_timeout * 2,
-            minval=0,
-        )
-        if (
-            self.connection_initial_timeout != 0
-            and self.connection_initial_timeout < connection_initial_min
-        ):
-            raise config.error(
-                f"`connection_initial_timeout` must either be 0 or >= {connection_initial_min}."
-            )
-        if self.connection_initial_timeout == 0 and self.bt_address is None:
-            raise config.error(
-                f"`connection_initial_timeout` cannot be 0 if `bt_address` is not specified."
-            )
+        self.serial = NevermoreSerialInfo.mk(config)
+        if self.serial is None:
+            self.ble = NevermoreBleInfo(config)
 
         # LED-specific code.
         # Ripped from `extras/neopixel.py` because the processing code is entangled with MCU transmission.
@@ -1022,7 +852,7 @@ class Nevermore:
         def opt(mk: Callable[[_A], _B], x: Optional[_A]):
             return mk(x) if x is not None else None
 
-        def cfg_fan_power(mk: Callable[[float], CmdFanPowerAbstract], name: str):
+        def cfg_fan_power(mk: Callable[[float], CommandSimplePercent], name: str):
             return opt(mk, config.getfloat(name, default=None, minval=0, maxval=1))
 
         self._voc_gating_threshold = opt(
@@ -1077,7 +907,7 @@ class Nevermore:
                 f"`display_ui` isn't one of: {', '.join(x.name for x in DisplayUI)}"
             )
 
-        self._interface: Optional[NevermoreBackgroundWorker] = None
+        self._interface: Optional[NevermoreInterface] = None
         self._handle_request_restart(None)
 
         self.printer.add_object(f"fan_generic {self.fan.name}", self.fan)
@@ -1085,6 +915,10 @@ class Nevermore:
         self.printer.register_event_handler("klippy:shutdown", self._handle_shutdown)
         self.printer.register_event_handler(
             "gcode:request_restart", self._handle_request_restart
+        )
+
+        self._timer_refresh = self.printer.get_reactor().register_timer(
+            self._handle_refresh, self.printer.get_reactor().NOW
         )
 
         gcode: GCodeDispatch = self.printer.lookup_object("gcode")
@@ -1125,10 +959,7 @@ class Nevermore:
 
         self._led_update(self.led_helper.get_status()["color_data"], None)
 
-        if (
-            self.connection_initial_timeout != 0
-            and not self._interface.wait_for_connection(self.connection_initial_timeout)
-        ):
+        if not self._interface.wait_for_connection():
             self._interface.disconnect()  # the deadline was blown, it doesn't need to keep trying.
             raise self.printer.config_error(
                 f"nevermore '{self.name}' failed to connect - timed out"
@@ -1155,13 +986,39 @@ class Nevermore:
 
     def _handle_request_restart(self, print_time: Optional[float]):
         self._handle_shutdown()
-        self._interface = NevermoreBackgroundWorker(self)
+
+        if self.serial is not None:
+            self._interface = NevermoreSerial(
+                self,
+                serial.Serial(
+                    self.serial.path,
+                    self.serial.baudrate,
+                    timeout=NEVERMORE_SERIAL_TIMEOUT,
+                    write_timeout=NEVERMORE_SERIAL_TIMEOUT,
+                    exclusive=True,
+                ),
+            )
+        elif self.ble is not None:
+            self._interface = NevermoreBLE(
+                self, self.ble.address, self.ble.connection_initial_timeout
+            )
+        else:
+            raise Exception(f"no transport configured for {self.name}")
+
+        self._interface.launch()
+
         # TODO: reset fan & LED to defaults?
 
     def _handle_shutdown(self):
         if self._interface is not None:
             self._interface.disconnect()
             self._interface = None
+
+    def _handle_refresh(self, eventtime: float) -> None:
+        if self._interface is not None and self._interface.connected:
+            self._interface.refresh()
+
+        return self.printer.get_reactor().monotonic() + NEVERMORE_REFRESH_DELAY
 
     # having this method is sufficient to be visible to klipper/moonraker
     def get_status(self, eventtime: float) -> Dict[str, float]:
@@ -1210,7 +1067,7 @@ class Nevermore:
             self._interface.send_command(self._voc_calibrate_enabled)
 
     def cmd_NEVERMORE_REBOOT(self, gcmd: GCodeCommand) -> None:
-        if self._interface is not None and self._interface.wait_for_connection(0):
+        if self._interface is not None and self._interface.connected:
             self._interface.send_command(CmdConfigReboot())
         else:
             gcmd.respond_info(f"{self.name} not yet connected")
@@ -1222,7 +1079,7 @@ class Nevermore:
             )
 
     def cmd_NEVERMORE_STATUS(self, gcmd: GCodeCommand) -> None:
-        if self._interface is not None and self._interface.wait_for_connection(0):
+        if self._interface is not None and self._interface.connected:
             gcmd.respond_info(f"{self.name} connected")
         else:
             gcmd.respond_info(f"{self.name} not yet connected")

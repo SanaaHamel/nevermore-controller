@@ -186,4 +186,12 @@ bool init() {
     return true;
 }
 
+optional<uint16_t> read(uint16_t attr, span<uint8_t> buffer) {
+    return attr_read(HCI_CON_HANDLE_INVALID, attr, buffer);
+}
+
+optional<uint16_t> write(uint16_t attr, std::span<uint8_t const> buffer) {
+    return attr_write(HCI_CON_HANDLE_INVALID, attr, buffer);
+}
+
 }  // namespace nevermore::gatt

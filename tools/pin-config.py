@@ -28,6 +28,7 @@ import re
 import textwrap
 from pathlib import Path
 from typing import Optional, Sequence, Set, TypeVar
+from typing_extensions import Buffer
 
 import construct as cs
 import typed_argparse as tap
@@ -265,7 +266,6 @@ PINS_FORMAT = DataclassStruct(Pins)
 
 
 class CmdLnArgs(NevermoreToolCmdLnArgs):
-    bt_address: Optional[str] = tap.arg(help="device's BT adddress")
     file: Path = tap.arg(
         help="filepath for pin config", default=PIN_CONFIG_FILE_DEFAULT_PATH
     )
@@ -293,49 +293,30 @@ def input_options(msg: str, default: str, opts: Set[str]):
 
 @dataclass
 class ControllerChars:
-    current: BleakGATTCharacteristic
-    default: BleakGATTCharacteristic
-    error_msg: BleakGATTCharacteristic
-    reboot: BleakGATTCharacteristic
+    current: Transport.Attribute
+    default: Transport.Attribute
+    error_msg: Transport.Attribute
+    reboot: Transport.Attribute
 
 
-async def pins_chars(client: BleakClient):
-    UUIDs = [
-        UUID_CHAR_CONFIG_PINS,
-        UUID_CHAR_CONFIG_PINS_DEFAULT,
-        UUID_CHAR_CONFIG_PINS_ERROR,
-        UUID_CHAR_CONFIG_REBOOT,
-    ]
-
-    chars = [client.services.get_characteristic(x) for x in UUIDs]
-    for i, char in enumerate(chars):
-        if char is None:
-            logging.error(
-                f"{client.address} missing characteristic {UUIDs[i]} (old controller version?)"
-            )
-
-    if any(x is None for x in chars):
-        return None
-
-    return ControllerChars(*chars)  # type: ignore
+def pins_chars(transport: Transport):
+    P = CharacteristicProperty
+    return ControllerChars(
+        transport(UUID_CHAR_CONFIG_PINS, {P.READ, P.WRITE}),
+        transport(UUID_CHAR_CONFIG_PINS_DEFAULT),
+        transport(UUID_CHAR_CONFIG_PINS_ERROR),
+        transport(UUID_CHAR_CONFIG_REBOOT, {P.WRITE}),
+    )
 
 
-async def pins_reset(client: BleakClient) -> bool:
-    chars = await pins_chars(client)
-    if chars is None:
-        return False
-
-    raw = await client.read_gatt_char(UUID_CHAR_CONFIG_PINS_DEFAULT)
-    await pins_write(client, raw)
-    return True
+async def pins_reset(transport: Transport) -> bool:
+    raw = await pins_chars(transport).default.read()
+    return await pins_write(transport, raw)
 
 
-async def pins_read(client: BleakClient, current: bool = True) -> Optional[Pins]:
-    chars = await pins_chars(client)
-    if chars is None:
-        return None
-
-    raw = await client.read_gatt_char(chars.current if current else chars.default)
+async def pins_read(transport: Transport, current: bool = True) -> Optional[Pins]:
+    chars = pins_chars(transport)
+    raw = await (chars.current if current else chars.default).read()
 
     try:
         return PINS_FORMAT.parse(raw)
@@ -344,17 +325,17 @@ async def pins_read(client: BleakClient, current: bool = True) -> Optional[Pins]
         return None
 
 
-async def pins_write(client: BleakClient, pins: Union[Pins, bytearray]) -> bool:
-    chars = await pins_chars(client)
-    if chars is None:
-        return False
+async def pins_write(transport: Transport, pins: Union[Pins, bytes]) -> bool:
+    chars = pins_chars(transport)
+
+    if isinstance(pins, Pins):
+        pins = PINS_FORMAT.build(pins)
 
     try:
-        raw = pins if isinstance(pins, bytearray) else PINS_FORMAT.build(pins)
-        await client.write_gatt_char(chars.current, raw)
-    except bleak.exc.BleakError:
+        await chars.current.write(pins)
+    except:
         logging.exception("pin write failed, fetching error msg", exc_info=True)
-        msg = await client.read_gatt_char(chars.error_msg)
+        msg = await chars.error_msg.read()
         logging.error(f"pin config error: {msg}")
         return False
 
@@ -365,19 +346,18 @@ async def pins_write(client: BleakClient, pins: Union[Pins, bytearray]) -> bool:
             return True
 
         if answer in {"y", ""}:
-            await client.write_gatt_char(chars.reboot, b'\x00')
+            await chars.reboot.write(b'\x00')
             return True
 
 
 async def using(
-    args: NevermoreToolCmdLnArgs, go: Callable[[BleakClient], Coroutine[Any, Any, _A]]
-):
-    if await args.bt_address_discover() is None:
+    args: NevermoreToolCmdLnArgs, go: Callable[[Transport], Coroutine[Any, Any, _A]]
+) -> Optional[_A]:
+    if (transport := await args.connect()) is None:
         return None
 
-    assert args.bt_address is not None  # type refine from `bt_address_discover`
-    print(f"connecting to {args.bt_address}")
-    return await retry_if_disconnected(args.bt_address, go, retry=lambda: False)
+    async with transport:
+        return await go(transport)
 
 
 async def pins_to_file(args: CmdLnArgs):
@@ -444,7 +424,7 @@ async def main(args: CmdLnArgs) -> int:
     file_json = re.sub(r"\/\/[^\n]*\n", "\n", file_json)
 
     try:
-        pins = Pins.from_json(file_json)
+        pins: Pins = Pins.from_json(file_json)  # type: ignore
     except KeyError as e:
         print(f"Malformed config file: {args.file}")
         print(f"A struct is missing field `{e.args[0]}`")
@@ -454,7 +434,9 @@ async def main(args: CmdLnArgs) -> int:
         print(e)
         return 1
 
-    await using(args, lambda x: pins_write(x, pins))
+    if await using(args, lambda x: pins_write(x, pins)) != True:
+        return 1
+
     return 0
 
 

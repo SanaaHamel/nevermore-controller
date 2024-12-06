@@ -6,17 +6,11 @@ set -o pipefail
 FILE="$(readlink -f "$0")"
 ROOT_DIR="$(dirname "$FILE")"
 
-TCP=0
-NO_TMUX=0
 IGNORE_KLIPPER=0
 for ARG; do
   shift
-  if [ "$ARG" = "--no-tmux" ]; then
-    NO_TMUX=1
-  elif [ "$ARG" = "--ignore-klipper" ]; then
+  if [ "$ARG" = "--ignore-klipper" ]; then
     IGNORE_KLIPPER=1
-  elif [ "$ARG" = "--tcp" ]; then
-    TCP=1
   fi
   set -- "$@" "$ARG"
 done
@@ -60,31 +54,14 @@ finish() {
 }
 trap finish EXIT
 
+"$ROOT_DIR/setup-tool-env.bash"
 
-# only run in `tmux` if we'd switch wifi (i.e. using `tcp`)
-if [[ "$TCP" = 0 || "$NO_TMUX" = 1 ]]; then
-  "$ROOT_DIR/setup-tool-env.bash"
-  if [[ "$IGNORE_KLIPPER" = 0 ]]; then
-    ensure_klipper_not_running
-  fi
-  "$ROOT_DIR/.venv/bin/python" "$FILE" "$@"
-  exit 0
+if [[ "$IGNORE_KLIPPER" = 0 ]]; then
+  ensure_klipper_not_running
 fi
 
-if ! which tmux &>/dev/null; then
-  echo "installing 'tmux'..."
-  sudo apt-get install tmux -y
-fi
-
-escape() {
-  printf "%q " "$@"
-}
-
-tmux new-session -A -s "nevermore-update" \
-  "$(escape bash -c "$(escape "$FILE" --no-tmux "$@"); \
-                     $(escape read -r -p "Press enter to continue")")"
-
-exit 0 # required to stop shell execution here
+"$ROOT_DIR/.venv/bin/python" "$FILE" "$@"
+exit 0
 '''
 
 # Script for updating a Nevermore controller.
@@ -114,7 +91,7 @@ from bleak import BleakClient
 from nevermore_tool_utilities import NevermoreToolCmdLnArgs
 from nevermore_utilities import *
 from serial_flash.transport.bluetooth.spp import SppArgs
-from serial_flash.transport.tcp import TcpArgs
+from serial_flash.transport.serial import SerialArgs
 from typing_extensions import override
 
 if typing.TYPE_CHECKING:
@@ -124,12 +101,7 @@ else:
 
 __all__ = ['CmdLnArgs', 'main']
 
-NEVERMORE_OTA_WIFI_SSID = 'nevermore-update-ota'
-NEVERMORE_OTA_WIFI_KEY = 'raccoons-love-floor-onions'
-
-CONNECT_TO_AP_TIMEOUT = 20  # seconds
-CONNECT_TO_AP_DELAY = 2  # seconds
-REBOOT_DELAY = 1  # seconds
+REBOOT_DELAY = 3  # seconds
 
 URL_RELEASES_FETCH_LATEST = (
     "https://api.github.com/repos/sanaahamel/nevermore-controller/releases?per_page=1"
@@ -155,6 +127,8 @@ ADDRESS_2_BOARD_CACHE_PATH = os.path.join(
 )
 
 _A = TypeVar("_A")
+
+P = CharacteristicProperty
 
 
 def join_multi_line_list_tabbed(xs: Iterable[str]) -> Optional[str]:
@@ -261,27 +235,21 @@ async def download_board_update(release: ReleaseInfo, board: str):
     return None
 
 
-async def hardware_board(client: BleakClient):
-    char_hardware = client.services.get_characteristic(UUID_CHAR_HARDWARE_REVISION)
-    if char_hardware is None:
+async def hardware_board(transport: Transport):
+    try:
+        return str(await transport(UUID_CHAR_HARDWARE_REVISION).read(), "UTF-8")
+    except Transport.AttrNotFound:
         logging.warning(
             "device does not have a hardware revision characteristic, assuming board is `pico_w`"
         )
         return "pico_w"
 
-    return str(await client.read_gatt_char(char_hardware), "UTF-8")
 
-
-async def software_revision(client: BleakClient):
-    char_revision = client.services.get_characteristic(UUID_CHAR_SOFTWARE_REVISION)
-    if char_revision is None:
-        logging.warning("device does not have a software revision characteristic")
-        return "<unknown>"
-
+async def software_revision(transport: Transport):
     HEADER = "commit: "
     DIRTY = "-dirty"
 
-    revision = str(await client.read_gatt_char(char_revision), "UTF-8")
+    revision = str(await transport(UUID_CHAR_SOFTWARE_REVISION).read(), "UTF-8")
     commit = revision
     if commit.startswith(HEADER):
         commit = commit[len(HEADER) :]
@@ -299,18 +267,16 @@ async def software_revision(client: BleakClient):
         return revision
 
 
-async def reset_setting_defaults(client: BleakClient):
-    char_reset = client.services.get_characteristic(UUID_CHAR_CONFIG_RESET)
-    if char_reset is None:
-        logging.error("device does not have a char reset characteristic")
-        return
-
-    await client.write_gatt_char(char_reset, (1 << 1).to_bytes(byteorder='little'))
+async def reset_setting_defaults(transport: Transport):
+    await transport(UUID_CHAR_CONFIG_RESET, {P.WRITE}).write(
+        (1 << 1).to_bytes(byteorder='little')
+    )
 
 
-async def reboot_into_ota_mode(client: BleakClient):
-    char_reboot = client.services.get_characteristic(UUID_CHAR_CONFIG_REBOOT)
-    if char_reboot is None:
+async def reboot_into_ota_mode(transport: Transport):
+    try:
+        char_reboot = transport(UUID_CHAR_CONFIG_REBOOT, {P.WRITE})
+    except Transport.AttrNotFound:
         logging.error(
             "Nevermore is too old to update with OTA. Manually flash the latest UF2 to it."
         )
@@ -318,127 +284,17 @@ async def reboot_into_ota_mode(client: BleakClient):
 
     print(f"sending reboot-to-OTA command...")
     # b"\1" to reboot to OTA, "0" to restart
-    await client.write_gatt_char(char_reboot, b"\1")
-    return client.address
-
-
-def _ota_ap_visible(bt_address: str) -> bool:  # type: ignore
-    try:
-        subprocess.run(
-            [
-                "nmcli",
-                "device",
-                "wifi",
-                "list",
-                "bssid",
-                _bssid_from_bt_address(bt_address),
-                "--rescan",
-                "yes",
-            ],
-            text=True,
-            check=True,
-            stdout=open("/dev/null"),
-        )
-        return True
-    except subprocess.CalledProcessError:
-        return False
-
-
-class ConnectToWifiAccessPoint:
-    def __init__(
-        self,
-        bssid: Optional[str] = None,
-        *,
-        timeout: float = CONNECT_TO_AP_TIMEOUT,
-        retry_delay: float = CONNECT_TO_AP_DELAY,
-    ):
-        assert 0 <= timeout
-        assert 0 < retry_delay
-        self._bssid = bssid
-        self._timeout = timeout
-        self._retry_delay = retry_delay
-        self._closed = False
-
-    async def __aenter__(self):
-        print("waiting for OTA access point...")
-        if self._timeout == 0:
-            await asyncio.wait_for(self._connect_forever(), self._timeout)
-        else:
-            await self._connect_forever()
-
-        return self
-
-    async def __aexit__(self, *_args: Any):
-        if not self._closed:
-            self._closed = True
-            await self._disconnect()
-
-    async def _connect_forever(self):
-        while not await self._connect_attempt():
-            await asyncio.sleep(self._retry_delay)
-
-    @abstractmethod
-    async def _connect_attempt(self) -> bool:
-        raise NotImplementedError()
-
-    @abstractmethod
-    async def _disconnect(self) -> None:
-        raise NotImplementedError()
-
-
-class ConnectToWifiAccessPointNetworkManager(ConnectToWifiAccessPoint):
-    @override
-    async def _connect_attempt(self):
-        subprocess.check_call(["nmcli", "device", "wifi", "rescan"])
-
-        try:
-            subprocess.check_call(
-                [
-                    "nmcli",
-                    "device",
-                    "wifi",
-                    "connect",
-                    NEVERMORE_OTA_WIFI_SSID if self._bssid is None else self._bssid,
-                    "password",
-                    NEVERMORE_OTA_WIFI_KEY,
-                    "name",
-                    NEVERMORE_OTA_WIFI_SSID,
-                ]
-            )
-            return True
-        except subprocess.CalledProcessError as e:
-            if e.returncode not in {4, 10}:
-                raise
-
-        return False
-
-    @override
-    async def _disconnect(self):
-        try:
-            subprocess.check_call(
-                ["nmcli", "connection", "down", NEVERMORE_OTA_WIFI_SSID]
-            )
-        except subprocess.CalledProcessError as e:
-            if e.returncode not in {10}:  # 10 -> no active connection provided
-                raise
+    await char_reboot.write(b"\1")
 
 
 class CmdLnArgs(NevermoreToolCmdLnArgs):
     file: Optional[Path] = tap.arg(help="filepath for image")
     tag: Optional[str] = tap.arg(help="download specific release tag")
     board: Optional[str] = tap.arg(help="override/specify board (USE WITH CAUTION!)")
-    # `--no-tmux` and `--ignore-klipper` are used/handled by the shell wrapper script.
+    # `--ignore-klipper` are used/handled by the shell wrapper script.
     # They're listed here for `--help` and unknown-argument checking.
-    no_tmux: bool = tap.arg(help="don't run in a tmux session")
     ignore_klipper: bool = tap.arg(help="don't check if klipper is running")
     unattended: bool = tap.arg(help="do not ask user for input", default=False)
-    tcp: bool = tap.arg(help="connect via TCP instead of BT SPP")
-    ip: str = tap.arg(
-        default="192.168.4.1", help="if non-empty, connect via TCP to given IP"
-    )
-    port: int = tap.arg(
-        default=4242, help="port use when connecting via TCP, see `--ip`"
-    )
 
     @override
     def validate(self):
@@ -451,34 +307,22 @@ class CmdLnArgs(NevermoreToolCmdLnArgs):
         return ok
 
 
-async def _update_via_tcp(args: CmdLnArgs, bssid: Optional[str]):
-    if args.file is None:
-        logging.error("no image to upload specified")
-        return
+async def _update_via_serial(args: CmdLnArgs):
+    assert args.file is not None
+    assert args.serial is not None
 
-    if bssid is None:
-        logging.warning("no BSSID specified, attempting to connect by SSID...")
-    else:
-        print("waiting for OTA access point...")
-
-    async with ConnectToWifiAccessPointNetworkManager(bssid):
-        serial_flash.run(
-            TcpArgs(
-                filename=str(args.file.absolute()),
-                ip=args.ip or "192.168.4.1",
-                port=args.port,
-            )
+    serial_flash.run(
+        SerialArgs(
+            filename=str(args.file.absolute()),
+            port=args.serial,
+            baud_rate=args.baud_rate,
         )
+    )
 
 
 async def _update_via_bt_spp(args: CmdLnArgs):
-    if args.file is None:
-        logging.error("no image to upload specified")
-        return
-
-    if args.bt_address is None:
-        logging.error("no BT address specified")
-        return
+    assert args.file is not None
+    assert args.bt_address is not None
 
     while True:
         try:
@@ -497,10 +341,10 @@ async def _update_via_bt_spp(args: CmdLnArgs):
 
 
 async def _post_update_actions_interactive(args: CmdLnArgs, prev_version: str):
-    if args.bt_address is None:
+    if args.bt_address is None and args.serial is None:
         return
 
-    print(f"connecting to {args.bt_address} for post-upgrade actions...")
+    print(f"connecting to controller for post-upgrade actions...")
     print("(this may take longer than usual)")
     print(
         "NOTE: Ignore logged exceptions about `A message handler raised an exception: 'org.bluez.Device1'` or `org.bluez.GattService1`."
@@ -509,8 +353,8 @@ async def _post_update_actions_interactive(args: CmdLnArgs, prev_version: str):
         "      This is caused by a bug in `bleak` but should be benign for this application."
     )
 
-    async def go(client: BleakClient):
-        curr_version = await software_revision(client)
+    async def attempt(transport: Transport) -> None:
+        curr_version = await software_revision(transport)
         print(f"previous version: {prev_version}")
         print(f" current version: {curr_version}")
 
@@ -518,12 +362,32 @@ async def _post_update_actions_interactive(args: CmdLnArgs, prev_version: str):
             args,
             True,
             "Would you like to apply any default setting changes? (Recommended!)\n"
-            + "(Anything specified by your Klipper config will be re-applied afterwards.)",
+            + "(Anything specified by your Klipper config will be re-applied when Klipper reconnects.)",
         ):
             print("appling new defaults for settings...")
-            await reset_setting_defaults(client)
+            await reset_setting_defaults(transport)
 
-    await retry_if_disconnected(args.bt_address, go, connection_timeout=None)
+    while True:
+        if (transport := await args.connect(timeout=None)) is None:
+            print("unable to connect to nevermore")
+            return
+
+        try:
+            async with transport:
+                await attempt(transport)
+                return
+        except Transport.AttrNotFound as e:
+            # don't do this hack for non BT connections
+            if args.bt_address is None:
+                raise e
+
+            # HACK: Treat missing attributes as a broken early connection
+            #       This isn't true for every very old controller versions, but
+            #       dear gods those are old.
+            logging.warning(f"{e}\npossibly a broken early connection, reconnecting...")
+        except Exception as e:
+            if not is_lost_connection_exception(e):
+                raise
 
 
 def input_yes_no(args: CmdLnArgs, default: bool, msg: str) -> bool:
@@ -560,9 +424,9 @@ def address_2_board_cache_load() -> Dict[str, str]:
         return {}
 
 
-def address_2_board_cache_add(addr: str, board: str):
+def address_2_board_cache_add(device_key: str, board: str):
     xs = address_2_board_cache_load()
-    xs[addr.lower()] = board
+    xs[device_key.lower()] = board
 
     try:
         with open(ADDRESS_2_BOARD_CACHE_PATH, "w") as f:
@@ -572,10 +436,11 @@ def address_2_board_cache_add(addr: str, board: str):
 
 
 def guess_board(args: CmdLnArgs) -> Optional[str]:
-    if args.bt_address is not None:
-        board = address_2_board_cache_load().get(args.bt_address.lower())
+    device_key = args.bt_address or args.serial
+    if device_key is not None:
+        board = address_2_board_cache_load().get(device_key.lower())
         if board is not None:
-            print(f"{args.bt_address} was previously seen using `{board}`")
+            print(f"`{device_key}` was previously seen using `{board}`")
             return board
 
     if args.unattended:
@@ -611,16 +476,12 @@ async def main(args: CmdLnArgs) -> int:
         if not args.unattended:
             input("PRESS ENTER TO CONTINUE")
 
-    address_found = await args.bt_address_discover()
     prev_version = "<unknown>"
 
-    if address_found is not None:
-        print(f"connecting to {address_found}")
-
-        async def go(client: BleakClient):
-            nonlocal prev_version
-            prev_version = await software_revision(client)
-            board = await hardware_board(client)
+    if (transport := await args.connect()) is not None:
+        async with transport:
+            prev_version = await software_revision(transport)
+            board = await hardware_board(transport)
             print(f"board  : {board}")
             print(f"version: {prev_version}")
 
@@ -632,18 +493,22 @@ async def main(args: CmdLnArgs) -> int:
                 if not input_yes_no(
                     args, False, f"Do you wish to continue anyway using `{args.board}`?"
                 ):
-                    return
+                    return 1
 
-            address_2_board_cache_add(client.address, args.board)
+            device_key = args.bt_address or args.serial
+            assert device_key is not None
+            address_2_board_cache_add(device_key, args.board)
 
             assert args.file is not None or release is not None
             args.file = args.file or await download_board_update(release, args.board)
             if args.file is not None:
-                await reboot_into_ota_mode(client)
+                await reboot_into_ota_mode(transport)
 
-        await retry_if_disconnected(address_found, go, connection_timeout=None)
+        print(f"waiting for device to reboot ({REBOOT_DELAY} seconds)...")
+        await asyncio.sleep(REBOOT_DELAY)
     else:
-        print("attempting to connect to bootloader anyways...")
+        print("unable to connect to nevermore controller.")
+        print("attempting to connect to bootloader...")
 
         if args.file is None:
             assert release is not None
@@ -654,20 +519,9 @@ async def main(args: CmdLnArgs) -> int:
     if args.file is None:  # no file specified or didn't manage to download an update
         return 1
 
-    if args.tcp:
-        bssid = (
-            None if args.bt_address is None else _bssid_from_bt_address(args.bt_address)
-        )
-        await _update_via_tcp(args, bssid)
+    if args.serial is not None:
+        await _update_via_serial(args)
     else:
-        # FIXME: Can't scan for bootloaders w/ this API b/c they're BT devices, not BLE devices.
-        # address_found = await discover_device_address(
-        #     "bootloaders",
-        #     lambda x: x.name is not None and x.name.startswith("picowota"),
-        #     args.bt_address,
-        # )
-        # if args.bt_address is None:
-        #     args.bt_address = address_found
         await _update_via_bt_spp(args)
 
     print("update complete.")

@@ -290,51 +290,28 @@ def _extract_fields(fields: Dict[str, Any]):
     return parts
 
 
-async def _main_bluetooth(log: GraphiteLogger, address: Optional[str]):
-    if address is None:
-        print(f"failed to find a nevermore")
-        return
+async def _main_direct(log: GraphiteLogger, transport: Transport):
+    service_env = transport.service(UUID_SERVICE_ENVIRONMENTAL_SENSING)
+    service_fan = transport.service(UUID_SERVICE_FAN)
+    char_env = service_env(UUID_CHAR_DATA_AGGREGATE)
+    char_fan = service_fan(UUID_CHAR_FAN_AGGREGATE)
+    device_name = str(
+        await transport(UUID_CHAR_SERIAL_NUMBER).read(), encoding='UTF-8'
+    ).replace(":", "-")
 
-    async def _log_sensors(client: BleakClient):
-        service_env = client.services.get_service(UUID_SERVICE_ENVIRONMENTAL_SENSING)
-        service_fan = client.services.get_service(UUID_SERVICE_FAN)
-        assert service_env is not None
-        assert service_fan is not None
-        char_env = service_env.get_characteristic(UUID_CHAR_DATA_AGGREGATE)
-        char_fan = service_fan.get_characteristic(UUID_CHAR_FAN_AGGREGATE)
-        assert char_env is not None
-        assert char_fan is not None
+    async def snapshot() -> SystemSnapshot:
+        intake, exhaust = SensorState.parse(BleAttrReader(await char_env.read()))
+        fan = FanState.parse(BleAttrReader(await char_fan.read()))
+        sensors = _extract_fields(
+            ControllerState(intake, exhaust, fan.speed or 0, fan.rpm or 0).as_dict()
+        )
 
-        async def snapshot() -> SystemSnapshot:
-            intake, exhaust = SensorState.parse(
-                BleAttrReader(await client.read_gatt_char(char_env))
-            )
-            fan = FanState.parse(BleAttrReader(await client.read_gatt_char(char_fan)))
-            sensors = _extract_fields(
-                ControllerState(intake, exhaust, fan.speed or 0, fan.rpm or 0).as_dict()
-            )
+        return SystemSnapshot(device_name, {"nevermore": sensors})
 
-            return SystemSnapshot(address.replace(":", "-"), {"nevermore": sensors})
-
+    try:
         print("ready. logging...")
         while True:
             await log(await snapshot())
-
-    # HACK: Only want to consider these as cause for reconnect once we're
-    #       in the main query loop. Mistakes during setup should be fatal.
-    #       Fine for now b/c we're not a typical user tool.
-    def exc_filter(e: Exception) -> bool:
-        if isinstance(e, bleak.exc.BleakError):
-            logging.exception("bleak error, reconnecting...", exc_info=e)
-            return True
-
-        return False
-
-    try:
-        print(f"connecting to {address}")
-        await retry_if_disconnected(
-            address, _log_sensors, connection_timeout=None, exc_filter=exc_filter
-        )
     except asyncio.exceptions.CancelledError:
         pass
     except KeyboardInterrupt:
@@ -494,7 +471,11 @@ async def _main(args: CmdLnArgs):
     log_entry = graphite_connection(args.graphite, args.sampling_period)
 
     if args.moonraker is None:
-        await _main_bluetooth(log_entry, await args.bt_address_discover())
+        if (transport := await args.connect()) is None:
+            exit(1)
+
+        async with transport:
+            await _main_direct(log_entry, transport)
     else:
         await _main_moonraker(log_entry, args.moonraker)
 

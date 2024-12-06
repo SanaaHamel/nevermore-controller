@@ -405,22 +405,9 @@ void on_chart_draw(bool begin, lv_event_t* e) {
     }
 }
 
-SemaphoreHandle_t g_ui_lock;
-auto using_semaphore(SemaphoreHandle_t& lock, TickType_t ticks_to_wait = portMAX_DELAY) {
-    return [=](auto&& go) {
-        if (!xSemaphoreTake(lock, ticks_to_wait)) return false;
-
-        go();
-        xSemaphoreGive(lock);
-        return true;
-    };
-}
-
 }  // namespace
 
 bool init() {
-    g_ui_lock = xSemaphoreCreateMutex();  // we panic on alloc failures, no need to handle null
-
     using enum settings::DisplayUI;
     switch (settings::g_active.display_ui) {
     case CIRCLE_240_CLASSIC: {

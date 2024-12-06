@@ -54,8 +54,8 @@ pico_sdk_init()
 
 add_subdirectory(picowota)
 add_picowota(picowota)
-set_property(TARGET picowota PROPERTY PICOWOTA_TCP false)
-set_property(TARGET picowota PROPERTY PICOWOTA_BT_SPP true)
+set_property(TARGET picowota PROPERTY PICOWOTA_BT_SPP "${NEVERMORE_PICO_W_BT}")
+set_property(TARGET picowota PROPERTY PICOWOTA_USB_CDC true)
 # each slot is 4 KiB (== erase sector size), want 4 slots to cycle
 set_property(TARGET picowota PROPERTY PICOWOTA_APP_STORE_SIZE 16)
 
@@ -87,46 +87,50 @@ file(GLOB_RECURSE SRC_H ${SRC_DIR}/*.h)
 file(GLOB_RECURSE SRC_C ${SRC_DIR}/*.c)
 file(GLOB_RECURSE SRC_HPP ${SRC_DIR}/*.hpp)
 file(GLOB_RECURSE SRC_CPP ${SRC_DIR}/*.cpp)
-
 set(SRC_FILES ${SRC_H} ${SRC_C} ${SRC_HPP} ${SRC_CPP})
 
-# `psabi` is a useless warning for our purposes
-add_compile_options(-Wall -Wno-psabi -Wno-trigraphs)
-add_compile_definitions(PARAM_ASSERTIONS_ENABLE_ALL=1)
-add_compile_definitions(WANT_HCI_DUMP=1)
-add_compile_definitions(PICO_USE_MALLOC_MUTEX=1)
-add_compile_definitions(CYW43_LWIP=0)
-add_compile_definitions(CYW43_HOST_NAME="Nevermore")
-add_compile_definitions(USBD_PRODUCT="Pico Nevermore")
-target_compile_definitions(picowota PUBLIC USBD_PRODUCT="Pico Nevermore")
+add_library(nevermore-controller ${SRC_FILES})
+target_include_directories(nevermore-controller PUBLIC
+  "${SRC_DIR}"
+  "${SRC_CONFIG_DIR}"
+)
 
-# UGLY: Also defines the value of `nevermore::Priority::Communication`.
-# We want a priority above almost anything else.
-# Leaves 2 slots above
-add_compile_definitions(CYW43_TASK_PRIORITY=29)
+target_compile_options(nevermore-controller PUBLIC
+  -Wall
+  # disable useless warnings
+  -Wno-psabi -Wno-trigraphs
+)
 
-# default is 4.
-# Current users: tinyusb w/ DCD (1), stdio w/ USB (1), CYW43 driver (1), WS2812 (1), CST816S (1), GC9A01 (1)
-add_compile_definitions(PICO_MAX_SHARED_IRQ_HANDLERS=6)
+target_compile_definitions(nevermore-controller PUBLIC
+  NEVERMORE_BOARD="${NEVERMORE_BOARD}"
+  NEVERMORE_BOARD_HEADER="config/pins/${NEVERMORE_BOARD}.hpp"
+  NEVERMORE_PICO_W_BT=${NEVERMORE_PICO_W_BT}
+
+  # UGLY: Also defines the value of `nevermore::Priority::Communication`.
+  # We want a priority above almost anything else.
+  # Leaves 3 slots above (Max, USBD, Startup)
+  CYW43_TASK_PRIORITY=28
+  CYW43_HOST_NAME="Nevermore"
+  CYW43_LWIP=0
+
+  # default is 4.
+  # Current users: tinyusb w/ DCD (1), stdio w/ USB (1), CYW43 driver (1), WS2812 (1), CST816S (1), GC9A01 (1)
+  PICO_MAX_SHARED_IRQ_HANDLERS=6
+  PARAM_ASSERTIONS_ENABLE_ALL=1
+  PICO_USE_MALLOC_MUTEX=1
+
+  WANT_HCI_DUMP=1
+
+  CFG_TUSB_CONFIG_FILE="config/lib/tusb_config.h"
+)
 
 if(BLUETOOTH_DEBUG)
-  add_compile_definitions(CMAKE_BLUETOOTH_DEBUG=1)
+  target_compile_definitions(nevermore-controller PUBLIC CMAKE_BLUETOOTH_DEBUG=1)
 endif()
 
 if(BLUETOOTH_LOW_LEVEL_DEBUG)
-  add_compile_definitions(CMAKE_BLUETOOTH_LOW_LEVEL_DEBUG=1)
+  target_compile_definitions(nevermore-controller PUBLIC CMAKE_BLUETOOTH_LOW_LEVEL_DEBUG=1)
 endif()
-
-add_library(nevermore-controller ${SRC_FILES})
-
-target_compile_definitions(
-  nevermore-controller
-  PUBLIC NEVERMORE_BOARD="${NEVERMORE_BOARD}"
-         NEVERMORE_BOARD_HEADER="config/pins/${NEVERMORE_BOARD}.hpp"
-         NEVERMORE_PICO_W_BT=${NEVERMORE_PICO_W_BT}
-)
-
-target_include_directories(nevermore-controller PUBLIC ${SRC_DIR} ${SRC_CONFIG_DIR})
 
 target_link_libraries(
   nevermore-controller
@@ -140,15 +144,37 @@ target_link_libraries(
          hardware_spi
          hardware_watchdog
          pico_btstack_ble
+         pico_stdio_uart
+        #  pico_stdio_usb
          pico_stdlib
          pico_time
          pico_flash
          pico_unique_id
+         tinyusb_board
+         tinyusb_device
          # Others
          FreeRTOS-Kernel
          FreeRTOS-Kernel-Heap4
          lvgl::lvgl
          picowota_client
+)
+
+if(${PICO_BOARD} STREQUAL "pico_w")
+  target_link_libraries(nevermore-controller PUBLIC pico_cyw43_arch_sys_freertos)
+endif()
+
+if(${NEVERMORE_PICO_W_BT})
+  target_link_libraries(nevermore-controller PUBLIC pico_btstack_cyw43)
+endif()
+
+target_compile_definitions(nevermore-controller PUBLIC
+  USBD_MANUFACTURER="Nevermore"
+  USBD_PRODUCT="Filter ${NEVERMORE_BOARD}"
+)
+
+target_compile_definitions(picowota PUBLIC
+  USBD_MANUFACTURER="Nevermore"
+  USBD_PRODUCT="Filter ${NEVERMORE_BOARD}"
 )
 
 list(TRANSFORM SRC_IN REPLACE "(.*)\.in$" "\\1" OUTPUT_VARIABLE SRC_IN_BYPRODUCTS)
@@ -173,38 +199,20 @@ if(CMAKE_BUILD_TYPE STREQUAL "Debug")
   add_compile_definitions(PICO_DEBUG_MALLOC=0)
 endif()
 
-pico_enable_stdio_usb(picowota 1)
-
 pico_btstack_make_gatt_header(nevermore-controller PRIVATE ${SRC_DIR}/nevermore.gatt)
 pico_generate_pio_header(nevermore-controller ${SRC_DIR}/lib/pio_i2c.pio)
 pico_generate_pio_header(nevermore-controller ${SRC_DIR}/ws2812.pio)
-picowota_app_store_declare(picowota nevermore-controller)
+picowota_app_store_declare(nevermore-controller picowota)
+picowota_share_cyw43_firmware(nevermore-controller)
 
 add_executable(nevermore-controller-no-bootloader)
-set_target_properties(
-  nevermore-controller-no-bootloader PROPERTIES OUTPUT_NAME
-                                                "nevermore-controller_${NEVERMORE_BOARD}"
-)
+set_target_properties(nevermore-controller-no-bootloader PROPERTIES OUTPUT_NAME "nevermore-controller_${NEVERMORE_BOARD}")
 target_link_libraries(nevermore-controller-no-bootloader PRIVATE nevermore-controller)
-pico_enable_stdio_usb(nevermore-controller-no-bootloader 1)
-pico_enable_stdio_uart(nevermore-controller-no-bootloader 1)
 pico_add_extra_outputs(nevermore-controller-no-bootloader)
-picowota_build_no_bootloader_with_app_store(picowota nevermore-controller-no-bootloader)
+picowota_build_no_bootloader_with_app_store(nevermore-controller-no-bootloader picowota)
 
-if(NEVERMORE_PICO_W_BT)
-  target_link_libraries(nevermore-controller PUBLIC pico_btstack_cyw43 pico_cyw43_arch_sys_freertos)
-
-  add_executable(nevermore-controller-ota)
-  set_target_properties(
-    nevermore-controller-ota PROPERTIES OUTPUT_NAME "ota-nevermore-controller_${NEVERMORE_BOARD}"
-  )
-  target_link_libraries(nevermore-controller-ota PRIVATE nevermore-controller)
-  pico_enable_stdio_usb(nevermore-controller-ota 1)
-  pico_enable_stdio_uart(nevermore-controller-ota 1)
-  pico_add_extra_outputs(nevermore-controller-ota)
-
-  picowota_share_cyw43_firmware(nevermore-controller)
-  picowota_build_combined(picowota nevermore-controller-ota)
-else()
-  set_target_properties(picowota PROPERTIES EXCLUDE_FROM_ALL TRUE)
-endif()
+add_executable(nevermore-controller-ota)
+set_target_properties(nevermore-controller-ota PROPERTIES OUTPUT_NAME "ota-nevermore-controller_${NEVERMORE_BOARD}")
+target_link_libraries(nevermore-controller-ota PRIVATE nevermore-controller)
+pico_add_extra_outputs(nevermore-controller-ota)
+picowota_build_combined(nevermore-controller-ota picowota)

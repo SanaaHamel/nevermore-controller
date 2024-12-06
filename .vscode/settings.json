@@ -61,6 +61,7 @@
     "python.analysis.typeCheckingMode": "strict",
     "files.associations": {
         "*.souffle": "souffle",
+        "*.cfg": "ini",
         "cmath": "cpp",
         "cstddef": "cpp",
         "cstdio": "cpp",
@@ -103,6 +104,17 @@
         "sstream": "cpp",
         "stop_token": "cpp",
         "streambuf": "cpp",
-        "span": "cpp"
+        "span": "cpp",
+        "comm_bt_spp.h": "c",
+        "condition_variable": "cpp",
+        "io_context": "cpp",
+        "timer": "cpp",
+        "future": "cpp",
+        "mutex": "cpp",
+        "semaphore": "cpp",
+        "thread": "cpp",
+        "executor": "cpp",
+        "comm_stream.h": "c",
+        "stdio_usb.h": "c"
     },
 }

@@ -14,6 +14,7 @@ enum class Priority : UBaseType_t {
     Sensors,
     Communication = CYW43_TASK_PRIORITY,  // higher priority
     Startup,
+    USBD,
     WatchdogUpdate,  // highest
 };
 static_assert(UBaseType_t(Priority::WatchdogUpdate) < configMAX_PRIORITIES);
