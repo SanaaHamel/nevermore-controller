@@ -8,6 +8,7 @@
 #include <bitset>
 #include <chrono>
 #include <cstdint>
+#include <ratio>
 
 namespace nevermore::sensors {
 
@@ -18,7 +19,7 @@ using namespace std::literals::chrono_literals;
 struct Tachometer final : SensorPeriodic {
     // need at least 100ms for a reasonable read and no point sampling longer than 1s
     constexpr static auto TACHOMETER_READ_PERIOD =
-            std::clamp<std::chrono::milliseconds>(SENSOR_UPDATE_PERIOD, 100ms, 1s);
+            std::clamp<std::chrono::duration<float, std::milli>>(SENSOR_UPDATE_PERIOD / 4.f, 100ms, 1s);
 
     // WORKAROUND:  There's EMI from the PWM wire (runs adjacent to tacho).
     // Proper fix:  Add a 2.2k pull-up & 0.1uF capacitor-to-0v to tachometer.
