@@ -340,6 +340,11 @@ void init() {
 
     g_save_lock = xSemaphoreCreateMutex();
 
+#if !NEVERMORE_SETTINGS_PERSISTENCE
+    printf("WARN - this build doesn't persist settings; using default settings\n");
+    return;
+#endif
+
     if (auto const* latest = slot_latest()) {
         restore_from_slot(g_active, *latest);
         g_active_slot = reinterpret_cast<uint8_t const*>(latest);
@@ -353,6 +358,11 @@ void init() {
 }
 
 void save(SettingsPersisted& settings) {
+#if !NEVERMORE_SETTINGS_PERSISTENCE
+    printf("WARN - this build doesn't persist settings; skipping save\n");
+    return;
+#endif
+
     assert(sizeof(SettingsPersisted) <= settings.header.size && "should have a full size field");
     assert(g_active_slot);
     auto _ = save_guard();

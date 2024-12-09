@@ -7,6 +7,11 @@
 #include "utility/servo.hpp"
 #include <array>
 
+// Disables saving/loading settings from app storage. Useful for test builds.
+#ifndef NEVERMORE_SETTINGS_PERSISTENCE
+#define NEVERMORE_SETTINGS_PERSISTENCE 1
+#endif
+
 namespace nevermore::settings {
 
 using VOCIndex = sensors::VOCIndex;
