@@ -319,11 +319,13 @@ void Settings::reset(ResetFlags flags) {
         auto voc_calibration_ = voc_calibration;
         auto display_hw_ = display_hw;
         auto save_counter_ = save_counter;
+        auto pins_ = pins;
         *this = {};
         header = header_;
         voc_calibration = voc_calibration_;
         display_hw = display_hw_;
         save_counter = save_counter_;
+        pins = pins_;
     }
 
     if (flags & hardware) {
