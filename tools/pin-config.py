@@ -425,13 +425,19 @@ async def main(args: CmdLnArgs) -> int:
 
     try:
         pins: Pins = Pins.from_json(file_json)  # type: ignore
+    except TypeError as e:
+        logging.error(e, exc_info=e)
+        # FIXME: This sucks and should at least list the field in question.
+        print(f"Malformed config file: {args.file}")
+        print("Are all the fields of the correct type?")
+        return 1
     except KeyError as e:
         print(f"Malformed config file: {args.file}")
         print(f"A struct is missing field `{e.args[0]}`")
         return 1
     except ValueError as e:
+        logging.error(e)
         print(f"Malformed config file: {args.file}")
-        print(e)
         return 1
 
     if await using(args, lambda x: pins_write(x, pins)) != True:
