@@ -273,7 +273,32 @@ async def reset_setting_defaults(transport: Transport):
     )
 
 
-async def reboot_into_ota_mode(transport: Transport):
+class PinState(enum.Enum):
+    UNKNOWN = enum.auto()
+    DEFAULT = enum.auto()
+    CUSTOMISED = enum.auto()
+
+
+async def pin_config(transport: Transport) -> PinState:
+    try:
+        current = await transport(UUID_CHAR_CONFIG_PINS).read()
+        default = await transport(UUID_CHAR_CONFIG_PINS_DEFAULT).read()
+    except Transport.AttrNotFound:
+        logging.warning(
+            "device does not have pin configuration characteristics; ignoring pin config checks"
+        )
+        return PinState.UNKNOWN
+
+    return PinState.DEFAULT if current == default else PinState.CUSTOMISED
+
+
+async def pin_config_reset(transport: Transport):
+    print("!! Resetting pin assignments to defaults...")
+    pin_defaults = await transport(UUID_CHAR_CONFIG_PINS_DEFAULT).read()
+    await transport(UUID_CHAR_CONFIG_PINS, {P.WRITE}).write(pin_defaults)
+
+
+async def reboot_device(transport: Transport, *, bootloader: bool):
     try:
         char_reboot = transport(UUID_CHAR_CONFIG_REBOOT, {P.WRITE})
     except Transport.AttrNotFound:
@@ -282,9 +307,9 @@ async def reboot_into_ota_mode(transport: Transport):
         )
         return None
 
-    print(f"sending reboot-to-OTA command...")
+    print(f"sending {'reboot-to-ota' if bootloader else 'reboot'} command...")
     # b"\1" to reboot to OTA, "0" to restart
-    await char_reboot.write(b"\1")
+    await char_reboot.write(b"\1" if bootloader else b"\0")
 
 
 class CmdLnArgs(NevermoreToolCmdLnArgs):
@@ -340,7 +365,9 @@ async def _update_via_bt_spp(args: CmdLnArgs):
             )
 
 
-async def _post_update_actions_interactive(args: CmdLnArgs, prev_version: str):
+async def _post_update_actions_interactive(
+    args: CmdLnArgs, prev_version: str, prev_pin_state: PinState
+):
     if args.bt_address is None and args.serial is None:
         return
 
@@ -366,6 +393,27 @@ async def _post_update_actions_interactive(args: CmdLnArgs, prev_version: str):
         ):
             print("appling new defaults for settings...")
             await reset_setting_defaults(transport)
+
+        if await pin_config(transport) == PinState.CUSTOMISED:
+            if prev_pin_state == PinState.DEFAULT:
+                reset_pins = input_yes_no(
+                    args,
+                    True,
+                    "Pin assignment defaults have changed.\n"
+                    + "Would you like to reset them to the current defaults?",
+                )
+            else:
+                reset_pins = input_yes_no(
+                    args,
+                    False,
+                    "Current pin assignments do not match the defaults.\n"
+                    + "If there are new default pins, you will not be able to use them until they are assigned.\n"
+                    + "Would you like to reset them to the current defaults?",
+                )
+
+            if reset_pins:
+                await pin_config_reset(transport)
+                await reboot_device(transport, bootloader=False)
 
     while True:
         if (transport := await args.connect(timeout=None)) is None:
@@ -477,9 +525,11 @@ async def main(args: CmdLnArgs) -> int:
             input("PRESS ENTER TO CONTINUE")
 
     prev_version = "<unknown>"
+    prev_pin_state = PinState.UNKNOWN
 
     if (transport := await args.connect()) is not None:
         async with transport:
+            prev_pin_state = await pin_config(transport)
             prev_version = await software_revision(transport)
             board = await hardware_board(transport)
             print(f"board  : {board}")
@@ -502,7 +552,7 @@ async def main(args: CmdLnArgs) -> int:
             assert args.file is not None or release is not None
             args.file = args.file or await download_board_update(release, args.board)
             if args.file is not None:
-                await reboot_into_ota_mode(transport)
+                await reboot_device(transport, bootloader=True)
 
         print(f"waiting for device to reboot ({REBOOT_DELAY} seconds)...")
         await asyncio.sleep(REBOOT_DELAY)
@@ -528,10 +578,13 @@ async def main(args: CmdLnArgs) -> int:
 
     try:
         if not args.unattended:
-            print("You may safely abort if the following steps take too long [ctrl-c].")
+            print("You may abort if the following steps take too long [ctrl-c].")
+            print(
+                "It is recommended to wait so the updater can verify if there are post-update actions you should perform."
+            )
             print(f"waiting for device to reboot ({REBOOT_DELAY} seconds)...")
             await asyncio.sleep(REBOOT_DELAY)
-            await _post_update_actions_interactive(args, prev_version)
+            await _post_update_actions_interactive(args, prev_version, prev_pin_state)
     except asyncio.exceptions.CancelledError:
         pass
     except KeyboardInterrupt:
