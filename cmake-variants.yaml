@@ -13,30 +13,37 @@ buildType:
 board:
   default: pico_w
   choices:
+    fysetc_rp2040_touch_v1:
+      short: Fysetc RP2040 Touch v1
+      long: Fysetc RP2040 Touch v1
+      settings:
+        PICO_BOARD: fysetc_rp2040_touch_v1
+        NEVERMORE_BOARD: fysetc-rp2040-touch-v1
+        NEVERMORE_PICO_W_BT: "false"
     pico_w:
       short: Pico W
-      long: Classic Pico W
+      long: Pico W
       settings:
         PICO_BOARD: pico_w
         NEVERMORE_BOARD: pico_w
         NEVERMORE_PICO_W_BT: "true"
     pico_w_no_bt:
-      short: Pico W w/ BT Disabled
-      long: Classic Pico W w/ BT Disabled
+      short: Pico W w/o BT
+      long: Pico W with BT Disabled
       settings:
         PICO_BOARD: pico_w
         NEVERMORE_BOARD: pico_w
         NEVERMORE_PICO_W_BT: "false"
     waveshare-rp2040-lcd-1.28:
       short: Waveshare RP2040 LCD-1.28
-      long: Waveshare RP2040 LCD-1.28 (w/o wireless)
+      long: Waveshare RP2040 LCD-1.28
       settings:
         PICO_BOARD: waveshare_rp2040_lcd_1.28
         NEVERMORE_BOARD: waveshare-rp2040-lcd-1.28
         NEVERMORE_PICO_W_BT: "false"
     waveshare-rp2040-touch-lcd-1.28:
       short: Waveshare RP2040 Touch LCD-1.28
-      long: Waveshare RP2040 Touch LCD-1.28 (w/o wireless)
+      long: Waveshare RP2040 Touch LCD-1.28
       settings:
         PICO_BOARD: waveshare_rp2040_lcd_1.28
         NEVERMORE_BOARD: waveshare-rp2040-touch-lcd-1.28
