@@ -244,8 +244,10 @@ CST816S::~CST816S() {
 }
 
 void CST816S::read() {
-    // wait for interrupt to signal via notify
-    xTaskNotifyWait(0, 0, nullptr, portMAX_DELAY);
+    if (Pins::active().touch_interrupt) {
+        // wait for interrupt to signal via notify if we've an interrupt pin (otherwise poll)
+        xTaskNotifyWait(0, 0, nullptr, portMAX_DELAY);
+    }
 
     struct [[gnu::packed]] Batch {
         // for now we don't care/bother to populate these
