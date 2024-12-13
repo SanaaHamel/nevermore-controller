@@ -37,7 +37,7 @@ constexpr bool i2c_address_reserved(uint8_t addr) {
 }
 
 struct I2C_Bus {  // NOLINT(cppcoreguidelines-special-member-functions)
-    I2C_Bus(SemaphoreHandle_t lock = xSemaphoreCreateMutex()) : lock(lock){};
+    I2C_Bus(SemaphoreHandle_t lock = xSemaphoreCreateMutex()) : lock(lock) {};
     I2C_Bus(I2C_Bus const&) = delete;
     virtual ~I2C_Bus() {
         vSemaphoreDelete(lock);
@@ -51,6 +51,9 @@ struct I2C_Bus {  // NOLINT(cppcoreguidelines-special-member-functions)
     [[nodiscard]] bool write(char const* name, uint8_t addr, uint8_t const* src, size_t len) {
         assert(len <= INT_MAX && "success unrepresentable");
         auto _ = guard();
+#if NEVERMORE_I2C_DEBUG
+        log_debug(name, addr, "writing len=%d", len);
+#endif
         int r = write(addr, src, len);
         if (r < 0 || size_t(r) != len) {
             log_error(name, addr, "write failed; len=%d result=%d", len, r);
@@ -63,6 +66,9 @@ struct I2C_Bus {  // NOLINT(cppcoreguidelines-special-member-functions)
     [[nodiscard]] bool read(char const* name, uint8_t addr, uint8_t* dst, size_t len) {
         assert(len <= INT_MAX && "success unrepresentable");
         auto _ = guard();
+#if NEVERMORE_I2C_DEBUG
+        log_debug(name, addr, "reading len=%d", len);
+#endif
         int r = read(addr, dst, len);
         if (r < 0 || size_t(r) != len) {
             log_error(name, addr, "read failed; len=%d result=%d", len, r);
@@ -129,6 +135,7 @@ struct I2C_Bus {  // NOLINT(cppcoreguidelines-special-member-functions)
     DEFINE_I2C_LOG(log, "")
     DEFINE_I2C_LOG(log_warn, "WARN - ")
     DEFINE_I2C_LOG(log_error, "ERR - ")
+    DEFINE_I2C_LOG(log_debug, "DBG - ")
 #undef DEFINE_I2C_LOG
 
     [[nodiscard]] virtual const char* name() const = 0;

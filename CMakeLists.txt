@@ -41,8 +41,12 @@ include(cmake/FreeRTOS_Kernel_import.cmake)
 
 project(nevermore-controller C CXX ASM)
 
-option(BLUETOOTH_DEBUG "enable bluetooth debug logging (noisy)")
-option(BLUETOOTH_LOW_LEVEL_DEBUG "enable bluetooth low level debug logging (very noisy)")
+# debug logging options
+option(NEVERMORE_BLUETOOTH_DEBUG "bluetooth debug logging (noisy)" OFF)
+option(NEVERMORE_BLUETOOTH_LOW_LEVEL_DEBUG "bluetooth low level debug logging (very noisy)" OFF)
+option(NEVERMORE_I2C_DEBUG "I2C debug logging" OFF)
+# feature options
+option(NEVERMORE_SETTINGS_PERSISTENCE "settings are saved/restored from flash" ON)
 
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_CXX_STANDARD 23)
@@ -107,9 +111,16 @@ target_compile_options(nevermore-controller PUBLIC
 )
 
 target_compile_definitions(nevermore-controller PUBLIC
+  # board config/defs
   NEVERMORE_BOARD="${NEVERMORE_BOARD}"
   NEVERMORE_BOARD_HEADER="config/pins/${NEVERMORE_BOARD}.hpp"
   NEVERMORE_PICO_W_BT=${NEVERMORE_PICO_W_BT}
+  # logging options
+  NEVERMORE_BLUETOOTH_DEBUG=$<BOOL:${NEVERMORE_BLUETOOTH_DEBUG}>
+  NEVERMORE_BLUETOOTH_LOW_LEVEL_DEBUG=$<BOOL:${NEVERMORE_BLUETOOTH_LOW_LEVEL_DEBUG}>
+  NEVERMORE_I2C_DEBUG=$<BOOL:${NEVERMORE_I2C_DEBUG}>
+  # feature options
+  NEVERMORE_SETTINGS_PERSISTENCE=$<BOOL:${NEVERMORE_SETTINGS_PERSISTENCE}>
 
   # UGLY: Also defines the value of `nevermore::Priority::Communication`.
   # We want a priority above almost anything else.
@@ -128,14 +139,6 @@ target_compile_definitions(nevermore-controller PUBLIC
 
   CFG_TUSB_CONFIG_FILE="config/lib/tusb_config.h"
 )
-
-if(BLUETOOTH_DEBUG)
-  target_compile_definitions(nevermore-controller PUBLIC CMAKE_BLUETOOTH_DEBUG=1)
-endif()
-
-if(BLUETOOTH_LOW_LEVEL_DEBUG)
-  target_compile_definitions(nevermore-controller PUBLIC CMAKE_BLUETOOTH_LOW_LEVEL_DEBUG=1)
-endif()
 
 target_link_libraries(
   nevermore-controller
