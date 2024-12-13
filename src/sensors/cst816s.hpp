@@ -1,6 +1,7 @@
 #pragma once
 
 #include "async_sensor.hpp"
+#include "config/lib/lv_conf.h"
 #include <chrono>
 #include <cstdint>
 #include <memory>
@@ -61,7 +62,8 @@ struct CST816S final : SensorPeriodic {
     }
 
     [[nodiscard]] std::chrono::milliseconds update_period() const override {
-        return 5ms;
+        // no need to update more often than `LV_INDEV_DEF_READ_PERIOD`
+        return std::chrono::milliseconds(LV_INDEV_DEF_READ_PERIOD - 1);
     }
 
 protected:
