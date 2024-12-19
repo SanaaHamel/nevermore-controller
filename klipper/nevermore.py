@@ -514,6 +514,7 @@ class NevermoreBLE(NevermoreInterface):
             return False
 
         async def retry():
+            self._connected.clear()
             if self._disconnect.is_set():
                 return False
 
@@ -609,6 +610,8 @@ class NevermoreBLE(NevermoreInterface):
                 )
             except CantInferWhichNevermoreToUse:
                 pass  # quietly fail and move on
+            finally:
+                self._connected.clear()
 
         async def go():
             # set this up ASAP once we're in an asyncio loop
