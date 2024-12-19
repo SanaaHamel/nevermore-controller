@@ -611,11 +611,13 @@ layers:
 
 WARNING: Don't simply copy-paste this into your config. It won't give you a working setup. xref:guide-setup[Follow the setup guide.]
 
-This section lists all options and defaults. Some minor examples are also provided.
+This section lists all options and their defaults. Some minor examples are also provided. Use multiple `[nevermore ...]` sections if you have multiple Nevermores.
 
 NOTE: The values shown here are either the default for that option or a placeholder.
 
 WARNING: Leave an option unset if you don't need a value different than the default. Setting an option to the same value as the default will prevent you from getting new defaults from future updates.
+
+WARNING: Using multiple Nevermores over BLE is experimental and may take longer to connect.
 
 ```ini
 # DON'T JUST COPY PASTE THIS INTO YOUR CONFIG.
@@ -623,15 +625,17 @@ WARNING: Leave an option unset if you don't need a value different than the defa
 # 2) *Don't uncomment default values unless you explicitly wish to change them.*
 #    Doing so will prevent you from getting new defaults from future updates.
 
-# If name is omitted, will default to just `nevermore`
-[nevermore nevermore]
-# Can omit if you have only one nevermore in range.
+# If name is omitted, will default to just `nevermore`.
+# You may specify multiple `[nevermore ...]` sections to define multiple filters.
+[nevermore custom_names_allowed]
+# Can omit if you have only one nevermore in range, but it is recommended you
+# specify the address.
 # See <<Finding The BT Address>> for more info.
 # NOTE: Providing an address will make startup slightly faster.
 #       (If no address is provided then the system must spend extra time
 #        verifying that there's only one nearby Nevermore.)
 # example - `bt_address: 43:43:A2:12:1F:AC`
-bt_address: <optional, omitted by default>
+bt_address: <optional, recommended, omitted by default>
 
 # Use a serial connection instead of BLE.
 # Mutually exclusive w/ `bt_address`.
@@ -773,7 +777,7 @@ sensor_type: NevermoreSensor # fixed, must be `NevermoreSensor`
 sensor_kind: <required, no defaults>
 
 # full Klipper object name of the Nevermore instance to use as a source
-nevermore: nevermore
+nevermore: <omitted, e.g. `nevermore custom_names_allowed`>
 
 # Mainsail 2.7.1 doesn't recognise `NevermoreSensor` as sensor it should plot.
 # This hacky option allows overriding the class name with one it does recognise
