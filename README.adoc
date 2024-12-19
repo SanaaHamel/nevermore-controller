@@ -611,25 +611,29 @@ layers:
 
 WARNING: Don't copy-paste this into your config/ It won't give you a working setup. xref:guide-setup[Follow the setup guide if you have any doubts.]
 
-This section lists all options and defaults. Some minor examples are also provided.
+This section lists all options and defaults. Some minor examples are also provided. Use multiple sections if you have multiple Nevermores.
 
 NOTE: The values shown here are either the default for that option or a placeholder.
 
 NOTE: If you don't care about a setting, leave it unset. Suggested defaults will change over time based on user feedback.
 
+WARNING: Using multiple Nevermores over BLE is experimental and may take longer to connect.
+
 ```ini
 # DON'T JUST COPY PASTE THIS INTO YOUR CONFIG.
 # READ THE SETUP GUIDE.
 
-# If name is omitted, will default to just `nevermore`
-[nevermore nevermore]
-# Can omit if you have only one nevermore in range.
+# If name is omitted, will default to just `nevermore`.
+# You may specify multiple `[nevermore ...]` sections to define multiple filters.
+[nevermore custom_names_allowed]
+# Can omit if you have only one nevermore in range, but it is recommended you
+# specify the address.
 # See <<Finding The BT Address>> for more info.
 # NOTE: Providing an address will make startup slightly faster.
 #       (If no address is provided then the system must spend extra time
 #        verifying that there's only one nearby Nevermore.)
 # example - `bt_address: 43:43:A2:12:1F:AC`
-bt_address: <optional, omitted by default>
+bt_address: <optional, recommended, omitted by default>
 
 # Use a serial connection instead of BLE.
 # Mutually exclusive w/ `bt_address`.
