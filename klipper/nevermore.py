@@ -1028,6 +1028,7 @@ class Nevermore:
         data = self.state.as_dict()
         data.update((f"{k}_min", v) for k, v in self._state_min.as_dict().items())
         data.update((f"{k}_max", v) for k, v in self._state_max.as_dict().items())
+        data['connected'] = self._interface is not None and self._interface.connected
         return data
 
     def cmd_NEVERMORE_PRINT_START(self, gcmd: GCodeCommand) -> None:
