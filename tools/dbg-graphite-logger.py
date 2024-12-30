@@ -462,7 +462,10 @@ async def _main(args: CmdLnArgs):
         with tempfile.NamedTemporaryFile() as f:
             f.write(service_def.encode("utf-8"))
             f.flush()
+            # remove existing service file if any
+            sudo_cmd(f"rm {shlex.join([SYSTEMD_SERVICE_PATH])}")
             sudo_cmd(f"cp {shlex.join([f.name, SYSTEMD_SERVICE_PATH])}")
+            sudo_cmd(f"systemctl daemon-reload")
             sudo_cmd(f"systemctl enable {SYSTEMD_SERVICE_FILENAME}")
             sudo_cmd(f"systemctl start {SYSTEMD_SERVICE_FILENAME}")
 
