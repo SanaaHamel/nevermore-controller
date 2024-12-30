@@ -404,13 +404,14 @@ Alternatively, you can flash Klipper to the Pico and use it like any other Klipp
 +
 NOTE: I intend to improve the experience for people using a wired connection instead of wireless (via the Klipper MCU), but have no concrete timeline.
 
-* **I'm using the xref:klipper-config-minimal[minimal configuration] and I only see the VOC plot entry in Mainsail, there's no 'Nevermore' item.**
+* **I'm using the xref:klipper-config-minimal[minimal configuration] and I only see the VOC plot entry in Mainsail/Fluidd, there's no 'Nevermore' item.**
 +
-Verify that your Mainsail version is at least 2.7.1 (first release w/ official support).
+Mainsail must be version >= 2.7.1.
+Fluidd must be version >= 1.31.0.
 If that's fine then double check there isn't any config errors.
 
 [#pin-config-update-bug]
-* **Only the intake/exhaust side shows values in Mainsail, the other side only shows `---`.**
+* **Only the intake/exhaust side shows values in Mainsail/Fluidd, the other side only shows `---`.**
 +
 . Run `./tools/pin-config.py --reset-default`.
 +
@@ -420,11 +421,6 @@ This fixes a known bug when updating to 0.14+ from older versions that would cor
 You can quickly test this by swapping your working side's sensors with the problematic one.
 If problematic side starts working then the issue is with the sensors you pulled, otherwise the wiring is the problem.
 
-* **Fluidd doesn't show sensor values other than temperature, even with the `class_name_override` hack.**
-+
-Fluidd is partially supported with regards to sensor display and visualisation.
-It requires using `temperature_sensor` with `NevermoreSensor` to display state;
-it does not have an equivalent to Mainsail's dedicated display.
 
 == Display Support
 
@@ -572,19 +568,11 @@ fan_power_coefficient: 0.7  # lower max power to keep things much more quiet
 
 # Optional
 # This 'temperature' sensor only serves to draw the intake VOC index on
-# Mainsail's temperature plot.
+# Mainsail/Fluidd's temperature plot.
 [temperature_sensor nevermore_intake_VOC]
 sensor_type: NevermoreSensor
 sensor_kind: intake
 plot_voc: true
-
-# Uncomment the following if you're using Fluidd as your main UI.
-# [temperature_sensor nevermore_intake]
-# sensor_type: NevermoreSensor
-# sensor_kind: intake
-# [temperature_sensor nevermore_exhaust]
-# sensor_type: NevermoreSensor
-# sensor_kind: exhaust
 ```
 
 
@@ -765,8 +753,9 @@ serial: <device path>
 
 
 # MOSTLY OBSOLETE.
-# Mainsail 2.7.1 introduced dedicated support for Nevermore controllers, simply having
-# `[nevermore]` is sufficient to display sensor values in the 'Temperatures' panel.
+# Mainsail 2.7.1+ and Fluidd 1.31.0+ both have dedicated support for Nevermores.
+# Simply having `[nevermore ...]` is sufficient to display sensor values in the
+# 'Temperatures' panel.
 #
 # Only remaining useful behaviour for `temperature_sensors` is the `plot_voc` option
 # which allows drawing the VOC index values for intake/exhaust in the temperature plot.
