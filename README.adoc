@@ -246,7 +246,7 @@ The controller should now be visible as a serial device at `/dev/serial/by-id/us
 
 NOTE: You want the first interface (ends with `_if00`), *not* the second (ends with `_if02`).
 
-. Open a terminal and run `minicom -c on -b 115200 -D /dev/serial/by-id/usb-Nevermore_Filter_<board>_<device-id>_if00`.
+. Open a terminal and run `minicom -c on -b 115200 -O timestamp=extended -D /dev/serial/by-id/usb-Nevermore_Filter_<board>_<device-id>_if00`.
 +
 You will probably get a screen that looks like this:
 +
@@ -258,6 +258,10 @@ Port /dev/serial/by-id/usb-Raspberry_Pi_Pico_Nevermore_E6616408432C432E-if00, 15
 
 Press CTRL-A Z for help on special keys
 ```
+
+NOTE: Want to save this log to a file? (e.g. You're debugging a periodic crash.) Add `-C controller.log` to the command line arguments to save a copy of the log in `controller.log`.
+
+NOTE: Need a long term log? Use `tmux` (or equiv) to keep `minicom` alive even if SSH disconnects.
 
 . Restart the controller using one of the following:
 .. Use the reset button (if your board has one).
