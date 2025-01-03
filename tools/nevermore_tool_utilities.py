@@ -93,6 +93,14 @@ class NevermoreToolCmdLnArgs(tap.TypedArgs):
                     return None
                 except bleak.exc.BleakDeviceNotFoundError:
                     return None
+                except KeyError as e:
+                    # IDK why these aren't handled in bleak, but we have to handle their crap
+                    if len(e.args) == 1 and e.args[0] in {
+                        'org.bluez.Device1',
+                        'org.bluez.GattService1',
+                    }:
+                        return None
+                    raise e
                 except Exception as e:
                     if is_lost_connection_exception(e):
                         return None
