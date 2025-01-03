@@ -269,7 +269,7 @@ async def software_revision(transport: Transport):
 
 async def reset_setting_defaults(transport: Transport):
     await transport(UUID_CHAR_CONFIG_RESET, {P.WRITE}).write(
-        (1 << 1).to_bytes(byteorder='little')
+        (1 << 1).to_bytes(1, 'little')
     )
 
 
