@@ -182,7 +182,9 @@ git pull
 The when you run `update_ota.py` it will install any missing dependencies.
 This can take a while the first time, depending on the machine's capabilities.
 
-If you have multiple controllers in range, you can specify which to update using `--bt-address`. e.g. `./tools/update_ota.py --bt-address XX:XX:XX:XX:XX:XX`
+If you have multiple controllers in range, you can specify which to update using `--bt-address`. e.g. `./tools/update_ota.py --bt-address XX:XX:XX:XX:XX:XX`.
+
+If you're using serial, use `--serial <same path specified in your klipper cfg>` instead of `--bt-address`.
 
 See `./tools/update_ota.py --help` for all options.
 
@@ -226,6 +228,26 @@ NOTE: Ignore logged exceptions about `A message handler raised an exception: 'or
 previous version: v0.7.0  # whatever version was installed
  current version: v0.7.0  # in this example it tried to update to the same version
 ```
+
+=== Uploading Specific Versions & Custom Builds
+
+You may specify `--tag <release-tag>` to upload a specific release instead of the latest.
+e.g. `./tools/update_ota.py --tag v0.15.1` to download v0.15.1.
+
+You can also upload custom builds using `--file`. These builds must include a PicoWOTA bootloader; by convention these UF2 files are prefixed with `picowota_ota-`.
+
+If Sanaa sends you a custom build via Discord you can usually apply it as follows:
+
+. Right click on download -> "Copy link"
+. Open a SSH shell and run:
+```bash
+cd ~/nevermore-controller
+wget -O picowota_ota-custom.uf2 "<paste link, make sure it is quoted>"
+./tools/update_ota.py <serial or bt-address> --file "./picowota_ota-custom.uf2"
+```
+
+WARNING: Custom builds are often unstable and can break the bootloader. If something goes wrong you may have to flash an official release using USB & the boot button.
+
 
 [#usb-console-minicom]
 == Getting Console Logs Via USB / UART
