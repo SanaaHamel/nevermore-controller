@@ -140,9 +140,9 @@ Put this macro wrapper in your config:footnote:[Wherever you'd like.`TURN_OFF_HE
 ```ini
 # ASSUME: Your `print_end` macro calls `TURN_OFF_HEATERS`.
 [gcode_macro TURN_OFF_HEATERS]
-rename_existing: NEVERMORE_CONTROLLER_INNER_TURN_OFF_HEATERS
+rename_existing: _NEVERMORE_CONTROLLER_INNER_TURN_OFF_HEATERS
 gcode:
-    NEVERMORE_CONTROLLER_INNER_TURN_OFF_HEATERS
+    _NEVERMORE_CONTROLLER_INNER_TURN_OFF_HEATERS
     # See <<NEVERMORE_PRINT_END>> for options.
     NEVERMORE_PRINT_END
 ```
