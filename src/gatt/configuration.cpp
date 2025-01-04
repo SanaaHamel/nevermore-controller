@@ -51,6 +51,7 @@ optional<uint16_t> attr_read(
     switch (attr) {
         USER_DESCRIBE(CONFIG_REBOOT, "Reboot")
         USER_DESCRIBE(CONFIG_FLAGS, "Configuration Flags (bitset)")
+        USER_DESCRIBE(CONFIG_CHECKPOINT_SENSOR_CALIBRATION, "Force sensor calibration checkpoint")
         USER_DESCRIBE(CONFIG_RESET_SENSOR_CALIBRATION, "Reset sensor calibration")
         USER_DESCRIBE(CONFIG_RESET_SETTINGS, "Reset settings (bitset)")
         USER_DESCRIBE(CONFIG_VOC_GATING_THRESHOLD, "VOC Gating Threshold")
