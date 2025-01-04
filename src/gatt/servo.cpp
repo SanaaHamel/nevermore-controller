@@ -39,7 +39,8 @@ bool init() {
 
 void disconnected(hci_con_handle_t) {}
 
-optional<uint16_t> attr_read(hci_con_handle_t conn, uint16_t attr, span<uint8_t> buffer) {
+optional<uint16_t> attr_read(
+        hci_con_handle_t const conn, uint16_t const attr, uint16_t const offset, span<uint8_t> const buffer) {
     switch (attr) {
         USER_DESCRIBE(SERVO_VENT_RANGE, "Vent servo start/end range.")
         USER_DESCRIBE(SERVO_VENT_POWER, "Vent servo %")

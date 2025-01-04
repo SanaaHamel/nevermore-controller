@@ -8,7 +8,7 @@
 
 namespace nevermore::gatt::display {
 
-std::optional<uint16_t> attr_read(hci_con_handle_t, uint16_t attr, std::span<uint8_t>);
+std::optional<uint16_t> attr_read(hci_con_handle_t, uint16_t attr, uint16_t offset, std::span<uint8_t>);
 std::optional<int> attr_write(hci_con_handle_t, uint16_t attr, std::span<uint8_t const>);
 
 bool init();

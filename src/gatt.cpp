@@ -85,20 +85,23 @@ void hci_handler(uint8_t packet_type, [[maybe_unused]] uint16_t channel, uint8_t
     }
 }
 
-optional<uint16_t> attr_read(hci_con_handle_t conn, uint16_t attr, span<uint8_t> buffer) {
+optional<uint16_t> attr_read(hci_con_handle_t conn, uint16_t attr, uint16_t offset, span<uint8_t> buffer) {
     constexpr array HANDLERS{
 #define FOREACH_SERVICE_ACTION(x) x::attr_read,
             FOREACH_SERVICE()
 #undef FOREACH_SERVICE_ACTION
     };
     for (auto handler : HANDLERS)
-        if (auto r = handler(conn, attr, buffer)) return r;
+        if (auto r = handler(conn, attr, offset, buffer)) return r;
 
     printf("WARN - BLE GATT - attr_read unhandled attr 0x%04x\n", int(attr));
     return {};
 }
 
-int attr_write(hci_con_handle_t conn, uint16_t attr, span<uint8_t const> buffer) {
+int attr_write(hci_con_handle_t conn, uint16_t attr, uint16_t offset, span<uint8_t const> buffer) {
+    // FUTURE WORK: support offset'd writes to attributes
+    if (offset != 0) return ATT_ERROR_REQUEST_NOT_SUPPORTED;
+
     constexpr array HANDLERS{
 #define FOREACH_SERVICE_ACTION(x) x::attr_write,
             FOREACH_SERVICE()
@@ -117,22 +120,21 @@ int attr_write(hci_con_handle_t conn, uint16_t attr, span<uint8_t const> buffer)
 }
 
 // This API sucks.
-// To query length: call w/ `buffer == null` (`offset` and `buffer_size` should both be 0)
+// To query length: call w/ `buffer == null` (`buffer_size` should both be 0)
 // To return an error code: return `err + ATT_READ_ERROR_CODE_OFFSET`
 // Otherwise: return how many bytes were written to the buffer.
+// `offset` is an offset within the attr blob; if past end of blob -> 0 bytes written back.
 uint16_t attr_read(
         hci_con_handle_t conn, uint16_t attr, uint16_t offset, uint8_t* buffer, uint16_t buffer_size) {
-    assert(offset <= buffer_size);
-    assert(buffer || (offset == 0 && buffer_size == 0));
+    assert(buffer || buffer_size == 0);
     auto result = attr_read(
             // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic)
-            conn, attr, buffer ? span<uint8_t>{buffer + offset, buffer + buffer_size} : span<uint8_t>{});
+            conn, attr, offset, buffer ? span<uint8_t>{buffer, buffer + buffer_size} : span<uint8_t>{});
     return result.value_or(ATT_READ_ERROR_CODE_OFFSET + ATT_ERROR_INVALID_HANDLE);
 }
 
 int attr_write(hci_con_handle_t conn, uint16_t attr, uint16_t transaction_mode, uint16_t offset,
         uint8_t* buffer, uint16_t buffer_size) {
-    if (buffer_size < offset) return ATT_ERROR_INVALID_OFFSET;
     // `attr == 0` is an invalid handle, but the combination of `attr == 0` and a cancel transaction means
     // 'drop everything pending, the other side has disconnected'.
     // For us, this means a no-op; we don't support prepared writes so there's nothing to cancel.
@@ -146,7 +148,7 @@ int attr_write(hci_con_handle_t conn, uint16_t attr, uint16_t transaction_mode, 
     }
 
     // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic)
-    return attr_write(conn, attr, {buffer + offset, buffer + buffer_size});
+    return attr_write(conn, attr, offset, {buffer, buffer + buffer_size});
 }
 
 btstack_packet_callback_registration_t g_hci_handler{.callback = &hci_handler};
@@ -187,11 +189,11 @@ bool init() {
 }
 
 optional<uint16_t> read(uint16_t attr, span<uint8_t> buffer) {
-    return attr_read(HCI_CON_HANDLE_INVALID, attr, buffer);
+    return attr_read(HCI_CON_HANDLE_INVALID, attr, 0, buffer);
 }
 
 optional<uint16_t> write(uint16_t attr, std::span<uint8_t const> buffer) {
-    return attr_write(HCI_CON_HANDLE_INVALID, attr, buffer);
+    return attr_write(HCI_CON_HANDLE_INVALID, attr, 0, buffer);
 }
 
 }  // namespace nevermore::gatt

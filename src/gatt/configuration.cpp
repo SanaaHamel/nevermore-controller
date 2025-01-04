@@ -46,7 +46,8 @@ bool init() {
 
 void disconnected(hci_con_handle_t) {}
 
-optional<uint16_t> attr_read(hci_con_handle_t conn, uint16_t attr, span<uint8_t> buffer) {
+optional<uint16_t> attr_read(
+        hci_con_handle_t const conn, uint16_t const attr, uint16_t const offset, span<uint8_t> const buffer) {
     switch (attr) {
         USER_DESCRIBE(CONFIG_REBOOT, "Reboot")
         USER_DESCRIBE(CONFIG_FLAGS, "Configuration Flags (bitset)")
@@ -77,8 +78,8 @@ optional<uint16_t> attr_read(hci_con_handle_t conn, uint16_t attr, span<uint8_t>
         READ_VALUE(CONFIG_PINS_DEFAULT, PINS_DEFAULT)
 
     case HANDLE_ATTR(CONFIG_PINS_ERROR, VALUE):
-        return att_read_callback_handle_blob(
-                reinterpret_cast<uint8_t const*>(g_pins_config_error), strlen(g_pins_config_error), buffer);
+        return att_read_callback_handle_blob(reinterpret_cast<uint8_t const*>(g_pins_config_error),
+                strlen(g_pins_config_error), offset, buffer);
 
     default: return {};
     }
