@@ -668,13 +668,17 @@ class NevermoreBLE(NevermoreInterface):
             char: Transport.Attribute,
             callback: Callable[["Nevermore", BleAttrReader], Any],
         ):
-            def go(_: BleakGATTCharacteristic, params: bytearray):
+            def go(_: Any, params: bytearray):
                 nonlocal last_notify_timestamp
                 last_notify_timestamp = datetime.datetime.now()
 
                 nevermore = self.nevermore
                 if nevermore is not None:  # if frontend is dead -> nothing to do
                     callback(nevermore, BleAttrReader(bytes(params)))
+
+            # immediately fetch b/c our readings may be out of date and if they
+            # don't change on the controller we'll never be notified
+            go(None, await client.read_gatt_char(char.handle))
 
             await client.start_notify(char.handle, go)
 
