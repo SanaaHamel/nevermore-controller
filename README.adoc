@@ -587,10 +587,11 @@ Check out the full documentation section (just after this) after you've tested e
 # If you don't have LEDs, you can omit the two `led_*` lines entirely
 led_colour_order: GBR
 led_chain_count: 16
+
 # These `fan_power_*` entries are for a DELTA BFB0712HF (StealthMax BOM)
 # If you have a different fan then play with these numbers to your satisfaction.
 # See full config documentation for details.
-fan_power_coefficient: 0.7  # lower max power to keep things much more quiet
+fan_power_coefficient: 0.8  # lower max power to keep things much more quiet
 
 # Optional
 # This 'temperature' sensor only serves to draw the intake VOC index on
