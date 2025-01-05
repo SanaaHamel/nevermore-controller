@@ -1089,9 +1089,9 @@ class Nevermore:
 
     def cmd_NEVERMORE_STATUS(self, gcmd: GCodeCommand) -> None:
         if self._interface is not None and self._interface.connected:
-            gcmd.respond_info(f"{self.name} connected")
+            gcmd.respond_info(f"'{self.name}' connected")
         else:
-            gcmd.respond_info(f"{self.name} not yet connected")
+            gcmd.respond_info(f"'{self.name}' not connected")
 
     def cmd_NEVERMORE_SENSOR_CALIBRATION_CHECKPOINT(self, gcmd: GCodeCommand) -> None:
         if self._interface is not None:
