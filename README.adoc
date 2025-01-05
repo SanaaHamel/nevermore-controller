@@ -95,7 +95,7 @@ Instructions:
 +
 The Pico W's LED should start flashing once the controller has booted.
 
-. Execute the following to install the Klipper module:
+. SSH into your printer. Execute the following to install the Klipper module:
 +
 ```sh
 cd ~
