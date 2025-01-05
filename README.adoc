@@ -129,33 +129,62 @@ gcode:
     ... <SNIP YOUR CURRENT GCODE> ...
 ```
 
-.. Add `<<NEVERMORE_PRINT_END>>` to your `TURN_OFF_HEATERS` macro.
+.. Add `<<NEVERMORE_PRINT_END>>` to your `TURN_OFF_HEATERS` override macro.
 +
 WARNING: This assumes your `print_end` macro calls `TURN_OFF_HEATERS`. If it doesn't then you're doing something weird and potentially dangerous.
 +
 WARNING: Do *not* put it directly in your `print_end` macro, otherwise it won't trigger on exceptional circumstances (e.g. aborts, errors, cancels).
 +
-Put this macro wrapper in your config:footnote:[Wherever you'd like.`TURN_OFF_HEATERS` is a built-in macro, and should never be overridden w/o calling the replaced macro, so it doesn't matter if another macro ends up wrapping this wrapper.]
+WARNING: Make sure you don't have other overrides for `TURN_OFF_HEATERS`. e.g. Ellis' bed fans config overrides this. See below.
++
+Add this macro wrapper to the printer config or add `NEVERMORE_PRINT_END` to an existing macro wrapper. Verify there is **exactly** one instance of `[gcode_macro TURN_OFF_HEATERS]` in the config files. They do not stack and only the last will take effect.
 +
 ```ini
-# ASSUME: Your `print_end` macro calls `TURN_OFF_HEATERS`.
+# REQUIRE:  `print_end` macro calls `TURN_OFF_HEATERS`.
+# REQUIRE:  There are *NO OTHER* overrides of `[gcode_macro TURN_OFF_HEATERS]` in the cfg.
+#           Combine them if there are. There can only be one.
 [gcode_macro TURN_OFF_HEATERS]
-rename_existing: _NEVERMORE_CONTROLLER_INNER_TURN_OFF_HEATERS
+rename_existing: _TURN_OFF_HEATERS_ORIGINAL
 gcode:
-    _NEVERMORE_CONTROLLER_INNER_TURN_OFF_HEATERS
+    # **Always** run the system cmd first to turn off heaters.
+    _TURN_OFF_HEATERS_ORIGINAL
     # See <<NEVERMORE_PRINT_END>> for options.
     NEVERMORE_PRINT_END
+    # Any other commands that need to run
+    # This will vary depending on what other mods you are using.
 ```
 
-. Check your printer's log file. If everything went well you should see something like:
+. Check your printer's log file for the following:
+.. `TURN_OFF_HEATERS` macro was correctly added/modified. You should see one instance in the config section and it should contain a call to `NEVERMORE_PRINT_END`.
+.. Verify Klipper managed to connect to the controller(s).
++
+The log should contain lines similar to:
 +
 ```log
+Starting Klippy...
 ... BLAH
 ... BLAH
-Sending MCU 'mcu' printer configuration...
-Configured MCU 'mcu' (283 moves)
+===== Config file =====
 ... BLAH
 ... BLAH
+
+[gcode_macro TURN_OFF_HEATERS]
+rename_existing = _TURN_OFF_HEATERS_ORIGINAL
+gcode =
+    _TURN_OFF_HEATERS_ORIGINAL
+    NEVERMORE_PRINT_END
+    # This hypothetical printer has bed fans, so
+    # the bed fan turn off macro must be called.
+    BED_FANS_OFF
+
+... BLAH
+... BLAH
+=======================
+Extruder max_extrude_ratio=... BLAH
+mcu 'mcu': Starting CAN connect
+... BLAH
+... BLAH
+# lines saying discovered controller & connected
 [11:27:13:976834] nevermore - discovered controller 28:CD:C1:09:64:8F
 [11:27:13:981190] nevermore - connected to controller 28:CD:C1:09:64:8F
 ... BLAH
