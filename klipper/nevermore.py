@@ -469,8 +469,9 @@ class NevermoreBLE(NevermoreInterface):
     @override
     def wait_for_connection(self) -> bool:
         # if the thread isn't running then we're already broken, don't bother waiting
-        return self._thread.is_alive() and self._connected.wait(
-            self.connection_initial_timeout
+        return self._thread.is_alive() and (
+            self.connection_initial_timeout == 0
+            or self._connected.wait(self.connection_initial_timeout)
         )
 
     @override
