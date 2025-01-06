@@ -664,40 +664,6 @@ class NevermoreBLE(NevermoreInterface):
         nevermore.handle_controller_connect()
         nevermore = None  # release local ref
 
-        last_notify_timestamp = datetime.datetime.now()
-
-        async def notify(
-            char: Transport.Attribute,
-            callback: Callable[["Nevermore", BleAttrReader], Any],
-        ):
-            def go(_: Any, params: bytearray):
-                nonlocal last_notify_timestamp
-                last_notify_timestamp = datetime.datetime.now()
-
-                nevermore = self.nevermore
-                if nevermore is not None:  # if frontend is dead -> nothing to do
-                    callback(nevermore, BleAttrReader(bytes(params)))
-
-            # immediately fetch b/c our readings may be out of date and if they
-            # don't change on the controller we'll never be notified
-            go(None, await client.read_gatt_char(char.handle))
-
-            await client.start_notify(char.handle, go)
-
-        def notify_env(nevermore: "Nevermore", params: BleAttrReader):
-            (intake, exhaust) = SensorState.parse(params)
-            # HACK: Abuse GIL to keep this thread-safe
-            nevermore.state.intake = intake
-            nevermore.state.exhaust = exhaust
-            nevermore.state_stats_update()
-
-        def notify_fan(nevermore: "Nevermore", params: BleAttrReader):
-            # HACK: Abuse GIL to keep this thread-safe
-            # show the current fan power even if it isn't overridden
-            nevermore.state.fan_power = (params.percentage8() or 0) / 100.0
-            nevermore.state.fan_tacho = params.tachometer()
-            nevermore.state_stats_update()
-
         async def handle_commands():
             cmd = await self._command_queue.async_q.get()
 
@@ -717,28 +683,32 @@ class NevermoreBLE(NevermoreInterface):
             self._led_dirty.clear()
             await self.leds_update(comm)
 
-        async def handle_notify_timeout():
-            nonlocal last_notify_timestamp
-            elapsed = (datetime.datetime.now() - last_notify_timestamp).total_seconds()
-            if CONTROLLER_NOTIFY_TIMEOUT < elapsed:
-                self.log.warning(
-                    f"last notify was {elapsed} seconds ago. reconnecting..."
-                )
-                raise NevermoreForceReconnection("notify timeout", elapsed)
+        async def handle_poll():
+            nevermore = self.nevermore
+            if nevermore is not None:
+                params = BleAttrReader(bytes(await comm.aggregate_env.read()))
+                (intake, exhaust) = SensorState.parse(params)
+                # HACK: Abuse GIL to keep this thread-safe
+                nevermore.state.intake = intake
+                nevermore.state.exhaust = exhaust
 
-            await asyncio.sleep(CONTROLLER_NOTIFY_TIMEOUT)
+                params = BleAttrReader(bytes(await comm.aggregate_fan.read()))
+                # show the current fan power even if it isn't overridden
+                nevermore.state.fan_power = (params.percentage8() or 0) / 100.0
+                nevermore.state.fan_tacho = params.tachometer()
+                nevermore.state_stats_update()
+
+            await asyncio.sleep(NEVERMORE_REFRESH_DELAY)
 
         async def forever(go: Callable[[], Coroutine[Any, Any, Any]]):
             while True:
                 await go()
 
         tasks = asyncio.gather(
-            *[forever(x) for x in [handle_commands, handle_led, handle_notify_timeout]]
+            *[forever(x) for x in [handle_commands, handle_led, handle_poll]]
         )
 
         try:
-            await notify(comm.aggregate_env, notify_env)
-            await notify(comm.aggregate_fan, notify_fan)
             await tasks
         finally:
             tasks.cancel()  # kill off all active tasks if any fail
