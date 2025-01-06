@@ -682,7 +682,8 @@ serial: <device path>
 # NB: if < 200 then fan will engage when in the 'nominal' region (see VOC guide)
 #fan_policy_voc_passive_max: 200
 # voc index, 0 to disable, filter if the intake exceeds exhaust by at least this much
-#fan_policy_voc_improve_min: 25
+# Not recommended; `voc_passive_max` is generally more reliable and useful.
+#fan_policy_voc_improve_min: 0
 
 # Fan Policy - Thermal Limit
 # Controls how/when the fan power is throttled down if the temperature is too high.
