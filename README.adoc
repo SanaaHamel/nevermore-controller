@@ -818,10 +818,12 @@ At this time, there can only be one Nevermore controller, which is named `neverm
 
 Command:
 ```
-NEVERMORE_VENT_SERVO_SET [NEVERMORE=<name>] [PERCENT=<float \in [0, 1]>]
+NEVERMORE_VENT_SERVO_SET [NEVERMORE=<name>] [PERCENT=<float \in [0, 1]>] [HOLD_FOR=<seconds > 0, optional>]
 ```
 
 Set the vent's servo pulse to the specified % between . Omitting `PERCENT` disables the servo.
+Specifying `HOLD_FOR` disables the servo after the specified # of seconds.
+`HOLD_FOR` requires a `PERCENT`.
 
 
 ==== NEVERMORE_STATUS

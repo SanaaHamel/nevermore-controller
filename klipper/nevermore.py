@@ -892,8 +892,10 @@ class Nevermore:
             "gcode:request_restart", self._handle_request_restart
         )
 
-        self._timer_refresh = self.printer.get_reactor().register_timer(
-            self._handle_refresh, self.printer.get_reactor().NOW
+        reactor = self.printer.get_reactor()
+        reactor.register_timer(self._timer_refresh, reactor.NOW)
+        self._timer_vent_servo_release_handle = reactor.register_timer(
+            self._timer_vent_servo_release
         )
 
         gcode: GCodeDispatch = self.printer.lookup_object("gcode")
@@ -906,12 +908,21 @@ class Nevermore:
         if self._interface is not None:
             self._interface.send_command(CmdFanPowerOverride(percent))
 
-    def set_vent_servo_pwm(self, percent: Optional[float]):
+    def set_vent_servo(
+        self, percent: Optional[float], hold_for: Optional[float] = None
+    ):
         if percent is not None:
             percent = max(min(percent, 1), 0)
 
         if self._interface is not None:
             self._interface.send_command(CmdServoVentPWM(percent))
+
+            if percent is not None and 0 < (hold_for or 0):
+                reactor = self.printer.get_reactor()
+                reactor.update_timer(
+                    self._timer_vent_servo_release_handle,
+                    reactor.monotonic() + hold_for,
+                )
 
     def state_stats_update(self):
         self._state_min = self._state_min.min(self.state)
@@ -1000,11 +1011,15 @@ class Nevermore:
             self._interface.disconnect()
             self._interface = None
 
-    def _handle_refresh(self, eventtime: float) -> None:
+    def _timer_refresh(self, eventtime: float) -> None:
         if self._interface is not None and self._interface.connected:
             self._interface.refresh()
 
         return eventtime + NEVERMORE_REFRESH_DELAY
+
+    def _timer_vent_servo_release(self, eventtime: float) -> None:
+        self.set_vent_servo(None)
+        return self.printer.get_reactor().NEVER
 
     # having this method is sufficient to be visible to klipper/moonraker
     def get_status(self, eventtime: float) -> Dict[str, float]:
@@ -1021,7 +1036,11 @@ class Nevermore:
         gcmd.respond_info(self.cmd_NEVERMORE_PRINT_END_help)
 
     def cmd_NEVERMORE_VENT_SERVO_SET(self, gcmd: GCodeCommand) -> None:
-        self.set_vent_servo_pwm(gcmd.get_float("PWM", None, 0, 1))
+        perc: Optional[float] = gcmd.get_float("PERCENT", None, 0, 1)
+        hold: Optional[float] = gcmd.get_float("HOLD_FOR", None, above=0)
+        if hold is not None and perc is None:
+            gcmd.error("`HOLD_FOR` cannot be used w/o `PERCENT`")
+        self.set_vent_servo(perc, hold)
 
     def cmd_NEVERMORE_VOC_GATING_THRESHOLD_OVERRIDE(self, gcmd: GCodeCommand) -> None:
         # `None` to allow explicitly clearing override by not specifying a `SPEED` arg
