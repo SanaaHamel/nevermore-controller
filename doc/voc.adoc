@@ -80,7 +80,7 @@ The degree of all of these varies between different models but generally applies
 [#baseline-calibration]
 === Baseline Calibration
 
-NOTE: The printer cannot be used during calibration.
+NOTE: **The printer cannot be used during calibration.**
 
 Baseline calibration consists of letting the system learn a <<Baseline>> corresponding to 'clean air', where 'clean air' means as clean as the air in the room. This will take 8+ hours minimum and ideally 24.
 
@@ -92,13 +92,7 @@ WARNING: The controller saves the current baseline to flash every 24 hours. If y
 +
 e.g. `SET_FAN_SPEED FAN=nevermore_fan SPEED=0`
 
-. Open the printer door/enclosure.
-
-. *[Optional]* Remove the carbon basket (if applicable).
-+
-This helps ensure both intake/exhaust sensors are exposed to the same air and reach similar calibrations. You can leave the basket on the printer bed during calibration.
-
-. Let some fresh air into the room for a minute or two.
+. Open the printer door/enclosure & let some fresh air into the room for ~5 minutes.
 +
 Open a window for a few minutes, flap a hand towel in the doorway, whatever. The objective is to get clean air into the enclosure. **This air will serve as reference for the baseline.** If you're not happy breathing it, it isn't clean air.
 
@@ -112,7 +106,7 @@ The system will take longer to assume current conditions are clean air if there 
 
 The system should now have a good baseline for the sensors.
 
-*Remember to reinstall any carbon basket(s), clear the fan override, and to keep the controller powered on for at least 24 hours to ensure the calibration is saved.*
+*Remember to keep the controller powered on for at least 24 hours to ensure the calibration is saved and to clear the fan override once you're done.*
 
 You can also use the Klipper command `NEVERMORE_SENSOR_CALIBRATION_CHECKPOINT` (see main doc) to persist a calibration if you don't wish to wait for the periodic checkpoint.
 
