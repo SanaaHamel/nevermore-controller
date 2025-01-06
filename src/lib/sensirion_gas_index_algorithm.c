@@ -440,8 +440,8 @@ static void  GasIndexAlgorithm__mean_variance_estimator__set_parameters(GasIndex
 }
 
 static void  GasIndexAlgorithm__mean_variance_estimator__set_states(GasIndexAlgorithmParams *params, fix16_t mean, fix16_t std, fix16_t uptime_gamma) {
-
-    params->m_Mean_Variance_Estimator___Mean = mean;
+    params->m_Mean_Variance_Estimator___Sraw_Offset = mean; // upstream forgot to clear/reset this
+    params->m_Mean_Variance_Estimator___Mean = F16(0.);
     params->m_Mean_Variance_Estimator___Std = std;
     params->m_Mean_Variance_Estimator___Uptime_Gamma = uptime_gamma;
     params->m_Mean_Variance_Estimator___Initialized = true;
