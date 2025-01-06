@@ -43,6 +43,7 @@ from bleak import BleakClient
 from bleak.backends.characteristic import BleakGATTCharacteristic
 from configfile import ConfigWrapper
 from extras.led import LEDHelper
+from extras.heaters import Heater
 from gcode import GCodeCommand, GCodeDispatch
 from klippy import Printer
 from reactor import SelectReactor
@@ -795,12 +796,8 @@ class NevermoreBleInfo:
 
 
 class Nevermore:
-    cmd_NEVERMORE_PRINT_START_help = (
-        "Set Nevermores to printing state. See documentation for details."
-    )
-    cmd_NEVERMORE_PRINT_END_help = (
-        "Set Nevermores to idle state. See documentation for details."
-    )
+    cmd_NEVERMORE_PRINT_START_help = "`NEVERMORE_PRINT_START` is deprecated and no longer has any effect. Remove it from macros."
+    cmd_NEVERMORE_PRINT_END_help = "`NEVERMORE_PRINT_END` is deprecated and no longer has any effect. Remove it from macros."
     cmd_NEVERMORE_VENT_SERVO_SET_help = (
         "Set the PWM for the vent servo. Omit `PWM` to disable the servo."
     )
@@ -992,6 +989,15 @@ class Nevermore:
         self._interface.send_command(CmdWs2812MarkDirty())
         self._interface.send_command(self._vent_servo_range)
 
+        # ensure controller suspends calibration if we reconnection mid-print
+        self.send_printing_state_commands(
+            NevermoreGlobal.get_or_create(self.printer).printing
+        )
+
+    def send_printing_state_commands(self, printing: bool):
+        self.set_fan_power(1 if printing else 0)
+        self.cmd_NEVERMORE_VOC_CALIBRATION(not printing)
+
     def _handle_request_restart(self, print_time: Optional[float]):
         self._handle_shutdown()
 
@@ -1018,6 +1024,8 @@ class Nevermore:
         # TODO: reset fan & LED to defaults?
 
     def _handle_shutdown(self):
+        self.send_printing_state_commands(False)  # release fan control & calibration
+
         if self._interface is not None:
             self._interface.disconnect()
             self._interface = None
@@ -1026,7 +1034,7 @@ class Nevermore:
         if self._interface is not None and self._interface.connected:
             self._interface.refresh()
 
-        return self.printer.get_reactor().monotonic() + NEVERMORE_REFRESH_DELAY
+        return eventtime + NEVERMORE_REFRESH_DELAY
 
     # having this method is sufficient to be visible to klipper/moonraker
     def get_status(self, eventtime: float) -> Dict[str, float]:
@@ -1037,18 +1045,10 @@ class Nevermore:
         return data
 
     def cmd_NEVERMORE_PRINT_START(self, gcmd: GCodeCommand) -> None:
-        fan_speed: Optional[float] = gcmd.get_float(
-            "FAN_SPEED", default=1.0, minval=0.0, maxval=1.0
-        )
-        if gcmd.get_int("FAN_AUTOMATIC", default=0, minval=0, maxval=1) == 1:
-            fan_speed = None
-
-        self.set_fan_power(fan_speed)
-        self.cmd_NEVERMORE_VOC_CALIBRATION(False)
+        gcmd.respond_info(self.cmd_NEVERMORE_PRINT_START_help)
 
     def cmd_NEVERMORE_PRINT_END(self, gcmd: GCodeCommand) -> None:
-        self.set_fan_power(None)
-        self.cmd_NEVERMORE_VOC_CALIBRATION(True)
+        gcmd.respond_info(self.cmd_NEVERMORE_PRINT_END_help)
 
     def cmd_NEVERMORE_VENT_SERVO_SET(self, gcmd: GCodeCommand) -> None:
         self.set_vent_servo_pwm(gcmd.get_float("PWM", None, 0, 1))
@@ -1223,6 +1223,8 @@ class NevermoreSensor:
 
 
 class NevermoreGlobal:
+    EXTRUDER_HEATER_REGEX = re.compile(r"extruder\d*")
+
     @staticmethod
     def get_or_create(printer: Printer) -> "NevermoreGlobal":
         obj = printer.lookup_object("NevermoreGlobal", default=None)
@@ -1236,8 +1238,12 @@ class NevermoreGlobal:
 
     def __init__(self, printer: Printer) -> None:
         self.printer = printer
+        self.printing: bool = False
+        self._heaters: List[Heater] = []
 
-        gcode: GCodeDispatch = self.printer.lookup_object("gcode")
+        reactor = printer.get_reactor()
+        gcode: GCodeDispatch = printer.lookup_object("gcode")
+
         for cmd, desc in Nevermore.gcode_command_names():
             # python is ugly and stupid and does dynamic capture of values.
             def go(gcmd: GCodeCommand, cmd: str = cmd):
@@ -1245,6 +1251,27 @@ class NevermoreGlobal:
                     getattr(nevermore, f"cmd_{cmd}")(gcmd)
 
             gcode.register_mux_command(cmd, "NEVERMORE", None, go, desc=desc)
+
+        printer.register_event_handler("klippy:ready", self._handle_ready)
+        reactor.register_timer(self._check_heaters, reactor.NOW)
+
+    def _handle_ready(self) -> None:
+        heaters = self.printer.lookup_object('heaters')
+        self._heaters = [
+            heaters.lookup_heater(name)
+            for name in heaters.get_all_heaters()
+            if self.EXTRUDER_HEATER_REGEX.fullmatch(name)
+        ]
+
+    def _check_heaters(self, eventtime: float) -> float:
+        printing = any(heater.target_temp for heater in self._heaters)
+        if self.printing != printing:
+            self.printing = printing
+
+            for _, nevermore in self.nevermores():
+                nevermore.send_printing_state_commands(printing)
+
+        return eventtime + NEVERMORE_REFRESH_DELAY
 
     def nevermores(self) -> List[Tuple[str, Nevermore]]:
         return self.printer.lookup_objects("nevermore")

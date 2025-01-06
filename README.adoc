@@ -111,52 +111,7 @@ Do so, and then restart your Klipper host. (e.g. `sudo reboot`)
 +
 xref:klipper-config-full[See here for complete documentation.]
 
-. Update your printer macros.
-
-.. Add `<<NEVERMORE_PRINT_START>>` to your `print_start` macro.footnote:[I suggest adding gcode rather than a macro wrapper because you want the filter to start when the extruder/bed heats up, and your `print_start` probably does a lot of things (homing, QGL, purge, etc).]
-+
-```ini
-[gcode_macro PRINT_START]
-gcode:
-    ... <SNIP YOUR CURRENT GCODE> ...
-
-    # Insert right before heating extruder or bed
-    # (e.g. M104, M109, M190, ...)
-
-    # See <<NEVERMORE_PRINT_START>> for details and options.
-    NEVERMORE_PRINT_START
-
-    ... <SNIP YOUR CURRENT GCODE> ...
-```
-
-.. Add `<<NEVERMORE_PRINT_END>>` to your `TURN_OFF_HEATERS` override macro.
-+
-WARNING: This assumes your `print_end` macro calls `TURN_OFF_HEATERS`. If it doesn't then you're doing something weird and potentially dangerous.
-+
-WARNING: Do *not* put it directly in your `print_end` macro, otherwise it won't trigger on exceptional circumstances (e.g. aborts, errors, cancels).
-+
-WARNING: Make sure you don't have other overrides for `TURN_OFF_HEATERS`. e.g. Ellis' bed fans config overrides this. See below.
-+
-Add this macro wrapper to the printer config or add `NEVERMORE_PRINT_END` to an existing macro wrapper. Verify there is **exactly** one instance of `[gcode_macro TURN_OFF_HEATERS]` in the config files. They do not stack and only the last will take effect.
-+
-```ini
-# REQUIRE:  `print_end` macro calls `TURN_OFF_HEATERS`.
-# REQUIRE:  There are *NO OTHER* overrides of `[gcode_macro TURN_OFF_HEATERS]` in the cfg.
-#           Combine them if there are. There can only be one.
-[gcode_macro TURN_OFF_HEATERS]
-rename_existing: _TURN_OFF_HEATERS_ORIGINAL
-gcode:
-    # **Always** run the system cmd first to turn off heaters.
-    _TURN_OFF_HEATERS_ORIGINAL
-    # See <<NEVERMORE_PRINT_END>> for options.
-    NEVERMORE_PRINT_END
-    # Any other commands that need to run
-    # This will vary depending on what other mods you are using.
-```
-
-. Check your printer's log file for the following:
-.. `TURN_OFF_HEATERS` macro was correctly added/modified. You should see one instance in the config section and it should contain a call to `NEVERMORE_PRINT_END`.
-.. Verify Klipper managed to connect to the controller(s).
+. Verify Klipper managed to connect to the controller(s) by checking the printer's logs:
 +
 The log should contain lines similar to:
 +
@@ -165,18 +120,6 @@ Starting Klippy...
 ... BLAH
 ... BLAH
 ===== Config file =====
-... BLAH
-... BLAH
-
-[gcode_macro TURN_OFF_HEATERS]
-rename_existing = _TURN_OFF_HEATERS_ORIGINAL
-gcode =
-    _TURN_OFF_HEATERS_ORIGINAL
-    NEVERMORE_PRINT_END
-    # This hypothetical printer has bed fans, so
-    # the bed fan turn off macro must be called.
-    BED_FANS_OFF
-
 ... BLAH
 ... BLAH
 =======================
@@ -190,10 +133,13 @@ mcu 'mcu': Starting CAN connect
 ... BLAH
 ... BLAH
 ```
-
 . If you've flashed a OTA-capable UF2 to your controller (v0.3+) you can update it wirelessly.
 
 . **Calibrate your sensors.** xref:doc/voc.adoc#baseline-calibration[See the calibration section in the VOC Guide.]
+
+
+Configured Nevermores will automatically turn on/off depending on whether any extruder heaters are active. They will also turn on/off depending on sensor values and configured fan policies.
+
 
 [#guide-updating]
 == Updating Guide For Dummies
@@ -867,38 +813,6 @@ These typically require a `NEVERMORE=` parameter to specify which Nevermore to i
 At this time, there can only be one Nevermore controller, which is named `nevermore`.
 
 
-==== NEVERMORE_PRINT_START
-
-Command:
-```
-NEVERMORE_PRINT_START [NEVERMORE=<name>] [FAN_SPEED=1.0 <float \in [0, 1]>] [FAN_AUTOMATIC=0 <int \in [0, 1]>]
-```
-
-Set Nevermores into a reasonable state for printing. **You should use this G-Code command instead of manually issuing the equivalent commands**; it will allow future updates to automatically apply recommended print-start actions. Applies to all Nevermores unless a specific one is named using`NEVERMORE=`.
-
-This command currently performs the following series of actions for every Nevermore (currently only 1):
-
-* If `FAN_AUTOMATIC=0`, turns on fan override w/ given `FAN_SPEED`, otherwise clears any override (go into automatic mode).
-+
-Overriding automatic mode starts the filter without waiting for the air to get detectably dirty and ensures the fan is always running during a print (regardless of sensor readings).
-* Disables <<NEVERMORE_VOC_CALIBRATION>>.
-
-
-==== NEVERMORE_PRINT_END
-
-Command:
-```
-NEVERMORE_PRINT_END [NEVERMORE=<name>]
-```
-
-Set Nevermores into a reasonable idle state. **You should use this G-Code command instead of manually issuing the equivalent commands**; it will allow future updates to automatically apply recommended print-end actions. Applies to all Nevermores unless a specific one is named using`NEVERMORE=`.
-
-This command currently performs the following series of actions for every Nevermore (currently only 1):
-
-* Disables fan override.
-* Enables <<NEVERMORE_VOC_CALIBRATION>>.
-
-
 ==== NEVERMORE_VENT_SERVO_SET
 
 Command:
@@ -956,6 +870,8 @@ Command:
 ```
 NEVERMORE_VOC_CALIBRATION ENABLED={0, 1} [NEVERMORE=<name>]
 ```
+
+WARNING: Calibration is automatically suspended by the Klipper module when any extruders have a target temperature. It is resumed when no extruders have a target temperature. You should not have to explicitly use this command in typical scenarios.
 
 Enables/disables the VOC sensor calibration.
 *Sensor calibration should be enabled whenever the printer isn't printing.*
