@@ -94,12 +94,23 @@ optional<bool> vbus_powered() {
 #endif
 }
 
-void setup_watchdog() {
-    if (watchdog_enable_caused_reboot()) {
-        printf("WARN - last reboot triggered by watchdog timeout\n");
-    }
+struct WatchdogSetupInfo {
+    bool watchdog_enable_caused_reboot;
+};
+
+WatchdogSetupInfo setup_watchdog_pre_stdio() {
+    WatchdogSetupInfo info{
+            .watchdog_enable_caused_reboot = watchdog_enable_caused_reboot(),
+    };
 
     picowota_watchdog_enable_bootloader(WATCHDOG_TIMEOUT / 1ms, true);
+    return info;
+}
+
+void setup_watchdog_post_stdio(WatchdogSetupInfo const& info) {
+    if (info.watchdog_enable_caused_reboot) {
+        printf("WARN - last reboot triggered by watchdog timeout\n");
+    }
 
     // Kinda wasteful to allocate a whole task for this.
     // Can't use a timer, they might starve/miss their deadline.
@@ -113,7 +124,7 @@ void setup_watchdog() {
 
 }  // namespace
 
-void startup() {
+void startup(WatchdogSetupInfo const watchdog_setup_info) {
     tusb_init();
     stdio_init_all();
     adc_init();
@@ -142,7 +153,7 @@ void startup() {
             sleep(100ms);
     }
 
-    setup_watchdog();
+    setup_watchdog_post_stdio(watchdog_setup_info);
 
     settings::init();
 
@@ -180,9 +191,12 @@ void startup() {
 }
 
 int main() {
+    // HACK: static/global b/c it's tiny and a hassle to pipe through to `startup`
+    static WatchdogSetupInfo s_watchdog_setup_info = setup_watchdog_pre_stdio();
+
     // has to be done on core 0 for `stdio_init_all`.
     mk_task("startup", Priority::Startup, 1024, 1 << 0)([]() {
-        startup();
+        startup(s_watchdog_setup_info);
         vTaskDelete(nullptr);  // we're done, delete ourselves
     }).release();
 
