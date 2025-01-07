@@ -1,5 +1,6 @@
 #include "htu2xd.hpp"
 #include "config.hpp"
+#include "pico/platform.h"
 #include "sdk/ble_data_types.hpp"
 #include "sdk/i2c.hpp"
 #include "sdk/task.hpp"
@@ -40,7 +41,15 @@ constexpr auto HTU2xD_MEASURE_TEMPERATURE_DELAY = 50ms;
 // 16ms @ 12 bits,  8ms @ 11 bits,  5ms @ 10 bits, 3ms @  8 bits
 constexpr auto HTU2xD_MEASURE_HUMIDITY_DELAY = 16ms;
 
-enum class HTU2xD_Measure { Humidity, Temperature };
+enum class HTU2xD_Measure : uint8_t { Humidity, Temperature };
+
+char const* show(HTU2xD_Measure kind) {
+    switch (kind) {
+    case HTU2xD_Measure::Temperature: return "temperature";
+    case HTU2xD_Measure::Humidity: return "humidity";
+    default: panic_unsupported();
+    }
+}
 
 template <typename A>
 constexpr CRC8_t htu2xd_crc(A&& x) {
@@ -121,7 +130,12 @@ struct HTU2xDSensor final : SensorPeriodic {
             if (!response) return;
 
             auto [response_kind, value] = *response;
-            assert(kind == response_kind && "htu2xd_fetch - response kind mismatch");
+            if (kind != response_kind) {
+                bus.log_error(name(), HTU2xD_I2C_ADDRESS, "response mismatch expected=%s recieved=%s",
+                        show(kind), show(response_kind));
+                return;
+            }
+
             switch (response_kind) {
             case HTU2xD_Measure::Temperature: side.set(Temperature(value)); break;
             case HTU2xD_Measure::Humidity: side.set(Humidity(value)); break;
