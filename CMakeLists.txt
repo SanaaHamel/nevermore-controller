@@ -224,3 +224,6 @@ set_target_properties(nevermore-controller-ota PROPERTIES OUTPUT_NAME "ota-never
 target_link_libraries(nevermore-controller-ota PRIVATE nevermore-controller)
 pico_add_extra_outputs(nevermore-controller-ota)
 picowota_build_combined(nevermore-controller-ota picowota)
+
+# Extra tools/projects
+add_subdirectory(tools/sensorium)

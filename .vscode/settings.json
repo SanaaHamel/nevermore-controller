@@ -116,6 +116,7 @@
         "thread": "cpp",
         "executor": "cpp",
         "comm_stream.h": "c",
-        "stdio_usb.h": "c"
+        "stdio_usb.h": "c",
+        "ranges": "cpp"
     },
 }
