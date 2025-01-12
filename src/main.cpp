@@ -104,13 +104,6 @@ WatchdogSetupInfo setup_watchdog_pre_stdio() {
     };
 
     picowota_watchdog_enable_bootloader(WATCHDOG_TIMEOUT / 1ms, true);
-    return info;
-}
-
-void setup_watchdog_post_stdio(WatchdogSetupInfo const& info) {
-    if (info.watchdog_enable_caused_reboot) {
-        printf("WARN - last reboot triggered by watchdog timeout\n");
-    }
 
     // Kinda wasteful to allocate a whole task for this.
     // Can't use a timer, they might starve/miss their deadline.
@@ -120,6 +113,14 @@ void setup_watchdog_post_stdio(WatchdogSetupInfo const& info) {
             task_delay<WATCHDOG_TIMEOUT / 4>();
         }
     }).release();
+
+    return info;
+}
+
+void setup_watchdog_post_stdio(WatchdogSetupInfo const& info) {
+    if (info.watchdog_enable_caused_reboot) {
+        printf("WARN - last reboot triggered by watchdog timeout\n");
+    }
 }
 
 }  // namespace
