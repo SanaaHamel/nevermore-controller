@@ -68,7 +68,7 @@ void pins_clear_user_defined() {
 
         gpio_set_function(pin, GPIO_FUNC_NULL);
         gpio_set_dir(pin, false);
-        gpio_pull_down(pin);
+        gpio_disable_pulls(pin);
     }
 }
 
