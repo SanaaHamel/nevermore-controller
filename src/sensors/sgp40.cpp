@@ -75,12 +75,7 @@ struct SGP40 final : SensorPeriodicEnvI2C<Cmd, "SGP40", 0xFF> {
         if (!response) return;
 
         auto voc_raw = byteswap(*response);
-        side.set(VOCRaw(voc_raw));
-        if (side.was_voc_breakdown_measurement()) return;
-
-        side.set(index.process(voc_raw));
-        side.set(GIAState(index.gia));
-        index.checkpoint(side.voc_calibration_blob(), i2c);
+        index.process_and_checkpoint(side, i2c, voc_raw);
     }
 
     [[nodiscard]] bool measure(double temperature, double humidity) const {

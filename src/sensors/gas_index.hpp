@@ -2,6 +2,7 @@
 
 #include "lib/sensirion_gas_index_algorithm.h"
 #include "sensors.hpp"
+#include "sensors/environmental.hpp"
 #include "settings.hpp"
 #include <cassert>
 #include <chrono>
@@ -20,6 +21,16 @@ struct GasIndex {
     GasIndex(int32_t type = GasIndexAlgorithm_ALGORITHM_TYPE_VOC) {
         assert(type == GasIndexAlgorithm_ALGORITHM_TYPE_VOC || type == GasIndexAlgorithm_ALGORITHM_TYPE_NOX);
         GasIndexAlgorithm_init(&gia, type);
+    }
+
+    void process_and_checkpoint(EnvironmentalFilter side, auto& log, int32_t raw,
+            settings::Settings const& settings = settings::g_active) {
+        side.set(VOCRaw(raw));
+        if (side.was_voc_breakdown_measurement()) return;
+
+        side.set(process(raw, settings));
+        side.set(GIAState(gia));
+        checkpoint(side.voc_calibration_blob(), log);
     }
 
     // ~330 us during steady-state, ~30 us during startup blackout

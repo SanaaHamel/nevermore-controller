@@ -142,12 +142,7 @@ struct SGP30Sensor final : SensorPeriodicEnvI2C<Reg, "SGP30", 0xFF> {
         auto raw = measure<25ms>(Reg::RawMeasure);
         if (!raw) return;
 
-        side.set(VOCRaw(raw->tvoc_ppb));
-        if (side.was_voc_breakdown_measurement()) return;
-
-        side.set(GIAState(index.gia));
-        side.set(index.process(raw->tvoc_ppb));
-        index.checkpoint(side.voc_calibration_blob(), i2c);
+        index.process_and_checkpoint(side, i2c, raw->tvoc_ppb);
 
         /*
         auto baseline = measure<10ms>(Reg::IAQ_Baseline);  // spec says 10ms
