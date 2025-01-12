@@ -72,8 +72,6 @@ private:
 } g_mcu_temperature_sensor;
 
 VecSensors sensors_init_bus(I2C_Bus& bus, optional<EnvironmentalFilter::Kind> state) {
-    printf("%s - initializing sensors...\n", bus.name());
-
     VecSensors sensors;
     auto add = [&](auto p) {
         if (!p) return;
@@ -96,7 +94,6 @@ VecSensors sensors_init_bus(I2C_Bus& bus, optional<EnvironmentalFilter::Kind> st
 
     add(CST816S::mk(bus));
 
-    if (sensors.empty()) printf("!! No sensors found?\n");
     return sensors;
 }
 
@@ -156,7 +153,10 @@ bool init() {
     task_delay<SENSOR_POWER_ON_DELAY>();
 
     foreach_sensor_bus([](auto&& bus, auto&& kind) {
+        printf("%s - initializing sensors...\n", bus.name());
         auto xs = sensors_init_bus(bus, kind);
+        if (xs.empty()) bus.log_warn("N/A", 0, "!! No sensors found?");
+
         std::move(begin(xs), end(xs), back_inserter(g_sensor_devices));
     });
 
