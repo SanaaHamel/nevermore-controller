@@ -8,7 +8,6 @@
 #include "pico/stdio.h"
 #include "picowota/reboot.h"
 #include "sensors.hpp"
-#include "utility/i2c.hpp"
 #include "utility/i2c_pins.hpp"
 #include <cassert>
 #include <chrono>
@@ -70,26 +69,6 @@ private:
     chrono::milliseconds period = {};
 };
 
-// NB: changes pin function assignments
-void pins_i2c_reset() {
-    for (auto const& bus : sensorium::i2c_pins()) {
-        // `i2c_bitbang_reset` is responsible for changing the pin functions
-        if (!bus) continue;
-
-        if (!i2c_bitbang_reset(bus.data, bus.clock)) {
-            printf("WARN - I2C (CLK %d, DAT %d) - failed to reset bus\n", (int)bus.clock, (int)bus.data);
-        }
-
-        gpio_set_function(bus.clock, GPIO_FUNC_NULL);
-        gpio_set_dir(bus.clock, false);
-        gpio_pull_up(bus.clock);
-
-        gpio_set_function(bus.data, GPIO_FUNC_NULL);
-        gpio_set_dir(bus.data, false);
-        gpio_pull_up(bus.data);
-    }
-}
-
 struct WatchdogSetupInfo {
     bool watchdog_caused_reboot;
 };
@@ -128,7 +107,14 @@ int main() {
 
     setup_watchdog_post_stdio(watchdog_info);
 
-    pins_i2c_reset();
+    for (auto const& bus : sensorium::i2c_pins()) {
+        if (!bus) continue;
+
+        gpio_set_function(bus.clock, GPIO_FUNC_I2C);
+        gpio_set_function(bus.data, GPIO_FUNC_I2C);
+        gpio_pull_up(bus.clock);
+        gpio_pull_up(bus.data);
+    }
 
     printf("I2C0 running at %u baud/s (requested %u baud/s)\n", i2c_init(i2c0, I2C_BAUD_RATE_SENSOR_MAX),
             unsigned(I2C_BAUD_RATE_SENSOR_MAX));

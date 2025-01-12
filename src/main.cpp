@@ -20,7 +20,6 @@
 #include "tusb.h"
 #include "usb_cdc_gatt.hpp"
 #include "utility/cyw43_timer.hpp"
-#include "utility/i2c.hpp"
 #include "utility/task.hpp"
 #include "ws2812.hpp"
 #include <cassert>
@@ -69,16 +68,6 @@ void pins_clear_user_defined() {
         gpio_set_function(pin, GPIO_FUNC_NULL);
         gpio_set_dir(pin, false);
         gpio_disable_pulls(pin);
-    }
-}
-
-// NB: changes pin function assignments
-void pins_i2c_reset(Pins const& pins = settings::g_active.pins) {
-    for (auto const& bus : pins.i2c) {
-        // `i2c_bitbang_reset` is responsible for changing the pin functions
-        if (bus && !i2c_bitbang_reset(bus.data, bus.clock)) {
-            printf("WARN - I2C (CLK %d, DAT %d) - failed to reset bus\n", (int)bus.clock, (int)bus.data);
-        }
     }
 }
 
@@ -159,8 +148,6 @@ void startup(WatchdogSetupInfo const watchdog_setup_info) {
     settings::init();
 
     pins_clear_user_defined();
-    pins_i2c_reset();           // bit-bang out a reset for the I2C buses
-    pins_clear_user_defined();  // clear pins again, `pins_i2c_reset` leaves things dirty
     // setup everything (except UART, which should be set to default 0/1)
     [[maybe_unused]] auto pin_setup_ok = Pins::setup(settings::g_active.pins);
     assert(pin_setup_ok);
