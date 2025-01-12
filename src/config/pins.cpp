@@ -15,13 +15,20 @@ namespace {
 bool g_pins_assigned = false;
 Pins g_pins;
 
-void bind_logical(GPIO const& gpio, bool dir) {
-    if (gpio) {
-        gpio_set_dir(gpio, dir);
-        if (dir == GPIO_OUT) gpio_put(gpio, false);
-        gpio_set_function(gpio, GPIO_FUNC_SIO);
-    }
-};
+void bind_logical_in(GPIO const& gpio) {
+    if (!gpio) return;
+
+    gpio_set_dir(gpio, GPIO_IN);
+    gpio_set_function(gpio, GPIO_FUNC_SIO);
+}
+
+void bind_logical_out(GPIO const& gpio, bool def = false) {
+    if (!gpio) return;
+
+    gpio_set_dir(gpio, GPIO_OUT);
+    gpio_put(gpio, def);
+    gpio_set_function(gpio, GPIO_FUNC_SIO);
+}
 
 void bind_bus(auto const& xs, auto&& using_hw, auto&& using_pio) {
     uint32_t hw_used = 0;
@@ -134,18 +141,20 @@ bool Pins::apply() const {
     for (auto&& pin : neopixel_data)
         if (pin) gpio_set_function(pin, GPIO_FUNC_PIO0);
 
-    bind_logical(display_command, GPIO_OUT);
-    bind_logical(display_reset, GPIO_OUT);
-    bind_logical(touch_interrupt, GPIO_IN);
-    bind_logical(touch_reset, GPIO_OUT);
+    bind_logical_out(display_command);
+    // FUTURE WORK: Pick default state based on display device.
+    //              GC9A01 reset is active-low, and it's the only supported ATM.
+    bind_logical_out(display_reset, true);
+    bind_logical_in(touch_interrupt);
+    bind_logical_out(touch_reset, true);
 
 #if defined(PICO_DEFAULT_LED_PIN)
-    bind_logical(PICO_DEFAULT_LED_PIN, GPIO_OUT);
+    bind_logical_out(PICO_DEFAULT_LED_PIN);
 #elif defined(PICO_DEFAULT_WS2812_PIN)
     // FUTURE WORK: implement WS2812 LED
 #endif
 
-    bind_logical(led_status_voc_calibration, GPIO_OUT);
+    bind_logical_out(led_status_voc_calibration);
 
 #ifndef NDEBUG
     if (auto pin = square_wave_pwm_first_available_pin())
