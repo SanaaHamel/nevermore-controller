@@ -3,6 +3,7 @@
 #include "sdk/ble_data_types.hpp"
 #include "sdk/i2c_hw.hpp"
 #include "sdk/i2c_pio.hpp"
+#include "sdk/task.hpp"
 #include "sensors/ahtxx.hpp"
 #include "sensors/async_sensor.hpp"
 #include "sensors/bme280.hpp"
@@ -16,6 +17,7 @@
 #include "sensors/sgp40.hpp"
 #include <algorithm>
 #include <cstdio>
+#include <set>
 #include <vector>
 
 using namespace std;
@@ -71,17 +73,20 @@ private:
     }
 } g_mcu_temperature_sensor;
 
-VecSensors sensors_init_bus(I2C_Bus& bus, optional<EnvironmentalFilter::Kind> state) {
-    VecSensors sensors;
-    auto add = [&](auto p) {
-        if (!p) return;
-        printf("Found %s\n", p->name());
-        p->start();
-        sensors.push_back(std::move(p));
-    };
+bool sensors_add(unique_ptr<SensorPeriodic> p) {
+    if (!p) return false;
 
+    printf("sensor found: %s\n", p->name());
+    p->start();
+    g_sensor_devices.push_back(std::move(p));
+    return true;
+}
+
+// Adds everything except CST816; those need to be immediately queried after being reset.
+bool sensors_init_bus(I2C_Bus& bus, optional<EnvironmentalFilter::Kind> state) {
+    bool found_anything = false;
     if (state) {
-        auto add_env = [&](auto&& fn) { add(fn(bus, *state)); };
+        auto add_env = [&](auto&& fn) { found_anything |= sensors_add(fn(bus, *state)); };
         add_env(ahtxx);
         add_env(bme280);
         add_env(bme68x);
@@ -92,9 +97,7 @@ VecSensors sensors_init_bus(I2C_Bus& bus, optional<EnvironmentalFilter::Kind> st
         add_env(sgp40);
     }
 
-    add(CST816S::mk(bus));
-
-    return sensors;
+    return found_anything;
 }
 
 template <typename F>
@@ -145,24 +148,41 @@ bool init() {
     adc_set_temp_sensor_enabled(true);
     g_mcu_temperature_sensor.start();
 
-    // Explicitly reset b/c we may be restarting the program w/o power cycling the device.
-    CST816S::reset_all();
     CST816S::register_isr();
 
-    printf("Waiting %u ms for sensor init\n", unsigned(SENSOR_POWER_ON_DELAY / 1ms));
+    printf("waiting %u ms for sensor init\n", unsigned(SENSOR_POWER_ON_DELAY / 1ms));
     task_delay<SENSOR_POWER_ON_DELAY>();
 
-    foreach_sensor_bus([](auto&& bus, auto&& kind) {
-        printf("%s - initializing sensors...\n", bus.name());
-        auto xs = sensors_init_bus(bus, kind);
-        if (xs.empty()) bus.log_warn("N/A", 0, "!! No sensors found?");
+    printf("scanning for sensors...\n");
 
-        std::move(begin(xs), end(xs), back_inserter(g_sensor_devices));
+    set<I2C_Bus*> buses_with_sensors;
+
+    // CST816s start in dynamic mode. They also only respond to I2C in dynamic mode.
+    // Reset them to force them into dynamic mode, and scan for them immediately
+    // to avoid timing out to standby mode.
+    CST816S::reset_all();
+    foreach_sensor_bus([&](auto&& bus, auto&& /*kind*/) {
+        if (sensors_add(CST816S::mk(bus))) {
+            buses_with_sensors.insert(&bus);
+        }
+    });
+
+    // search for all other sensors
+    foreach_sensor_bus([&](auto&& bus, auto&& kind) {
+        if (sensors_init_bus(bus, kind)) buses_with_sensors.insert(&bus);
+    });
+
+    foreach_sensor_bus([&](auto&& bus, auto&& /*kind*/) {
+        if (buses_with_sensors.find(&bus) == buses_with_sensors.end()) {
+            bus.log_warn("N/A", 0, "!! no sensors found?");
+        }
     });
 
     // honestly if we low on space or are getting fragmentation issues we might
     // as well just reserve a `sizeof(P*) * 32` block and call it a day.
     g_sensor_devices.shrink_to_fit();
+
+    printf("sensor scan complete\n");
 
     // wait again b/c probing might be implemented by sending a reset command to the sensor
     task_delay<SENSOR_POWER_ON_DELAY>();
