@@ -6,7 +6,7 @@ https://www.buymeacoffee.com/sanaahamel[image:https://img.shields.io/badge/Suppo
 
 A guide for building attractive wire nests that'll impress anyone, guaranteed.
 
-These guides should *not* be considered authoritative: if ever in doubt, refer to the BOM/build guide for your filter and the pins list in the main documentation.
+These guides should *not* be considered authoritative: if ever in doubt, refer to the BOM/build guide for the filter and the pins list in the main documentation.
 
 NOTE: The diagrams themselves were not made by Sanaa, and credit should be attributed to their authors listed above each section.
 
@@ -14,12 +14,12 @@ toc::[]
 
 == Gotchas & General Notes (READ ME DAMN IT)
 
-* **Build and test all your electronics twice: once before mounting anything in a build, then again once everything is mounted but just before you screw/press everything closed.**
+* **Build and test all the electronics twice: once before mounting anything in a build, then again once everything is mounted but just before you screw/press everything closed.**
 footnote:[This really matters for builds like the StealthMax, where there's 20,00+ screws and half the parts of press-fit and are not made to be easily disassembled.]
 +
 Complete the entire xref:testing-checklist[Electronics Testing Checklist].
 +
-The electronics system should be fully operational on your table/floor/work surface before anything else gets built.
+The electronics system should be fully operational on a table/floor/work surface before anything else gets built.
 This will save you from disassembling the entire build if something was damaged during soldering, wiring, or assembly.
 
 * **You might not need everything you see.**
@@ -32,11 +32,11 @@ These guides are not necessarily complete/exhaustive.
 
 * **Wagos are shown for clarity but you might have to splice/solder wires instead.**
 +
-Consider them optional, depending on your budget and filter. (e.g. Wagos might not fit in the space available.) You just need to ensure those wires are on the same circuit.
+Consider them optional, depending on the budget and filter. (e.g. Wagos might not fit in the space available.) You just need to ensure those wires are on the same circuit.
 
-* **Use 3.3v to power your sensors instead of 5v when possible.**
+* **Use 3.3v to power sensors instead of 5v when possible.**
 ** All footnote:[Almost all?] sensor boards can handle 3.3v. This is not true for 5v.
-** If you screw up your wiring (e.g. swap V~in~ with SCL or SDA), you're less likely to fry your device. Avoid doing that.
+** If you screw up the wiring (e.g. swap V~in~ with SCL or SDA), you're less likely to fry the device. Avoid doing that.
 
 * **Voltage converters can usually be avoided.**
 +

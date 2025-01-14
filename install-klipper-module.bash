@@ -84,7 +84,7 @@ fix_mainsail_os_bluetooth() {
         echo "[FAILED]"
         echo "It looks like you're using Mainsail OS and the BlueTooth is currently disabled."
         echo "Do you wish to enable it now?"
-        echo "WARNING:  Do not do this if you're using the UART to communicate with your board."
+        echo "WARNING:  Do not do this if the Klipper host is using the UART to communicate with an MCU."
         echo "          This will disable the UART on Raspberry Pis."
         echo "Details:  https://docs-os.mainsail.xyz/faq/enable-bluetooth-on-rpi"
 
@@ -228,7 +228,7 @@ uninstall() {
         echo -n "Uninstalling... "
         rm -f "${KLIPPER_PATH}/klippy/extras/nevermore.py"
         echo "[OK]"
-        echo "You can now remove the [update_manager nevermore] section in your moonraker.conf and delete this directory. Also remove all nevermore configurations from your Klipper configuration."
+        echo "You can now remove the [update_manager nevermore] section in 'moonraker.conf' and delete this directory. Also remove all nevermore configurations from the Klipper configuration."
     else
         echo "nevermore.py not found in \"${KLIPPER_PATH}/klippy/extras/\". Is it installed?"
         echo "[FAILED]"

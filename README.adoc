@@ -27,7 +27,7 @@ toc::[]
 
 *Refer to the BOM from whatever filter you're building. This is just a basic guide for what kind of hardware is needed.*
 
-NOTE: Sensors are available in various sizes, form factors, and pin orders. Check your filter's BOM to see which you should obtain.
+NOTE: Sensors are available in various sizes, form factors, and pin orders. Check the filter's BOM to see which you should obtain.
 
 .Recommended Hardware
 [%autowidth]
@@ -48,7 +48,7 @@ The VOC sensors are critical; they measure the relevant contaminants we wish to 
 
 The temperature & humidity sensors are optional; they serve to improve the accuracy of the VOC sensor. If they're omitted, the system will assume some sensible defaults instead.
 
-NOTE: In the future, you'll be able to use Klipper sensors/thermistors to provide these values. This isn't as precise as dedicated sensors, but it's better than nothing. e.g. You could use the temperature from your toolhead's MCU for the intake temperature.
+NOTE: In the future, you'll be able to use Klipper sensors/thermistors to provide these values. This isn't as precise as dedicated sensors, but it's better than nothing. e.g. You could use the temperature from the toolhead's MCU for the intake temperature.
 
 == Supported Hardware
 
@@ -95,7 +95,7 @@ Instructions:
 +
 The Pico W's LED should start flashing once the controller has booted.
 
-. SSH into your printer. Execute the following to install the Klipper module:
+. SSH into the printer. Execute the following to install the Klipper module:
 +
 ```sh
 cd ~
@@ -105,9 +105,9 @@ cd nevermore-controller
 ```
 
 . If you're using Mainsail OS then the install script will ask if you wish to enable BlueTooth.
-Do so, and then restart your Klipper host. (e.g. `sudo reboot`)
+Do so, and then restart the Klipper host. (e.g. `sudo reboot`)
 
-. Add nevermore your printer config. xref:klipper-config-minimal[Here's a trivial configuration example you can use.]
+. Add nevermore to the printer config. xref:klipper-config-minimal[Here's a trivial configuration example you can use.]
 +
 xref:klipper-config-full[See here for complete documentation.]
 
@@ -133,9 +133,9 @@ mcu 'mcu': Starting CAN connect
 ... BLAH
 ... BLAH
 ```
-. If you've flashed a OTA-capable UF2 to your controller (v0.3+) you can update it wirelessly.
+. If you've flashed a OTA-capable UF2 to the controller (v0.3+) you can update it wirelessly.
 
-. **Calibrate your sensors.** xref:doc/voc.adoc#baseline-calibration[See the calibration section in the VOC Guide.]
+. **Calibrate the sensors.** xref:doc/voc.adoc#baseline-calibration[See the calibration section in the VOC Guide.]
 
 
 Configured Nevermores will automatically turn on/off depending on whether any extruder heaters are active. They will also turn on/off depending on sensor values and configured fan policies.
@@ -144,9 +144,9 @@ Configured Nevermores will automatically turn on/off depending on whether any ex
 [#guide-updating]
 == Updating Guide For Dummies
 
-If you've flashed a OTA-capable UF2 to your controller (v0.3+) you can update it wirelessly. The process is simple:
+If you've flashed a OTA-capable UF2 to the controller (v0.3+) you can update it wirelessly. The process is simple:
 ```sh
-# switch to your nevermore-controller installation
+# switch to the nevermore-controller installation
 cd ~/nevermore-controller
 # fetch updates for klipper module and tools
 git pull
@@ -159,7 +159,7 @@ This can take a while the first time, depending on the machine's capabilities.
 
 If you have multiple controllers in range, you can specify which to update using `--bt-address`. e.g. `./tools/update_ota.py --bt-address XX:XX:XX:XX:XX:XX`.
 
-If you're using serial, use `--serial <same path specified in your klipper cfg>` instead of `--bt-address`.
+If you're using serial, use `--serial <same path specified in the klipper cfg>` instead of `--bt-address`.
 
 See `./tools/update_ota.py --help` for all options.
 
@@ -230,9 +230,9 @@ WARNING: Custom builds are often unstable and can break the bootloader. If somet
 If you run into any problems that look hardware related, you can plug the controller via USB or use UART (pins 0, 1) to get logs.
 In rare cases USB output might not work, but UART always should. If you have a debug build, this will also work in bootloader mode.
 
-WARNING: When using UART, always connect a shared ground pin between your UART adapter and the Pico _before_ connecting the UART pins. Failure to have a shared 0v can result in hardware damage.
+WARNING: When using UART, always connect a shared ground pin between the UART adapter and the Pico _before_ connecting the UART pins. Failure to have a shared 0v can result in hardware damage.
 
-The following assume you're on Linux (you can use your printer's Raspberry Pi) and using USB. Using UART should be identical, just use the UART adapter's serial device instead of the Nevermore directly.
+The following assume you're on Linux (you can use the printer's Klipper host) and using USB. Using UART should be identical, just use the UART adapter's serial device instead of the Nevermore directly.
 
 . **If you're using UART instead of USB then connect a shared ground pin before doing anything else.**
 See the big note/warning above that you ignored.
@@ -261,7 +261,7 @@ NOTE: Want to save this log to a file? (e.g. You're debugging a periodic crash.)
 NOTE: Need a long term log? Use `tmux` (or equiv) to keep `minicom` alive even if SSH disconnects.
 
 . Restart the controller using one of the following:
-.. Use the reset button (if your board has one).
+.. Use the reset button (if the board has one).
 .. Reboot it via `<<NEVERMORE_REBOOT>>` or directly via BLE.
 .. Unplug the controller and plug it back in (assuming it is powered by USB only).
 
@@ -329,11 +329,11 @@ Discovery started
 ^C⏎
 ```
 +
-If `bluetoothctl` doesn't work or the scan doesn't list any Bluetooth devices then there's something wrong with your OS's configuration and/or Bluetooth adapter.
+If `bluetoothctl` doesn't work or the scan doesn't list any Bluetooth devices then there's something wrong with the OS's configuration and/or Bluetooth adapter.
 You'll need to fix that first (see other FAQ entries for some ideas).
 +
-. Verify that your Bluetooth adapter can connect to the device. xref:xref:find-the-bt-address-bluetoothctl[If you're on Linux, follow this procedure to find and connect directly to the controller.]
-. Verify that *both* your Klipper installation and your controller are the same release version.
+. Verify that the Bluetooth adapter can connect to the device. xref:xref:find-the-bt-address-bluetoothctl[If you're on Linux, follow this procedure to find and connect directly to the controller.]
+. Verify that *both* the Klipper installation and the controller are the same release version.
 +
 xref:guide-updating[Easiest way ensure this is to follow the update guide.]
 +
@@ -343,19 +343,19 @@ If the printer log has exceptions similar to:
 Exception: 4553d138-1d00-4b6f-bc42-955a89cf8c36 (Handle: 67): Unknown doesn't have exactly N characteristic(s) 00002b04-0000-1000-8000-00805f9b34fb with properties ...
 ```
 +
-Then you probably have a mismatch between your controller and Klipper module.
+Then you probably have a mismatch between the controller and Klipper module.
 
 +
-If you've checked all of the above and you still have exceptions in your printer log then you may go find me on the Nevermore Discord for help.
+If you've checked all of the above and you still have exceptions in the printer log then you may go find me on the Nevermore Discord for help.
 
 [#faq-2.4ghz-interference]
 * **I'm having trouble getting a reliable connection to the controller. Sometimes it works, sometimes it just doesn't connect.**
 +
-(This is specifically for the case where your printer log does *not* show any exceptions mentioning bluetooth characteristics; xref:bluez-bad-cache[otherwise see below].)
+(This is specifically for the case where the printer log does *not* show any exceptions mentioning bluetooth characteristics; xref:bluez-bad-cache[otherwise see below].)
 +
-There might be interference on the 2.4 GHz wireless band. If your Klipper host is connected via WiFi make sure it's using 5.0 GHz or try using Ethernet instead.
+There might be interference on the 2.4 GHz wireless band. If the Klipper host is connected via WiFi make sure it's using 5.0 GHz or try using Ethernet instead.
 +
-You can test to see if the problem is specific to your Klipper host by xref:find-the-bt-address-nrf-connect[connecting with another machine, such as your pocket supercomputer].
+You can test to see if the problem is specific to the Klipper host by xref:find-the-bt-address-nrf-connect[connecting with another machine, such as the pocket supercomputer].
 +
 This can also happen in environments with absurd number of wireless devices or faulty microwave ovens.
 
@@ -370,7 +370,7 @@ Exception: <UUID> (Handle: <number>): Unknown has no characteristic <UUID> with 
 +
 Try the following, in order:
 +
-. xref:guide-updating[Update your controller using OTA.] The controller might be too old for the Klipper module you're using. If you know it's up to date, or can't connect via OTA, continue to 2.
+. xref:guide-updating[Update the controller using OTA.] The controller might be too old for the Klipper module you're using. If you know it's up to date, or can't connect via OTA, continue to 2.
 +
 . Disable and remove BlueZ GATT caches.
 +
@@ -416,10 +416,10 @@ If that's fine then double check there isn't any config errors.
 +
 . Run `./tools/pin-config.py --reset-default`.
 +
-This fixes a known bug when updating to 0.14+ from older versions that would corrupt the pin config for I2C0 (intake). If this does fix the problem and it was on the exhaust side, then your intake/exhaust I2C lines are swapped.
-. Double check your wiring.
+This fixes a known bug when updating to 0.14+ from older versions that would corrupt the pin config for I2C0 (intake). If this does fix the problem and it was on the exhaust side, then the intake/exhaust I2C lines are swapped.
+. Double check the wiring.
 +
-You can quickly test this by swapping your working side's sensors with the problematic one.
+You can quickly test this by swapping the working side's sensors with the problematic one.
 If problematic side starts working then the issue is with the sensors you pulled, otherwise the wiring is the problem.
 
 
@@ -523,7 +523,7 @@ Settings are also immediately written (if changed) before any reboot requests.
 
 The current implementation doesn't distinguish between user customised values
 and default ones. Consequently, if default settings change they won't be updated
-automatically unless your settings are reset.
+automatically unless the settings are reset.
 This can be done using xref:NEVERMORE_RESET[`NEVERMORE_RESET`], if you are connected via Klipper.
 
 
@@ -533,7 +533,7 @@ This can be done using xref:NEVERMORE_RESET[`NEVERMORE_RESET`], if you are conne
 [#klipper-requirements]
 === Requirements
 
-* xref:faq-is-the-bluetooth-on[Working BlueTooth on your Klipper host.]
+* xref:faq-is-the-bluetooth-on[Working BlueTooth on the Klipper host.]
 * Klipper using Python 3.7+
 * KIAUH-like installation (required by installation script)
 
@@ -541,14 +541,14 @@ TL;DR: If you installed everything using https://github.com/th33xitus/kiauh[KIAU
 
 === Configuration
 
-Configuration is typically done using a Klipper instance (e.g. the one on your printer) connected to the controller. Changes to settings are then persisted to flash after ~10 seconds.
+Configuration is typically done using a Klipper instance (e.g. the one on the printer) connected to the controller. Changes to settings are then persisted to flash after ~10 seconds.
 
-NOTE: If you have a non-Klipper printer then you can use a temporary Klipper instance to configure your controller, disconnect it from Klipper, and use it in your non-Klipper printer.
+NOTE: If you have a non-Klipper printer then you can use a temporary Klipper instance to configure the controller, disconnect it from Klipper, and use it in the non-Klipper printer.
 
 [#klipper-config-minimal]
 ==== Minimal Example
 
-This example configuration is intended for quickly getting up and running. You can just copy paste this into your printer's config.
+This example configuration is intended for quickly getting up and running. You can just copy paste this into the printer's config.
 
 Check out the full documentation section (just after this) after you've tested everything works with the minimal configuration; there are many useful options for customisation.
 
@@ -564,7 +564,7 @@ led_colour_order: GBR
 led_chain_count: 16
 
 # These `fan_power_*` entries are for a DELTA BFB0712HF (StealthMax BOM)
-# If you have a different fan then play with these numbers to your satisfaction.
+# If you have a different fan then play with these numbers to the satisfaction.
 # See full config documentation for details.
 fan_power_coefficient: 0.8  # lower max power to keep things much more quiet
 
@@ -580,7 +580,7 @@ plot_voc: true
 
 ==== WS2812 Example (NeoPixel)
 
-WS2812 pixel strips can be used just like any other WS2812 pixel strip connected to your Klipper instance. https://github.com/julianschill/klipper-led_effect/blob/master/docs/LED_Effect.md[This includes support for LED effects.]
+WS2812 pixel strips can be used just like any other WS2812 pixel strip connected to the Klipper instance. https://github.com/julianschill/klipper-led_effect/blob/master/docs/LED_Effect.md[This includes support for LED effects.]
 See xref:klipper-object-naming[Klipper Object Naming] if you have a non-default named Nevermore.
 
 ```ini
@@ -599,7 +599,7 @@ layers:
 [#klipper-config-full]
 ==== Full Documentation
 
-WARNING: Don't simply copy-paste this into your config. It won't give you a working setup. xref:guide-setup[Follow the setup guide.]
+WARNING: Don't simply copy-paste this into the config. It won't give you a working setup. xref:guide-setup[Follow the setup guide.]
 
 This section lists all options and their defaults. Some minor examples are also provided. Use multiple `[nevermore ...]` sections if you have multiple Nevermores.
 
@@ -610,7 +610,7 @@ WARNING: Leave an option unset if you don't need a value different than the defa
 WARNING: Using multiple Nevermores over BLE is experimental and may take longer to connect.
 
 ```ini
-# DON'T JUST COPY PASTE THIS INTO YOUR CONFIG.
+# DON'T JUST COPY PASTE THIS INTO THE PRINTER'S KLIPPER CONFIGURATION.
 # 1) Read the setup guide.
 # 2) *Don't uncomment default values unless you explicitly wish to change them.*
 #    Doing so will prevent you from getting new defaults from future updates.
@@ -638,7 +638,7 @@ serial: <device path>
 # Disabling this requires that `bt_address` is set.
 # Cannot be used w/ `serial`.
 #
-# WARNING:  **Do not disable unless you've fully tested everything on your filter.**
+# WARNING:  **Do not disable unless you've fully tested everything in the filter.**
 #           i.e. it should be ready for a serial # request on the Discord.
 #           Disabling makes it difficult to decern if a problem is caused by connection issues
 #           or something else.
@@ -653,7 +653,7 @@ serial: <device path>
 
 # LED
 # For the optional LED ring feature.
-# Members generally behaves like the WS2812 klipper module.
+# Members generally behaves like the WS2812 Klipper module.
 # (e.g. supports heterogenous pixel chains)
 #led_colour_order: GRB
 #led_chain_count: 0
@@ -848,7 +848,7 @@ NEVERMORE_REBOOT [NEVERMORE=<name>]
 Reboots Nevermores, if connected. Persistent settings will be saved.
 Applies to all Nevermores unless a specific one is named using`NEVERMORE=`.
 
-Probably easier than power cycling your whole printer.
+Probably easier than power cycling the whole printer.
 
 
 ==== NEVERMORE_RESET
@@ -936,7 +936,7 @@ Useful when moving the printer to a new environment.
 
 === Finding The BT Address
 
-**If you have only one Nevermore controller in range then you can omit the `bt_address` option in your printer configuration and ignore this section entirely.**
+**If you have only one Nevermore controller in range then you can omit the `bt_address` option in the printer configuration and ignore this section entirely.**
 
 If you have multiple BlueTooth (BT) devices in range that look like candidates for a Nevermore controller, then you have to specify which one to use. This is done by specifying their 'address' in the printer config using `bt_address: <address>`.
 
@@ -959,7 +959,7 @@ For example, given this log:
 ...
 ...
 [11:06:36:535560] nevermore - multiple nevermore controllers discovered.
-specify which to use by setting `bt_address: <insert-address-here>` in your Klipper config.
+specify which to use by setting `bt_address: <insert-address-here>` in the Klipper config.
 discovered controllers (ordered by signal strength):
     address           | signal strength
     -----------------------------------
@@ -985,7 +985,7 @@ In this case I'd plug in `FA:KE:AD:RE:SS:01` since that device has the strongest
 
 NOTE: Only works on Linux. Yes, I know you didn't read the title.
 
-. Make sure your Nevermore controller is powered and the LED is blinking. (Indicates it is active.)
+. Make sure the Nevermore controller is powered and the LED is blinking. (Indicates it is active.)
 
 . In a terminal, run: `bluetoothctl`
 +
@@ -1047,11 +1047,11 @@ Connection successful
 <lots of of new services/characteristics announced>
 ```
 +
-If connecting fails, or momentarily succeeds and then connection is lost, then there might be interference from your WiFi adapter. xref:faq-2.4ghz-interference[See this FAQ for details.]
+If connecting fails, or momentarily succeeds and then connection is lost, then there might be interference from the WiFi adapter. xref:faq-2.4ghz-interference[See this FAQ for details.]
 
 
 [#find-the-bt-address-nrf-connect]
-==== Method C - Use Your Phone + nRF Connect
+==== Method C - Use A Phone + nRF Connect
 
 WARNING: If you're hosting Klipper on MacOS then you cannot use this approach and must use <<Method A - Check the Klipper Log>>.
 
@@ -1063,7 +1063,7 @@ Load the app, scan for BLE devices. The controllers will all be named "Nevermore
 .nRF Connect displays device names & addresses
 image::doc/README-nrf-connect.png[nRC Connect Screenshot,256]
 
-You can test if your controller is accepting new connections by pressing the 'connect' button.
+You can test if the controller is accepting new connections by pressing the 'connect' button.
 
 
 [#fan-control]

@@ -113,7 +113,7 @@ You can also use the Klipper command `NEVERMORE_SENSOR_CALIBRATION_CHECKPOINT` (
 
 === Hints & Tips
 
-* Wash your printer if there's any smell.
+* Wash the printer if there's any smell.
 +
 There's no point calibrating a baseline if it's dirty and off gassing.
 Use hot water & soap to scrub the panels, enclosures, print sheets, beds, etc.
@@ -124,7 +124,7 @@ Use hot water & soap to scrub the panels, enclosures, print sheets, beds, etc.
 
 * **When calibrating VOC readings start around 100, then rise to 400+.**
 +
-Likely cause: The printer is filthy and there's something off-gassing. Wash your printer (see hints & tips).
+Likely cause: The printer is filthy and there's something off-gassing. Wash the printer (see hints & tips).
 +
 The air is steadily getting dirtier from whatever is off-gassing. The air will keep getting worse until it reaches saturation. If you were to plot the raw response, you'd see it steadily degrade over time.
 +

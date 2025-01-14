@@ -205,7 +205,7 @@ void display_update_plot(auto*) {
     set_next_value(ui_chart_temp_exhaust.ui, state.temperature_exhaust);
 
     auto scale_axis = [](lv_chart_axis_t axis, ChartDivY const& div, initializer_list<Series> const& xs) {
-        // TODO: handle case where plot coords are < 0 (why are you running your printer in a freezer?)
+        // TODO: handle case where plot coords are < 0 (why is the printer in a freezer?)
         lv_coord_t top = 0;
         for (auto&& x : xs) {
             auto val = *std::max_element(x.values.begin(), x.values.end(), chart_point_less_than);

@@ -17,8 +17,8 @@
  * the CMake (which achieves the same thing) will add USB CDC to the drivers
  * used for standard input/output
  *
- *  Note this library is a developer convenience. It is not applicable in all
- * cases; for one it takes full control of the USB device precluding your use of
+ * Note this library is a developer convenience. It is not applicable in all
+ * cases; for one it takes full control of the USB device precluding use of
  * the USB in device or host mode. For this reason, this library will
  * automatically disengage if you try to using it alongside \ref tinyusb_device
  * or \ref tinyusb_host. It also takes control of a lower level IRQ and sets up

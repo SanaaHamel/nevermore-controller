@@ -566,7 +566,7 @@ class NevermoreBLE(NevermoreInterface):
                 if 1 < len(devices):  # multiple devices found
                     self.log.error(
                         f"multiple nevermore controllers discovered.\n"
-                        f"specify which to use by setting `bt_address: <insert-address-here>` in your klipper config.\n"
+                        f"specify which to use by setting `bt_address: <insert-address-here>` in the Klipper config.\n"
                         f"discovered controllers (ordered by signal strength):\n"
                         f"\taddress           | signal strength\n"
                         f"\t-----------------------------------\n"

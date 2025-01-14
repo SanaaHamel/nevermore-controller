@@ -227,7 +227,7 @@ def graphite_connection(dst: Ip4Port, sampling_period: float) -> GraphiteLogger:
             f"WARN - `--sampling-period` of {sampling_period} sec is less than half the default graphite retention period ({GRAPHITE_DEFAULT_RETENTION_RESOLUTION} sec)."
         )
         print(
-            "If you need a more fine-grain retention period then you'll need to modify your graphite installation's `/opt/graphite/conf/storage-schemas.conf`"
+            "If you need a more fine-grain retention period then you'll need to modify the graphite installation's `/opt/graphite/conf/storage-schemas.conf`"
         )
 
     print(f"connecting to graphite: tcp://{dst.addr}:{dst.port}")
