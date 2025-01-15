@@ -14,6 +14,7 @@ import os.path
 import re
 import sys
 import threading
+import time
 import weakref
 from abc import ABCMeta, abstractmethod
 from dataclasses import dataclass
@@ -42,8 +43,8 @@ import serial
 from bleak import BleakClient
 from bleak.backends.characteristic import BleakGATTCharacteristic
 from configfile import ConfigWrapper
-from extras.led import LEDHelper
 from extras.heaters import Heater
+from extras.led import LEDHelper
 from gcode import GCodeCommand, GCodeDispatch
 from klippy import Printer
 from reactor import SelectReactor
@@ -73,19 +74,17 @@ __all__ = [
     "load_config",
 ]
 
-NEVERMORE_REFRESH_DELAY = 1  # seconds, only relevant for serial connections
+CONTROLLER_REFRESH_DELAY = 1  # seconds, how long between sensor refreshes
 
 # Non-configurable constants
-CONTROLLER_NOTIFY_TIMEOUT = 30  # seconds, reconnect if no updates found
 
 # retry quickly during initial setup to minimise likelihood of failing timeout
 CONTROLLER_CONNECTION_RETRY_DELAY_INITIAL = 1
 # be really conservative about this because we don't want to spam the logs
 CONTROLLER_CONNECTION_RETRY_DELAY_POST_CONNECT = 60
 
-# we've very little time because we're executing on the main thread and cannot
-# block w/o screwing over other processes
-NEVERMORE_SERIAL_TIMEOUT = 0.025
+# This is executed in a background thread so we can afford some timing slack.
+CONTROLLER_SERIAL_TIMEOUT = 0.5
 
 _A = TypeVar("_A")
 _B = TypeVar("_B")
@@ -268,11 +267,6 @@ class UNSAFE_LazyAsyncioEvent(asyncio.Event):
         loop.call_soon_threadsafe(lambda: self.set())
 
 
-class NevermoreForceReconnection(Exception):
-    "Exception used to trigger a reconnection."
-    pass
-
-
 class NevermoreInterface:
     def __init__(self, name: str):
         self.name = name
@@ -299,10 +293,6 @@ class NevermoreInterface:
 
     @abstractmethod
     def disconnect(self) -> None:
-        raise NotImplemented
-
-    @abstractmethod
-    def refresh(self) -> None:
         raise NotImplemented
 
     # PRECONDITION: `self.connected` is True
@@ -335,108 +325,20 @@ class NevermoreInterface:
         self._led_colour_data_old[:] = led_colour_data
 
 
-class NevermoreSerial(NevermoreInterface):
-    def __init__(self, nevermore: "Nevermore", serial: serial.Serial) -> None:
-        super().__init__(f"nevermore {nevermore.name}")
-        self._nevermore = nevermore
-        self._serial = serial
-
-        original_timeout = self._serial.timeout
-        self._serial.timeout = 1  # relax during connect, we're not in a rush
-
-        try:
-            self._comms = CommBindings(TransportSerial(serial))
-        except Exception as e:
-            self.log.exception(e, exc_info=False)
-            raise e
-        finally:
-            self._serial.timeout = original_timeout
-
-    @property
-    @override
-    def nevermore(self):
-        return self._nevermore
-
-    @property
-    @override
-    def connected(self):
-        return self._serial.is_open
-
-    @override
-    def launch(self):
-        # inform frontend it should send setup/init commands
-        self.nevermore.handle_controller_connect()
-
-    @override
-    def wait_for_connection(self) -> bool:
-        # nothing to wait for it should immediately be ready
-        return True
-
-    @override
-    def disconnect(self):
-        self._serial.close()
-
-    @override
-    def refresh(self) -> None:
-        if not self.connected:
-            return
-
-        async def go():
-            fan = BleAttrReader(await self._comms.aggregate_fan.read())
-            self.nevermore.state.fan_power = (fan.percentage8() or 0) / 100.0
-            self.nevermore.state.fan_tacho = fan.tachometer()
-
-            (intake, exhaust) = SensorState.parse(
-                BleAttrReader(await self._comms.aggregate_env.read())
-            )
-            self.nevermore.state.intake = intake
-            self.nevermore.state.exhaust = exhaust
-
-            self.nevermore.state_stats_update()
-
-        try:
-            asyncio.run(go())
-        except Exception as e:
-            self.log.exception(e)
-
-    @override
-    def send_command(self, cmd: Optional[Union[Command, PseudoCommand]]):
-        if cmd is None:
-            return
-
-        try:
-            if isinstance(cmd, Command):
-                # this is god damn hideous, but there's no way to make async-ness parametric to the type
-                # in python.
-                asyncio.run(cmd.dispatch(self._comms))
-            elif isinstance(cmd, CmdWs2812MarkDirty):
-                asyncio.run(self.leds_update(self._comms))
-            else:
-                raise Exception(f"unhandled pseudo-command {cmd}")
-        except Exception as e:
-            self.log.exception(e)
-
-
 # HACK: This class *heavily* abuses the GIL for data synchronisation between
 # the klipper thread and the background worker thread.
-class NevermoreBLE(NevermoreInterface):
-    # HACK: Either BlueZ or Bleak is unable to handle concurrent discovery
-    #       requests. Serialise that section for now.
-    # FUTURE WORK:  Have a single thread service all BLE work?
-    scan_lock = threading.BoundedSemaphore()
-
+class NevermoreBackground(NevermoreInterface):
     def __init__(
         self,
+        name: str,
         nevermore: "Nevermore",
-        device_address: Optional[str],
         connection_initial_timeout: float,
     ) -> None:
-        super().__init__(f"nevermore-BLE '{nevermore.name}'")
+        super().__init__(name)
 
         # A weak ref allows us to end the worker if the nevermore instance is
         # ever GC'd without asking us to disconnect (for whatever reason).
         self._nevermore = weakref.ref(nevermore, lambda nevermore: self.disconnect())
-        self.device_address = device_address
         self.connection_initial_timeout = connection_initial_timeout
 
         self._connected = threading.Event()
@@ -481,10 +383,6 @@ class NevermoreBLE(NevermoreInterface):
         self._disconnect.set_threadsafe(self._loop)
 
     @override
-    def refresh(self) -> None:
-        pass  # no-op, we do everything via notify/internal monitoring
-
-    @override
     def send_command(self, cmd: Optional[Union[Command, PseudoCommand]]):
         assert self._command_queue is not None, "cannot send commands before connecting"
         if cmd is None:
@@ -501,128 +399,6 @@ class NevermoreBLE(NevermoreInterface):
         if self.nevermore is None:
             return  # Already dead and we didn't need to do anything...
 
-        connection_start = datetime.datetime.now()
-
-        def exc_filter(e: Exception):
-            # Be noisy about this, something unexpected happened.
-            # Try to recovery by resetting the connection.
-            # This sucks, but there's huge variety of errors that
-            # can happen due to a lost connection, and I can't think
-            # of a good way to recognise them with this API.
-            # TODO: Log this in the console area. Ostensibly you can
-            #       do this with `GCode::response_info`, but I don't
-            #       know if there are rules/invariants about this.
-            #       (e.g. only the active GCode/command may write)
-            if isinstance(e, bleak.exc.BleakError) or isinstance(e, EOFError):
-                self.log.exception("attempting reconnection...", exc_info=e)
-                return True
-
-            # Raiser is responsible for any associated logging w/ this exception.
-            if isinstance(e, NevermoreForceReconnection):
-                return True
-
-            return False
-
-        async def retry():
-            self._connected.clear()
-            if self._disconnect.is_set():
-                return False
-
-            delta = (datetime.datetime.now() - connection_start).total_seconds()
-            await asyncio.sleep(
-                CONTROLLER_CONNECTION_RETRY_DELAY_INITIAL
-                if delta <= self.connection_initial_timeout
-                else CONTROLLER_CONNECTION_RETRY_DELAY_POST_CONNECT
-            )
-
-            return True
-
-        async def handle_connection(device_address: Optional[str]) -> None:
-            class CantInferWhichNevermoreToUse(Exception):
-                pass
-
-            async def discover_device():
-                nonlocal device_address
-                scan_timeout = (
-                    BT_SCAN_GATHER_ALL_TIMEOUT
-                    if device_address is None
-                    else BT_SCAN_KNOWN_ADDRESS_TIMEOUT
-                )
-
-                while True:  # keep scanning until we find some devices...
-                    try:
-                        self.scan_lock.acquire()
-                        devices = await discover_bluetooth_devices(
-                            lambda x: device_is_likely_a_nevermore(x, log=LOG),
-                            device_address,
-                            scan_timeout,
-                        )
-                    finally:
-                        self.scan_lock.release()
-
-                    if not not devices:
-                        break
-
-                if 1 < len(devices):  # multiple devices found
-                    self.log.error(
-                        f"multiple nevermore controllers discovered.\n"
-                        f"specify which to use by setting `bt_address: <insert-address-here>` in the Klipper config.\n"
-                        f"discovered controllers (ordered by signal strength):\n"
-                        f"\taddress           | signal strength\n"
-                        f"\t-----------------------------------\n"
-                        f"\t"
-                        + "\n\t".join(
-                            f"{x.address} | {x.rssi} dBm"
-                            for x in sorted(devices, key=lambda x: -x.rssi)
-                        )
-                    )
-                    # don't bother trying again. abort & let the user deal with it
-                    raise CantInferWhichNevermoreToUse()
-
-                # remember the discovered device's address, just in case another
-                # controller wanders into range and we need to reconnect to this one
-                if device_address is None:
-                    device_address = devices[0].address
-
-                self.log.info(f"discovered controller {devices[0].address}")
-                return devices[0]
-
-            # Attempt (re)connection. Might have to do this multiple times if we lose connection.
-            #
-            # HACK: FIXME: Very rarely (race?) it happens that the cancel exception fires, but that
-            # the exception isn't properly propagated? I'm not sure what the hell is going on, but
-            # the log showed:
-            # ```
-            # Timeout with MCU 'mcu' (eventtime=252271.768243)
-            # Transition to shutdown state: Lost communication with MCU 'mcu'
-            # ...
-            # _GatheringFuture exception was never retrieved
-            # future: <_GatheringFuture finished exception=CancelledError()>
-            # cmd = await self._command_queue.async_q.get()
-            # ...
-            # [09:37:00:001317] nevermore - discovered controller 28:CD:C1:09:64:8F
-            # [09:37:01:811708] nevermore - connected to controller 28:CD:C1:09:64:8F
-            # ```
-            # So a cancel was raised, `_worker_using` exited, but the `main`
-            # task never was cancelled?
-            #
-            # As a hack/workaround, check that the exit isn't set.
-            # This should never be true, since the canceller task should cancel
-            # us when it fires, but apparently I've a bug in here.
-            try:
-                await retry_if_disconnected(
-                    discover_device,
-                    lambda client: self._worker_using(client),
-                    connection_timeout=None,
-                    exc_filter=exc_filter,
-                    log=self.log,
-                    retry=retry,
-                )
-            except CantInferWhichNevermoreToUse:
-                pass  # quietly fail and move on
-            finally:
-                self._connected.clear()
-
         async def go():
             # set this up ASAP once we're in an asyncio loop
             self._command_queue = janus.Queue()
@@ -630,7 +406,13 @@ class NevermoreBLE(NevermoreInterface):
             self._disconnect = UNSAFE_LazyAsyncioEvent()
             self._led_dirty = UNSAFE_LazyAsyncioEvent()
 
-            main = asyncio.create_task(handle_connection(self.device_address))
+            async def worker_setup():
+                try:
+                    await self._worker_setup()
+                finally:
+                    self._connected.clear()
+
+            main = asyncio.create_task(worker_setup())
 
             async def canceller():
                 await self._disconnect.wait()
@@ -646,11 +428,8 @@ class NevermoreBLE(NevermoreInterface):
         except:
             self.log.exception("worker failed")
 
-    async def _worker_using(self, client: BleakClient):
-        self.log.info(f"connected to controller {client.address}")
-
-        await client.get_services()  # ensure services have been pulled
-        comm = CommBindings(TransportBLE(client))
+    async def _worker_using(self, transport: Transport):
+        comm = CommBindings(transport)
         self._connected.set()
 
         # clear WS2812 diff cache, other end is in an undefined state
@@ -666,17 +445,7 @@ class NevermoreBLE(NevermoreInterface):
 
         async def handle_commands():
             cmd = await self._command_queue.async_q.get()
-
-            try:
-                await cmd.dispatch(comm)
-            except bleak.exc.BleakError as e:
-                # special case: lost connection -> wait and attempt reconnect
-                if is_lost_connection_exception(e):
-                    raise
-
-                # consider non-fatal. if we're in the wrong (API error), then
-                # we can do nothing but log it and limp on...
-                self.log.exception(f"command failed cmd={cmd}")
+            await self._handle_command(comm, cmd)
 
         async def handle_led():
             await self._led_dirty.wait()
@@ -698,7 +467,7 @@ class NevermoreBLE(NevermoreInterface):
                 nevermore.state.fan_tacho = params.tachometer()
                 nevermore.state_stats_update()
 
-            await asyncio.sleep(NEVERMORE_REFRESH_DELAY)
+            await asyncio.sleep(CONTROLLER_REFRESH_DELAY)
 
         async def forever(go: Callable[[], Coroutine[Any, Any, Any]]):
             while True:
@@ -712,6 +481,193 @@ class NevermoreBLE(NevermoreInterface):
             await tasks
         finally:
             tasks.cancel()  # kill off all active tasks if any fail
+
+    async def _reconnect_retry(self, connection_start: float):
+        self._connected.clear()
+        if self._disconnect.is_set():
+            return False
+
+        delta = time.monotonic() - connection_start
+        await asyncio.sleep(
+            CONTROLLER_CONNECTION_RETRY_DELAY_INITIAL
+            if delta <= self.connection_initial_timeout
+            else CONTROLLER_CONNECTION_RETRY_DELAY_POST_CONNECT
+        )
+
+        return True
+
+    # Override if you need to suppress exceptions from transient failures
+    async def _handle_command(self, comm: CommBindings, cmd: Command) -> None:
+        await cmd.dispatch(comm)
+
+    @abstractmethod
+    async def _worker_setup(self) -> None:
+        raise NotImplemented
+
+
+class NevermoreBLE(NevermoreBackground):
+    # HACK: Either BlueZ or Bleak is unable to handle concurrent discovery
+    #       requests. Serialise that section for now.
+    # FUTURE WORK:  Have a single thread service all BLE work?
+    scan_lock = threading.BoundedSemaphore()
+
+    def __init__(
+        self,
+        nevermore: "Nevermore",
+        device_address: Optional[str],
+        connection_initial_timeout: float,
+    ) -> None:
+        super().__init__(
+            f"nevermore-BLE '{nevermore.name}'", nevermore, connection_initial_timeout
+        )
+        self.device_address = device_address
+
+    @override
+    async def _worker_setup(self) -> None:
+        class CantInferWhichNevermoreToUse(Exception):
+            pass
+
+        device_address = self.device_address
+        connection_start = time.monotonic()
+
+        def exc_filter(e: Exception):
+            # Be noisy about this, something unexpected happened.
+            # Try to recovery by resetting the connection.
+            # This sucks, but there's huge variety of errors that
+            # can happen due to a lost connection, and I can't think
+            # of a good way to recognise them with this API.
+            # TODO: Log this in the console area. Ostensibly you can
+            #       do this with `GCode::response_info`, but I don't
+            #       know if there are rules/invariants about this.
+            #       (e.g. only the active GCode/command may write)
+            if isinstance(e, bleak.exc.BleakError) or isinstance(e, EOFError):
+                self.log.exception("attempting reconnection...", exc_info=e)
+                return True
+
+            return False
+
+        async def discover_device():
+            nonlocal device_address
+            scan_timeout = (
+                BT_SCAN_GATHER_ALL_TIMEOUT
+                if device_address is None
+                else BT_SCAN_KNOWN_ADDRESS_TIMEOUT
+            )
+
+            while True:  # keep scanning until we find some devices...
+                try:
+                    self.scan_lock.acquire()
+                    devices = await discover_bluetooth_devices(
+                        lambda x: device_is_likely_a_nevermore(x, log=LOG),
+                        device_address,
+                        scan_timeout,
+                    )
+                finally:
+                    self.scan_lock.release()
+
+                if not not devices:
+                    break
+
+            if 1 < len(devices):  # multiple devices found
+                self.log.error(
+                    f"multiple nevermore controllers discovered.\n"
+                    f"specify which to use by setting `bt_address: <insert-address-here>` in the Klipper config.\n"
+                    f"discovered controllers (ordered by signal strength):\n"
+                    f"\taddress           | signal strength\n"
+                    f"\t-----------------------------------\n"
+                    f"\t"
+                    + "\n\t".join(
+                        f"{x.address} | {x.rssi} dBm"
+                        for x in sorted(devices, key=lambda x: -x.rssi)
+                    )
+                )
+                # don't bother trying again. abort & let the user deal with it
+                raise CantInferWhichNevermoreToUse()
+
+            # remember the discovered device's address, just in case another
+            # controller wanders into range and we need to reconnect to this one
+            if device_address is None:
+                device_address = devices[0].address
+
+            self.log.info(f"discovered controller {devices[0].address}")
+            return devices[0]
+
+        async def worker_using(client: BleakClient):
+            self.log.info(f"connected to controller {client.address}")
+            await client.get_services()  # ensure services have been pulled
+            await self._worker_using(TransportBLE(client))
+
+        try:
+            await retry_if_disconnected(
+                discover_device,
+                worker_using,
+                connection_timeout=None,
+                exc_filter=exc_filter,
+                log=self.log,
+                retry=lambda: self._reconnect_retry(connection_start),
+            )
+        except CantInferWhichNevermoreToUse:
+            pass  # quietly fail and move on
+
+    @override
+    async def _handle_command(self, comm: CommBindings, cmd: Command) -> None:
+        try:
+            await cmd.dispatch(comm)
+        except bleak.exc.BleakError as e:
+            # special case: lost connection -> wait and attempt reconnect
+            if is_lost_connection_exception(e):
+                raise
+
+            # consider non-fatal. if we're in the wrong (API error), then
+            # we can do nothing but log it and limp on...
+            self.log.exception(f"command failed cmd={cmd}")
+
+
+class NevermoreSerial(NevermoreBackground):
+    _ERRNO_IO_ERROR = 5
+
+    def __init__(
+        self, nevermore: "Nevermore", mk_serial: Callable[[], serial.Serial]
+    ) -> None:
+        super().__init__(
+            f"nevermore-serial {nevermore.name}",
+            nevermore,
+            CONTROLLER_CONNECTION_RETRY_DELAY_INITIAL * 2,
+        )
+        self._mk_serial = mk_serial
+
+    @override
+    async def _worker_setup(self) -> None:
+        def mk_transport():
+            try:
+                s = self._mk_serial()
+            except serial.SerialException as e:
+                return None
+
+            try:
+                return TransportSerial(s)
+            except:
+                s.close()
+                self.log.exception("failed to load bindings")
+
+            return None
+
+        connection_start = time.monotonic()
+
+        while True:
+            self._connected.clear()
+
+            try:
+                if (transport := mk_transport()) is not None:
+                    self.log.info(f"connected to controller")
+                    await self._worker_using(transport)
+                elif not await self._reconnect_retry(connection_start):
+                    break
+            except OSError as e:
+                self.log.exception(e)
+                # common IO failure, USB likely got pulled
+                if e.errno != self._ERRNO_IO_ERROR:
+                    raise e  # not something we're expecting to handle
 
 
 @dataclass(frozen=True)
@@ -907,7 +863,6 @@ class Nevermore:
         )
 
         reactor = self.printer.get_reactor()
-        reactor.register_timer(self._timer_refresh, reactor.NOW)
         self._timer_vent_servo_release_handle = reactor.register_timer(
             self._timer_vent_servo_release
         )
@@ -994,12 +949,6 @@ class Nevermore:
     def _handle_shutdown(self):
         self.send_printing_state_commands(False)  # release fan control & calibration
         self._interface.disconnect()
-
-    def _timer_refresh(self, eventtime: float) -> None:
-        if self._interface.connected:
-            self._interface.refresh()
-
-        return eventtime + NEVERMORE_REFRESH_DELAY
 
     def _timer_vent_servo_release(self, eventtime: float) -> None:
         self.set_vent_servo(None)
@@ -1239,7 +1188,7 @@ class NevermoreGlobal:
             for _, nevermore in self.nevermores():
                 nevermore.send_printing_state_commands(printing)
 
-        return eventtime + NEVERMORE_REFRESH_DELAY
+        return eventtime + CONTROLLER_REFRESH_DELAY
 
     def nevermores(self) -> List[Tuple[str, Nevermore]]:
         return self.printer.lookup_objects("nevermore")
