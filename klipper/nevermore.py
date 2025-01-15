@@ -799,10 +799,6 @@ class Nevermore:
         self._state_max = ControllerState()
         self.fan = NevermoreFan(self)
 
-        self.serial = NevermoreSerialInfo.mk(config)
-        if self.serial is None:
-            self.ble = NevermoreBleInfo(config)
-
         # LED-specific code.
         # Ripped from `extras/neopixel.py` because the processing code is entangled with MCU transmission.
         # Modified to remove minor absurdities & fit our use case.
@@ -882,14 +878,32 @@ class Nevermore:
                 f"`display_ui` isn't one of: {', '.join(x.name for x in DisplayUI)}"
             )
 
-        self._interface: Optional[NevermoreInterface] = None
-        self._handle_request_restart(None)
+        self._interface: NevermoreInterface
+        if (cfg_serial := NevermoreSerialInfo.mk(config)) is not None:
+            self._interface = NevermoreSerial(
+                self,
+                lambda: serial.Serial(
+                    cfg_serial.path,
+                    cfg_serial.baudrate,
+                    timeout=CONTROLLER_SERIAL_TIMEOUT,
+                    write_timeout=CONTROLLER_SERIAL_TIMEOUT,
+                    exclusive=True,
+                ),
+            )
+        elif (cfg_ble := NevermoreBleInfo(config)) is not None:
+            self._interface = NevermoreBLE(
+                self, cfg_ble.address, cfg_ble.connection_initial_timeout
+            )
+        else:
+            raise config.error(f"no transport configured")
+
+        self._interface.launch()
 
         self.printer.add_object(f"fan_generic {self.fan.name}", self.fan)
         self.printer.register_event_handler("klippy:connect", self._handle_connect)
         self.printer.register_event_handler("klippy:shutdown", self._handle_shutdown)
         self.printer.register_event_handler(
-            "gcode:request_restart", self._handle_request_restart
+            "gcode:request_restart", lambda t: self._handle_shutdown()
         )
 
         reactor = self.printer.get_reactor()
@@ -905,8 +919,7 @@ class Nevermore:
             )
 
     def set_fan_power(self, percent: Optional[float]):
-        if self._interface is not None:
-            self._interface.send_command(CmdFanPowerOverride(percent))
+        self._interface.send_command(CmdFanPowerOverride(percent))
 
     def set_vent_servo(
         self, percent: Optional[float], hold_for: Optional[float] = None
@@ -914,15 +927,14 @@ class Nevermore:
         if percent is not None:
             percent = max(min(percent, 1), 0)
 
-        if self._interface is not None:
-            self._interface.send_command(CmdServoVentPWM(percent))
+        self._interface.send_command(CmdServoVentPWM(percent))
 
-            if percent is not None and 0 < (hold_for or 0):
-                reactor = self.printer.get_reactor()
-                reactor.update_timer(
-                    self._timer_vent_servo_release_handle,
-                    reactor.monotonic() + hold_for,
-                )
+        if percent is not None and 0 < (hold_for or 0):
+            reactor = self.printer.get_reactor()
+            reactor.update_timer(
+                self._timer_vent_servo_release_handle,
+                reactor.monotonic() + hold_for,
+            )
 
     def state_stats_update(self):
         self._state_min = self._state_min.min(self.state)
@@ -979,40 +991,12 @@ class Nevermore:
         self.set_fan_power(1 if printing else 0)
         self.cmd_NEVERMORE_VOC_CALIBRATION(not printing)
 
-    def _handle_request_restart(self, print_time: Optional[float]):
-        self._handle_shutdown()
-
-        if self.serial is not None:
-            self._interface = NevermoreSerial(
-                self,
-                serial.Serial(
-                    self.serial.path,
-                    self.serial.baudrate,
-                    timeout=NEVERMORE_SERIAL_TIMEOUT,
-                    write_timeout=NEVERMORE_SERIAL_TIMEOUT,
-                    exclusive=True,
-                ),
-            )
-        elif self.ble is not None:
-            self._interface = NevermoreBLE(
-                self, self.ble.address, self.ble.connection_initial_timeout
-            )
-        else:
-            raise Exception(f"no transport configured for {self.name}")
-
-        self._interface.launch()
-
-        # TODO: reset fan & LED to defaults?
-
     def _handle_shutdown(self):
         self.send_printing_state_commands(False)  # release fan control & calibration
-
-        if self._interface is not None:
-            self._interface.disconnect()
-            self._interface = None
+        self._interface.disconnect()
 
     def _timer_refresh(self, eventtime: float) -> None:
-        if self._interface is not None and self._interface.connected:
+        if self._interface.connected:
             self._interface.refresh()
 
         return eventtime + NEVERMORE_REFRESH_DELAY
@@ -1026,7 +1010,7 @@ class Nevermore:
         data = self.state.as_dict()
         data.update((f"{k}_min", v) for k, v in self._state_min.as_dict().items())
         data.update((f"{k}_max", v) for k, v in self._state_max.as_dict().items())
-        data['connected'] = self._interface is not None and self._interface.connected
+        data['connected'] = self._interface.connected
         return data
 
     def cmd_NEVERMORE_PRINT_START(self, gcmd: GCodeCommand) -> None:
@@ -1052,8 +1036,7 @@ class Nevermore:
                 VOC_INDEX_MAX,
             )
         )
-        if self._interface is not None:
-            self._interface.send_command(self._voc_gating_threshold_override)
+        self._interface.send_command(self._voc_gating_threshold_override)
 
     def cmd_NEVERMORE_VOC_CALIBRATION(self, gcmd: Union[GCodeCommand, bool]) -> None:
         self._voc_calibrate_enabled = CmdConfigVocCalibrateEnabled(
@@ -1061,34 +1044,30 @@ class Nevermore:
             if isinstance(gcmd, bool)
             else gcmd.get_int("ENABLED", minval=0, maxval=1) == 1
         )
-        if self._interface is not None:
-            self._interface.send_command(self._voc_calibrate_enabled)
+        self._interface.send_command(self._voc_calibrate_enabled)
 
     def cmd_NEVERMORE_REBOOT(self, gcmd: GCodeCommand) -> None:
-        if self._interface is not None and self._interface.connected:
+        if self._interface.connected:
             self._interface.send_command(CmdConfigReboot())
         else:
             gcmd.respond_info(f"{self.name} not yet connected")
 
     def cmd_NEVERMORE_RESET(self, gcmd: GCodeCommand) -> None:
-        if self._interface is not None:
-            self._interface.send_command(
-                CmdConfigReset(gcmd.get_int("FLAGS", minval=1, maxval=0xFF))
-            )
+        self._interface.send_command(
+            CmdConfigReset(gcmd.get_int("FLAGS", minval=1, maxval=0xFF))
+        )
 
     def cmd_NEVERMORE_STATUS(self, gcmd: GCodeCommand) -> None:
-        if self._interface is not None and self._interface.connected:
+        if self._interface.connected:
             gcmd.respond_info(f"'{self.name}' connected")
         else:
             gcmd.respond_info(f"'{self.name}' not connected")
 
     def cmd_NEVERMORE_SENSOR_CALIBRATION_CHECKPOINT(self, gcmd: GCodeCommand) -> None:
-        if self._interface is not None:
-            self._interface.send_command(CmdConfigCheckpointSensorCalibration())
+        self._interface.send_command(CmdConfigCheckpointSensorCalibration())
 
     def cmd_NEVERMORE_SENSOR_CALIBRATION_RESET(self, gcmd: GCodeCommand) -> None:
-        if self._interface is not None:
-            self._interface.send_command(CmdConfigResetSensorCalibration())
+        self._interface.send_command(CmdConfigResetSensorCalibration())
 
 
 # basically ripped from `extras/fan_generic.py`
