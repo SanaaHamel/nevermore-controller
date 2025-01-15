@@ -25,6 +25,7 @@ using namespace std;
 namespace nevermore::sensors {
 
 Sensors g_sensors;
+SemaphoreHandle_t g_sensors_lock;
 Config g_config;
 
 namespace {
@@ -144,6 +145,8 @@ Sensors Sensors::with_fallbacks(Config const& config) const {
 }
 
 bool init() {
+    g_sensors_lock = xSemaphoreCreateMutex();
+
     adc_select_input(ADC_CHANNEL_TEMP_SENSOR);
     adc_set_temp_sensor_enabled(true);
     g_mcu_temperature_sensor.start();

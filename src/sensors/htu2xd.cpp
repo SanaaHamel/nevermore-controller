@@ -136,6 +136,7 @@ struct HTU2xDSensor final : SensorPeriodic {
                 return;
             }
 
+            auto _ = side.guard();
             switch (response_kind) {
             case HTU2xD_Measure::Temperature: side.set(Temperature(value)); break;
             case HTU2xD_Measure::Humidity: side.set(Humidity(value)); break;

@@ -1,7 +1,10 @@
 #pragma once
 
+#include "FreeRTOS.h"  // IWYU pragma: keep
 #include "sdk/ble_data_types.hpp"
+#include "semphr.h"
 #include "sensors/gas_index_ble.hpp"
+#include "utility/scope_guard.hpp"
 #include <cstdint>
 
 #define DBG_MEASURE_VOC_TEMPERATURE_HUMIDITY_EFFECT 0
@@ -64,10 +67,16 @@ struct [[gnu::packed]] Sensors {
 };
 
 extern Sensors g_sensors;
+extern SemaphoreHandle_t g_sensors_lock;
 
 // Sensors are registered as periodic workers for the context.
 bool init();
 void calibrations_reset();
 void calibrations_force_checkpoint();
+
+[[nodiscard]] inline auto sensors_guard() {
+    xSemaphoreTake(g_sensors_lock, portMAX_DELAY);
+    return ScopeGuard{[&] { xSemaphoreGive(g_sensors_lock); }};
+}
 
 }  // namespace nevermore::sensors

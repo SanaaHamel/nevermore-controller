@@ -131,7 +131,12 @@ bool init() {
         // keep updating even w/ `g_fan_power_override` set b/c we need to
         // refresh to account for thermal throttling policy
         if (g_fan_power_override == BLE::NOT_KNOWN) {
-            if (auto perc = g_instance(sensors::g_sensors); 0 < perc)
+            auto perc = ({
+                auto _ = sensors::sensors_guard();
+                g_instance(sensors::g_sensors);
+            });
+
+            if (0 < perc)
                 fan_power_set(perc * settings::g_active.fan_power_automatic.value_or(0));
             else
                 fan_power_set(settings::g_active.fan_power_passive.value_or(0));

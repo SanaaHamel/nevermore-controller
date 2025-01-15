@@ -153,10 +153,10 @@ void startup(WatchdogSetupInfo const watchdog_setup_info) {
     assert(pin_setup_ok);
 
     ws2812::init();
-    if (!gatt::init()) return;
     // display must be init before sensors b/c some sensors are display input devices
     if (!display::init_with_ui()) return;
     if (!sensors::init()) return;
+    if (!gatt::init()) return;
 
     // HACK: Why the hell is this a BT timer instead of a FreeRTOS timer?
     // Because apparently you can't safely call `cyw43_arch_gpio_put` from a

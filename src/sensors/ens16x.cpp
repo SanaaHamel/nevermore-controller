@@ -144,10 +144,13 @@ struct ENS16xSensor final : SensorPeriodicEnvI2C<Reg, "ENS16x"> {
     }
 
     void read() override {
-        Compensation compensation{
-                .temperature = uint16_t(max(0., (side.compensation_humidity() + 273.15) * 64)),
-                .humidity = uint16_t(side.compensation_humidity() * 512),
-        };
+        auto compensation = ({
+            auto _ = side.guard();
+            Compensation{
+                    .temperature = uint16_t(max(0., (side.compensation_humidity() + 273.15) * 64)),
+                    .humidity = uint16_t(side.compensation_humidity() * 512),
+            };
+        });
         if (!i2c.write(Reg::TemperatureIn, compensation)) return;
 
 #if 0
@@ -219,6 +222,7 @@ struct ENS16xSensor final : SensorPeriodicEnvI2C<Reg, "ENS16x"> {
 
         // Serendipitously, this sensor also offers an arbitrary AQI value in the range of [0, 500]
         // FIXME: This is probably not suitable. 100 marks a 24h average, not an absolute value...
+        auto _ = side.guard();
         side.set(VOCIndex(clamp<uint16_t>(r->aqi_scio_sense, 1, 500)));
         side.set(VOCRaw(min(r->tvoc_ppb, VOCRaw::not_known_value)));
 #endif

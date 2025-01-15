@@ -96,6 +96,7 @@ struct AHTxxSensor final : SensorPeriodicEnvI2C<Reg, "AHTxx"> {
         auto t = (double(t_raw) / (1 << 20)) * 200 - 50;
         auto h = (double(h_raw) / (1 << 20)) * 100;
 
+        auto _ = side.guard();
         side.set(Temperature(t));
         side.set(Humidity(clamp(h, 0., 100.)));
     }

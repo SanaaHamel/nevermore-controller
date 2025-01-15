@@ -94,6 +94,7 @@ struct BME68x final : SensorPeriodicEnvI2C<Reg, "BME68x"> {
         }
         if (n_fields == 0) return;
 
+        auto _ = side.guard();
         side.set(BLE::Temperature(comp_data.temperature));
         side.set(BLE::Humidity(comp_data.humidity));
         side.set(BLE::Pressure(comp_data.pressure));

@@ -25,6 +25,7 @@ struct GasIndex {
 
     void process_and_checkpoint(EnvironmentalFilter side, auto& log, int32_t raw,
             settings::Settings const& settings = settings::g_active) {
+        auto _ = side.guard();
         side.set(VOCRaw(raw));
         if (side.was_voc_breakdown_measurement()) return;
 

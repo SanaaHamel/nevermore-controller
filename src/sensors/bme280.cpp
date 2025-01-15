@@ -81,6 +81,7 @@ struct BME280 final : SensorPeriodicEnvI2C<Reg, "BME280"> {
             return;
         }
 
+        auto _ = side.guard();
         side.set(BLE::Temperature(comp_data.temperature));
         side.set(BLE::Humidity(comp_data.humidity));
         side.set(BLE::Pressure(comp_data.pressure));

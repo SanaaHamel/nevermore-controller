@@ -76,17 +76,16 @@ struct BMP280 final : SensorPeriodicEnvI2C<Reg, "BMP280"> {
             return;
         }
 
-        int32_t t;
-        if (auto r = bmp280_get_comp_temp_32bit(&t, raw.uncomp_temp, &dev); r == BMP280_OK)
-            side.set(BLE::Temperature(t / 10.));
-        else
+        int32_t t = INT32_MIN;
+        if (auto r = bmp280_get_comp_temp_32bit(&t, raw.uncomp_temp, &dev); r != BMP280_OK)
             i2c.log_error("temperature error (code %+d)", r);
-
-        uint32_t p;
-        if (auto r = bmp280_get_comp_pres_32bit(&p, raw.uncomp_press, &dev); r == BMP280_OK)
-            side.set(BLE::Pressure(p));
-        else
+        uint32_t p = 0;
+        if (auto r = bmp280_get_comp_pres_32bit(&p, raw.uncomp_press, &dev); r != BMP280_OK)
             i2c.log_error("pressure error (code %+d)", r);
+
+        auto _ = side.guard();
+        if (t != INT32_MIN) side.set(BLE::Temperature(t / 10.));
+        if (p != 0) side.set(BLE::Pressure(p));
     }
 
     static int8_t i2c_read_(uint8_t reg_addr, uint8_t* reg_data, uint16_t len, void* intf_ptr) {

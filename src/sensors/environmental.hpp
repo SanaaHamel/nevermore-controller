@@ -20,6 +20,12 @@ struct EnvironmentalFilter {
 
     EnvironmentalFilter(Kind kind) : kind(kind) {}
 
+    // locks at least this side of sensors
+    // NOLINTNEXTLINE(readability-convert-member-functions-to-static)
+    [[nodiscard]] auto guard() const {
+        return sensors::sensors_guard();
+    }
+
     // The Right Thing(TM) would be to have refs to config/service-data.
     // For now, just use `EnvironmentalService::g_sensors` and `EnvironmentalService::g_config`.
 
