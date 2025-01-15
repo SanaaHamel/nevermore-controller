@@ -19,7 +19,7 @@ namespace {
 using PayloadSize = uint16_t;
 
 constexpr int GATT_ITF = 1;  // CDC interface #, 0 is stdio
-constexpr auto READ_FAILED_YIELD_PERIOD = 10ms;
+constexpr auto READ_FAILED_YIELD_PERIOD = 1ms;
 constexpr auto NOT_CONNECTED_YIELD_PERIOD = 100ms;
 
 enum class Cmd : uint8_t {
