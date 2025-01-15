@@ -69,8 +69,6 @@ struct SGP40 final : SensorPeriodicEnvI2C<Cmd, "SGP40", 0xFF> {
     void read() override {
         if (!measure(side.compensation_temperature(), side.compensation_humidity())) return;
 
-        task_delay<320ms>();
-
         auto response = i2c.read_crc<uint16_t>();
         if (!response) return;
 
