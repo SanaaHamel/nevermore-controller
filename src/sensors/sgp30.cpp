@@ -80,7 +80,7 @@ struct SGP30Sensor final : SensorPeriodicEnvI2C<Reg, "SGP30", 0xFF> {
     using SensorPeriodicEnvI2C::SensorPeriodicEnvI2C;
 
     GasIndex index;
-    Clock::time_point start = {};
+    Clock::time_point start;
     Version version = 0;
 
     bool setup() {
