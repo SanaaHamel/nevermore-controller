@@ -1,13 +1,13 @@
 #pragma once
 
 #include "FreeRTOS.h"  // IWYU pragma: keep
-#include "portmacro.h"
 #include "sdk/task.hpp"
 #include "task.h"  // IWYU pragma: keep
 #include <cassert>
 
 namespace nevermore {
 
+// NOLINTNEXTLINE(performance-enum-size)
 enum class Priority : UBaseType_t {
     Idle = 0,
     Display,
@@ -18,6 +18,7 @@ enum class Priority : UBaseType_t {
     WatchdogUpdate,  // highest
 };
 static_assert(UBaseType_t(Priority::WatchdogUpdate) < configMAX_PRIORITIES);
+static_assert(UBaseType_t(Priority::WatchdogUpdate) == configTIMER_TASK_PRIORITY);
 
 struct Task {
     Task() = default;
