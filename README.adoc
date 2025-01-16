@@ -353,11 +353,14 @@ If you've checked all of the above and you still have exceptions in the printer 
 +
 (This is specifically for the case where the printer log does *not* show any exceptions mentioning bluetooth characteristics; xref:bluez-bad-cache[otherwise see below].)
 +
-There might be interference on the 2.4 GHz wireless band. If the Klipper host is connected via WiFi make sure it's using 5.0 GHz or try using Ethernet instead.
+There might be interference on the 2.4 GHz wireless band. Verify the following:
 +
-You can test to see if the problem is specific to the Klipper host by xref:find-the-bt-address-nrf-connect[connecting with another machine, such as the pocket supercomputer].
+** If the Klipper host is connected via WiFi make sure it's using 5.0 GHz, or use Ethernet instead.
 +
-This can also happen in environments with absurd number of wireless devices or faulty microwave ovens.
+** If the Klipper host is a Raspberry Pi, make sure the Pi's USB C port is not used. It is not properly shielded and emits EMI.
++
+You can test to see if the problem is specific to the Klipper host by xref:find-the-bt-address-nrf-connect[connecting with another machine, such as a pocket supercomputer].
+
 
 [#bluez-bad-cache]
 * **The printer log or nevermore tools show exceptions/errors mentioning missing or unknown 'characteristics' and it can't connect to the controller.**
