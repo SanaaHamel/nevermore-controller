@@ -423,6 +423,8 @@ void SettingsV0::merge_valid_fields(SettingsV0 const& x) {
     } catch (char const* msg) {
         printf("WARN - Settings - pins invalid, resetting to defaults. reason: %s\n", msg);
     }
+
+    if (x.servo_vent.validate()) servo_vent = x.servo_vent;
 }
 
 }  // namespace nevermore::settings
