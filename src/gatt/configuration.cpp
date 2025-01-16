@@ -1,9 +1,12 @@
 #include "configuration.hpp"
+#include "FreeRTOS.h"
 #include "handler_helpers.hpp"
 #include "picowota/reboot.h"
+#include "portmacro.h"
+#include "sdk/task.hpp"
 #include "sensors.hpp"
 #include "settings.hpp"
-#include "utility/timer.hpp"
+#include "utility/task.hpp"
 #include <array>
 #include <cstdio>
 
@@ -13,6 +16,7 @@ namespace nevermore::gatt::configuration {
 
 namespace {
 
+// delay must be long enough let transports finish responding
 constexpr auto REBOOT_DELAY = 200ms;
 
 constexpr array FLAGS{
@@ -20,17 +24,11 @@ constexpr array FLAGS{
         &sensors::g_config.fallback_exhaust_mcu,
 };
 
-void reboot_delayed(bool to_bootloader) {
-    // if they want to race these, who cares, we're rebooting anyways
-    printf("!! GATT - Reboot Requested; OTA=%d\n", int(to_bootloader));
-    // flush/save settings before we reboot
-    settings::save(settings::g_active);
+// Use a task instead of a timer in case a timer misbehaves and blocks.
+Task g_reboot_task;
 
-    auto go = mk_timer("gatt-configuration-reboot", REBOOT_DELAY);
-    if (to_bootloader)
-        go([](auto* p) { picowota_reboot(true); });
-    else
-        go([](auto* p) { picowota_reboot(false); });
+void reboot_delayed(bool to_bootloader) {
+    xTaskNotify(g_reboot_task, to_bootloader, eSetValueWithoutOverwrite);
 }
 
 constexpr BLE::ValidRange VOC_GATING_THRESHOLD_RANGE{.min = settings::VOC_GATING_THRESHOLD_MIN,
@@ -41,6 +39,21 @@ char const* g_pins_config_error = "";
 }  // namespace
 
 bool init() {
+    g_reboot_task =
+            mk_task("reboot-task", Priority(configTIMER_TASK_PRIORITY), configMINIMAL_STACK_SIZE)([]() {
+                UBaseType_t to_bootloader;
+                xTaskNotifyWait(0, 0, &to_bootloader, portMAX_DELAY);
+                printf("!! reboot requested; to-bootloader=%d\n", int(to_bootloader));
+
+                task_delay<REBOOT_DELAY>();
+
+                // save settings before we reboot
+                settings::save(settings::g_active);
+                // wait for stdio to flush
+                task_delay<10ms>();
+
+                picowota_reboot(to_bootloader != 0);
+            });
     return true;
 }
 

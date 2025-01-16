@@ -83,7 +83,7 @@ struct Task {
         return task;
     }
 
-    [[nodiscard]] TaskHandle_t handle() {
+    [[nodiscard]] operator TaskHandle_t() {
         return task;
     }
 

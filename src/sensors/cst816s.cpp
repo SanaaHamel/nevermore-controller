@@ -179,7 +179,7 @@ struct CST816S::ISR {
         for (auto& instance : g_instances)
             if (auto* p = reinterpret_cast<CST816S*>(instance.driver.user_data)) {
                 BaseType_t xHigherPriorityTaskWoken2 = pdFALSE;
-                xTaskNotifyFromISR(p->task.handle(), 0, eNoAction, &xHigherPriorityTaskWoken2);
+                xTaskNotifyFromISR(p->task, 0, eNoAction, &xHigherPriorityTaskWoken2);
                 xHigherPriorityTaskWoken |= xHigherPriorityTaskWoken2;
             }
 
