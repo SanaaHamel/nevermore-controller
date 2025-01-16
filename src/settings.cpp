@@ -374,6 +374,29 @@ void save(SettingsPersisted& settings) {
     // NOLINTNEXTLINE(bugprone-suspicious-memory-comparison)
     if (memcmp(g_active_slot, &settings, sizeof(SettingsPersisted)) == 0) return;
 
+#define SETTINGS_FIELD_CHECK(field)                                                \
+    if (auto p = reinterpret_cast<SettingsPersisted const*>(g_active_slot.load()); \
+            memcmp(&p->field, &settings.field, sizeof(settings.field)) != 0)       \
+        printf("settings changed: `" #field "`\n");
+
+    SETTINGS_FIELD_CHECK(header);
+    SETTINGS_FIELD_CHECK(fan_policy_env);
+    SETTINGS_FIELD_CHECK(fan_policy_thermal);
+    SETTINGS_FIELD_CHECK(fan_power_passive);
+    SETTINGS_FIELD_CHECK(fan_power_automatic);
+    SETTINGS_FIELD_CHECK(fan_power_coefficient);
+    SETTINGS_FIELD_CHECK(voc_calibration);
+    SETTINGS_FIELD_CHECK(voc_gating_threshold);
+    SETTINGS_FIELD_CHECK(display_hw);
+    SETTINGS_FIELD_CHECK(display_ui);
+    SETTINGS_FIELD_CHECK(_0);
+    SETTINGS_FIELD_CHECK(display_brightness);
+    SETTINGS_FIELD_CHECK(save_counter);
+    SETTINGS_FIELD_CHECK(pins);
+    SETTINGS_FIELD_CHECK(servo_vent);
+    SETTINGS_FIELD_CHECK(_1);
+#undef SETTINGS_FIELD_CHECK
+
     if (reinterpret_cast<SettingsPersisted const*>(g_active_slot.load())->voc_calibration !=
             settings.voc_calibration)
         led_status::voc_calibration_mark_saved();
