@@ -35,21 +35,21 @@ struct Task {
 
     explicit Task(TaskHandle_t task) : task(task) {}
 
-    Task(void (*go)(void*), void* param, char const* name, uint32_t stack_depth, Priority priority,
+    Task(void (*go)(void*), void* param, char const* name, Priority priority, uint32_t stack_depth,
             UBaseType_t affinity_mask = tskNO_AFFINITY) {
-        xTaskCreateAffinitySet(go, "", stack_depth, param, UBaseType_t(priority), affinity_mask, &task);
+        xTaskCreateAffinitySet(go, name, stack_depth, param, UBaseType_t(priority), affinity_mask, &task);
     }
 
     Task(void (*go)(), char const* name, Priority priority, uint32_t stack_depth,
             UBaseType_t affinity_mask = tskNO_AFFINITY) {
-        xTaskCreateAffinitySet([](void* go) { reinterpret_cast<void (*)()>(go)(); }, "", stack_depth,
+        xTaskCreateAffinitySet([](void* go) { reinterpret_cast<void (*)()>(go)(); }, name, stack_depth,
                 reinterpret_cast<void*>(go), UBaseType_t(priority), affinity_mask, &task);
     }
 
     template <typename A>
     Task(A (*go)(), char const* name, Priority priority, uint32_t stack_depth,
             UBaseType_t affinity_mask = tskNO_AFFINITY) {
-        xTaskCreateAffinitySet([](void* go) { reinterpret_cast<A (*)()>(go)(); }, "", stack_depth,
+        xTaskCreateAffinitySet([](void* go) { reinterpret_cast<A (*)()>(go)(); }, name, stack_depth,
                 reinterpret_cast<void*>(go), UBaseType_t(priority), affinity_mask, &task);
     }
 

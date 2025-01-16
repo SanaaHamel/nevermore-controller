@@ -28,7 +28,7 @@ void SensorPeriodic::start() {
         }
     };
 
-    task = Task(go, this, name(), SENSOR_STACK_DEPTH, Priority::Sensors);
+    task = Task(go, this, name(), Priority::Sensors, SENSOR_STACK_DEPTH);
 }
 
 void SensorPeriodic::stop() {
