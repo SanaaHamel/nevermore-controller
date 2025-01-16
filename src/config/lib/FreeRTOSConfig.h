@@ -98,7 +98,12 @@
 /* Software timer related definitions. */
 #define configUSE_TIMERS 1
 #define configTIMER_TASK_PRIORITY (configMAX_PRIORITIES - 1)
-#define configTIMER_QUEUE_LENGTH 10
+// HACK:  usually 10 is enough, but async-ctx-freertos loves to spam change-period commands
+//        which can flood the timer cmd queue if a timer holds a lock for too long...
+//        (granted blocking in a timer is frowned upon, but hey)
+// FIXME: Remove all locks/calls to `btstack_run_loop_execute_on_main_thread` from timers.
+//        Move BLE notify to btstack-timer (those run in btstack task ctx).
+#define configTIMER_QUEUE_LENGTH 30
 #define configTIMER_TASK_STACK_DEPTH 1024
 
 /* Interrupt nesting behaviour configuration. */
