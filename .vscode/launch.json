@@ -24,7 +24,8 @@
                 "continue",
                 "set print pretty",
                 "set print object",
-                "source src/lib/fix16.gdb.py"
+                "source src/lib/fix16.gdb.py",
+                "python import freertos_gdb"
             ],
         },
         {
@@ -50,7 +51,8 @@
                 "continue",
                 "set print pretty",
                 "set print object",
-                "source src/lib/fix16.gdb.py"
+                "source src/lib/fix16.gdb.py",
+                "python import freertos_gdb"
             ]
         }
     ]
