@@ -943,7 +943,7 @@ class Nevermore:
         )
 
     def send_printing_state_commands(self, printing: bool):
-        self.set_fan_power(1 if printing else 0)
+        self.set_fan_power(1 if printing else None)
         self.cmd_NEVERMORE_VOC_CALIBRATION(not printing)
 
     def _handle_shutdown(self):
