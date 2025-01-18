@@ -1,4 +1,5 @@
 #include "sensors.hpp"
+#include "hardware/watchdog.h"
 #include "sdk/i2c.hpp"
 #include "sensors/ags10.hpp"
 #include "sensors/sgp30.hpp"
@@ -34,6 +35,7 @@ VecSensors g_sensor_devices;
 VecSensors sensors_on_bus(Pins::BusI2C const& pins) {
     VecSensors sensors;
     auto add = [&](auto&& fn) {
+        watchdog_update();  // HACK: it takes a while to do these scans and we might time out
         if (auto p = fn(pins)) {
             sensors.push_back(std::move(p));
         }

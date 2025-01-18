@@ -121,7 +121,7 @@ int main() {
     if (!gatt::init()) panic("ERR - GATT init failed\n");
 
     static Timer watchdog{WATCHDOG_TIMEOUT / 4, [](auto&) { watchdog_update(); }};
-    watchdog.schedule(); // need to wait for btstack loop to be initialised
+    watchdog.schedule();  // need to wait for btstack loop to be initialised
 
     if (!sensors::init()) panic("ERR - sensors init failed\n");
 
