@@ -55,6 +55,7 @@ bool init() {
     sleep(SENSOR_POWER_ON_DELAY);
 
     for (auto& pins : i2c_pins()) {
+        printf("pins: sda=%d scl=%d\n", int(pins.data), int(pins.clock));
         auto xs = Sensor::using_(pins, [&]() { return sensors_on_bus(pins); });
         ranges::move(xs, back_inserter(g_sensor_devices));
     }
