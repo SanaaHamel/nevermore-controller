@@ -107,8 +107,8 @@ int main() {
     for (auto const& bus : sensorium::i2c_pins()) {
         if (!bus) continue;
 
-        gpio_set_function(bus.clock, GPIO_FUNC_I2C);
-        gpio_set_function(bus.data, GPIO_FUNC_I2C);
+        gpio_set_function(bus.clock, GPIO_FUNC_NULL);
+        gpio_set_function(bus.data, GPIO_FUNC_NULL);
         gpio_pull_up(bus.clock);
         gpio_pull_up(bus.data);
     }
