@@ -65,7 +65,7 @@ bool init() {
 }
 
 void poll_issue(EnvState const& state) {
-    printf("SENSORIUM - temperature=%f humidity=%f\n", state.temperature(), state.humidity());
+    printf("SENSORIUM temperature=%f humidity=%f\n", state.temperature(), state.humidity());
 
     for (auto&& sensor : g_sensor_devices)
         sensor->using_([&]() { sensor->issue(state); });  // TODO: handle issue errors?
@@ -77,6 +77,7 @@ EnvState poll_readback() {
         sensor->using_([&]() {
             auto [env, value] = sensor->readback();
             if (value) sensor->log_reading(*value);
+            sensor->log_reading(env);
 
             global = global.or_else(env);
         });

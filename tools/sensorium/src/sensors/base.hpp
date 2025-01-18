@@ -33,7 +33,8 @@ struct Sensor {
     [[nodiscard]] virtual std::pair<EnvState, std::optional<uint16_t>> readback() = 0;
     [[nodiscard]] virtual char const* name() const = 0;
 
-    virtual void log_reading(uint16_t x) = 0;
+    virtual void log_reading(uint16_t) = 0;  // VOC raw
+    virtual void log_reading(EnvState const&) = 0;
 
     template <typename A>
     void using_(A&& go) {
@@ -73,8 +74,21 @@ struct SensorI2C : Sensor {
     }
 
     void log_reading(uint16_t x) final {
-        printf("SENSORIUM READBACK value=%05u clk=%02u dat=%02u addr=0x%02x name=%s\n", unsigned(x),
-                unsigned(pins.clock), unsigned(pins.data), unsigned(i2c.address), name());
+        printf("SENSORIUM MEASURE clk=%02u dat=%02u addr=0x%02x name=%s type=voc-raw  value=%05u\n",
+                unsigned(pins.clock), unsigned(pins.data), unsigned(i2c.address), name(), unsigned(x));
+    }
+
+    void log_reading(EnvState const& state) final {
+        if (state._temperature) {
+            printf("SENSORIUM MEASURE clk=%02u dat=%02u addr=0x%02x name=%s type=temp     value=%f\n",
+                    unsigned(pins.clock), unsigned(pins.data), unsigned(i2c.address), name(),
+                    *state._temperature);
+        }
+        if (state._humidity) {
+            printf("SENSORIUM MEASURE clk=%02u dat=%02u addr=0x%02x name=%s type=rh       value=%f\n",
+                    unsigned(pins.clock), unsigned(pins.data), unsigned(i2c.address), name(),
+                    *state._humidity);
+        }
     }
 };
 
