@@ -16,7 +16,7 @@ struct EnvState {
 
     // range: [0, 100]
     [[nodiscard]] float humidity() const {
-        auto value = _temperature.value_or(50.f);
+        auto value = _humidity.value_or(50.f);
         assert(0 <= value && value <= 100);
         return value;
     }
