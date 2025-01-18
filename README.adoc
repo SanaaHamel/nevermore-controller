@@ -65,6 +65,7 @@ footnote:[Only supported to detect when someone inadvertently uses a BMP280 inst
 | HTU2xD            | Humidity, Temperature             |
 | SGP30             | Volatile Organic Compounds        | Deprecated. footnote:[SGP40s are preferred, but SGP30s should still be functional.]
 | SGP40             | Volatile Organic Compounds        |
+| SHT4x             | Humidity, Temperature             |
 |===
 
 [#supported-displays]

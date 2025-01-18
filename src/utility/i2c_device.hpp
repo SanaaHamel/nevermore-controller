@@ -21,6 +21,9 @@ struct I2CDevice {
         return crc8(std::forward<A>(x), CRC_Init);
     }
 
+    template <typename A>
+    using ResponseCRC = ResponseCRC<A, CRC_Init>;
+
     I2C_Bus& bus;  // NOLINT(cppcoreguidelines-avoid-const-or-ref-data-members)
     uint8_t address;
 
@@ -73,6 +76,11 @@ struct I2CDevice {
 
         task_delay<delay>();
         return read_crc<A>();
+    }
+
+    template <typename A>
+    bool verify(ResponseCRC<A> const& x) {
+        return bus.verify(name, address, x);
     }
 
 #define DEFINE_I2C_DEVICE_LOG(fn_name)            \

@@ -4,6 +4,7 @@
 #include "sensors/ags10.hpp"
 #include "sensors/sgp30.hpp"
 #include "sensors/sgp40.hpp"
+#include "sensors/sht4x.hpp"
 #include "utility/i2c_pins.hpp"
 #include <algorithm>
 #include <cstdio>
@@ -20,12 +21,14 @@ constexpr auto SENSOR_POWER_ON_DELAY = max({
         AGS10_POWER_ON_DELAY,
         SGP30_POWER_ON_DELAY,
         SGP40_POWER_ON_DELAY,
+        SHT4x_POWER_ON_DELAY,
 });
 
 constexpr auto SENSOR_READ_DELAY = max({
         AGS10_READ_DELAY,
         SGP30_READ_DELAY,
         SGP40_READ_DELAY,
+        SHT4x_READ_DELAY,
 });
 
 using VecSensors = vector<unique_ptr<Sensor>>;
@@ -44,6 +47,7 @@ VecSensors sensors_on_bus(Pins::BusI2C const& pins) {
     add(ags10);
     add(sgp30);
     add(sgp40);
+    add(sht4x);
 
     return sensors;
 }

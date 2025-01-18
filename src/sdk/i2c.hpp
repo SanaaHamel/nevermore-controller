@@ -105,16 +105,22 @@ struct I2C_Bus {  // NOLINT(cppcoreguidelines-special-member-functions)
     [[nodiscard]] std::optional<A> read_crc(char const* name, uint8_t addr) {
         ResponseCRC<A, CRC_INIT> response;
         if (!read(name, addr, response)) return {};
+        if (!verify(name, addr, response)) return {};
 
+        // HACK: explicit copy to work around packed value ref issue
+        return A(response.data);
+    }
+
+    template <CRC8_t CRC_INIT, typename A>
+    [[nodiscard]] bool verify(char const* name, uint8_t addr, ResponseCRC<A, CRC_INIT> const& response) {
         if (!response.verify()) {
             // really should show up in a log if they've noise in their wiring
             log_error(name, addr, "read failed CRC; crc-reported=0x%02x crc-computed=0x%02x", response.crc,
                     response.data_crc());
-            return {};
+            return false;
         }
 
-        // HACK: explicit copy to work around packed value ref issue
-        return A(response.data);
+        return true;
     }
 
 #define DEFINE_I2C_LOG(fn_name, prefix)                                                  \

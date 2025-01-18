@@ -51,6 +51,9 @@ struct SensorI2C : Sensor {
     using I2CDevice = nevermore::I2CDevice<Register, Name, CRC_Init>;
 
     template <typename A>
+    using ResponseCRC = typename I2CDevice::template ResponseCRC<A>;
+
+    template <typename A>
     static constexpr CRC8_t crc(A x) {
         return I2CDevice::crc(std::move(x));
     }

@@ -40,6 +40,7 @@ static_assert(to_tick(25, -45, 130) == 0x6666, "temperature check");
 
 struct SGP40 final : SensorPeriodicEnvI2C<Cmd, "SGP40", 0xFF> {
     using SensorPeriodicEnvI2C::SensorPeriodicEnvI2C;
+    static_assert(crc(0xEFBE_u16) == 0x92);
 
     GasIndex index;
 
