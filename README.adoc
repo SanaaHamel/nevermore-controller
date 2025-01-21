@@ -695,10 +695,11 @@ serial: <device path>
 #fan_power_passive: 0
 
 # float \in [0, 1] - Fan power used when the automatic fan policy is active.
+# Useful if you'd prefer slower but quieter background/automatic filtering.
 #fan_power_automatic: 1
 
 # float \in [0, 1] - Coefficient applied to the fan power.
-# i.e. Limits the maximum speed of the fan. Useful for things like managing noise.
+# i.e. Limits the maximum speed of the fan. Useful for managing noise.
 # e.g. At 0.75, requesting 100% power will run the fan at 75% power.
 #fan_power_coefficient: 1
 
