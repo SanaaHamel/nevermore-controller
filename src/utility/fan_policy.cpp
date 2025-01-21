@@ -21,7 +21,7 @@ constexpr bool policy_voc_improving(VOCIndex voc_improve_min, VOCIndex intake, V
     if (intake == NOT_KNOWN || exhaust == NOT_KNOWN) return false;  // Need a reading for both sensors.
 
     auto const voc_improvement = intake.value_or(0) - exhaust.value_or(0);
-    return 0 <= voc_improvement && voc_improve_min <= voc_improvement;
+    return 0 < voc_improvement && voc_improve_min <= voc_improvement;
 }
 
 constexpr bool should_filter(FanPolicyEnvironmental const& params, VOCIndex intake, VOCIndex exhaust) {
@@ -78,9 +78,12 @@ static_assert(policy_voc_improving(2, 3, 1));                   // barely
 static_assert(!policy_voc_improving(2, 3, 2));                  // not enough
 static_assert(!policy_voc_improving(2, 3, NOT_KNOWN));          // basic case - need both sensors
 static_assert(!policy_voc_improving(2, NOT_KNOWN, 1));          // basic case - need both sensors
-static_assert(!policy_voc_improving(NOT_KNOWN, 3, 1));          // disabled
+static_assert(!policy_voc_improving(NOT_KNOWN, 0, 0));          // disabled
+static_assert(!policy_voc_improving(NOT_KNOWN, 1, 1));          // disabled
+static_assert(!policy_voc_improving(NOT_KNOWN, 2, 1));          // disabled
+static_assert(!policy_voc_improving(NOT_KNOWN, 1, 2));          // disabled
 static_assert(!policy_voc_improving(2, NOT_KNOWN, NOT_KNOWN));  // sensors not connected
-static_assert(!policy_voc_improving(NOT_KNOWN, 68, 76));        // disabled, unusual intake/exhuast
-static_assert(!policy_voc_improving(1, 68, 76));                // disabled, unusual intake/exhuast
+static_assert(!policy_voc_improving(NOT_KNOWN, 68, 76));        // disabled
+static_assert(!policy_voc_improving(1, 68, 76));                // disabled
 
 }  // namespace nevermore
