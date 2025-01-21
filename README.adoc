@@ -494,6 +494,7 @@ WARNING: GPIO 0 and 1 are reserved for UART. They cannot be used in any pin assi
 |10 | Photocatalytic Control (PWM)
 |12 | NeoPixel - Data
 |13 | Fan - PWM
+|14 | Vent Servo PWM
 |15 | Fan - Tachometer
 |18 | Exhaust - I2C SDA
 |19 | Exhaust - I2C SCL
