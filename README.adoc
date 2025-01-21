@@ -683,8 +683,8 @@ serial: <device path>
 # seconds, how long to keep filtering after the policy would otherwise stop
 #fan_policy_cooldown: 900
 # voc index, 0 to disable, filter if any sensor meets this threshold
-# NB: if < 200 then fan will engage when in the 'nominal' region (see VOC guide)
-#fan_policy_voc_passive_max: 200
+# NB: if <= 200 then fan will engage when in the 'nominal' region (see VOC guide)
+#fan_policy_voc_passive_max: 250
 # voc index, 0 to disable, filter if the intake exceeds exhaust by at least this much
 # Not recommended; `voc_passive_max` is generally more reliable and useful.
 #fan_policy_voc_improve_min: 0
@@ -712,12 +712,10 @@ serial: <device path>
 # brands.
 # Set this threshold to the 'typical' VOC index observed mid print.
 # Setting this *too* low will prevent the system from adjusting to normal
-# air quality variations.
+# air quality variations. Advised not to set < 225.
 # If you print with multiple materials/brands, see the G-Code command
 # `NEVERMORE_VOC_GATING_THRESHOLD_OVERRIDE`.
-# (or as close as possible given the minimum)
-# voc index \in [175, 500]
-#voc_gating_threshold: 240
+#voc_gating_threshold: 250
 
 
 # Display Options

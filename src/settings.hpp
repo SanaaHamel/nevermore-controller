@@ -74,7 +74,7 @@ struct [[gnu::packed]] SettingsV0 {
     BLE::Percentage8 fan_power_automatic = 100;    // not-known -> disallowed
     BLE::Percentage8 fan_power_coefficient = 100;  // not-known -> disallowed
     std::array<SensorCalibrationBlob, 2> voc_calibration{};
-    VOCIndex voc_gating_threshold = 240;  // not-known -> disallowed
+    VOCIndex voc_gating_threshold = 250;  // not-known -> disallowed
     DisplayHW display_hw = DisplayHW::GC9A01_240_240;
     DisplayUI display_ui = DisplayUI::CIRCLE_240_CLASSIC;
     Padding<1> _0{};
