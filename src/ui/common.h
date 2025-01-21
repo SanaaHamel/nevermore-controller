@@ -34,6 +34,7 @@ typedef struct NevermoreDisplayUI {
     /* lv_label_t */ lv_obj_t* fan_rpm;
     /* lv_arc_t */ lv_obj_t* fan_power_arc;
     /* lv_obj_t */ lv_obj_t* touch_overlay;
+    /* lv_obj_t */ lv_obj_t* startup_overlay;
 } NevermoreDisplayUI;
 
 #ifdef __cplusplus

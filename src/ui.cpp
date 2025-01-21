@@ -3,6 +3,7 @@
 #include "display.hpp"
 #include "gatt/fan.hpp"
 #include "lvgl.h"
+#include "pico/rand.h"
 #include "sdk/ble_data_types.hpp"
 #include "semphr.h"
 #include "sensors.hpp"
@@ -28,6 +29,7 @@ constexpr bool CHAR_DRAW_TEMPERATURE_HDIV = false;
 constexpr auto CHART_X_AXIS_LENGTH = 1.h;
 constexpr uint8_t CHART_SERIES_ENTIRES_MAX = display::RESOLUTION.width / 3;
 
+constexpr auto DISPLAY_STARTUP_OVERLAY_DURATION = 10s;
 constexpr auto DISPLAY_TIMER_PLOT_INTERVAL = CHART_X_AXIS_LENGTH / CHART_SERIES_ENTIRES_MAX;
 constexpr auto DISPLAY_TIMER_LABELS_INTERVAL = 1s;
 // no need to run timers faster than 2x the device or refresh period
@@ -405,6 +407,70 @@ void on_chart_draw(bool begin, lv_event_t* e) {
     }
 }
 
+lv_obj_t* startup_ui(NevermoreDisplayUI const& ui) {
+    struct Entry {
+        Entry(char const* text) : text(text) {}
+        Entry(char const* text, lv_font_t const& font) : text(text), font(font) {}
+        char const* text;
+        // NOLINTNEXTLINE(cppcoreguidelines-avoid-const-or-ref-data-members)
+        lv_font_t const& font = lv_font_montserrat_14;
+    } const MESSAGES[] = {
+            {"No darkness lasts forever.\nAnd even there, there are stars."},
+            {"We live in capitalism.\nIts power seems inescapable.\n"
+             "So did the divine right of kings.\n"
+             "Any human power can be resisted and changed by human beings."},
+            {"Nothing is yours.\nIt is to use. It is to share.\n"
+             "If you will not share it, you cannot use it."},
+            {"No man earns punishment, no man earns reward.\n"
+             "Free your mind of the idea of deserving, the idea of earning, and you will begin to be able to "
+             "think."},
+            {"It's always easier not to think for oneself. Find a nice safe hierarchy and settle in. "
+             "Don't make changes, don't risk disapproval, don't upset your syndics. "
+             "It's always easiest to let yourself be governed.",
+                    lv_font_montserrat_12},
+            {"There's a point, around the age of twenty, when you have to choose whether to be like "
+             "everybody else the rest of your life, or to make a virtue of your peculiarities."},
+            {"Those who build walls are their own prisoners."},
+            {"What is an anarchist?\nOne who, choosing, accepts the responsibility of choice."},
+            {"The individual cannot bargain with the State.\nThe State recognizes no coinage but power;\nand "
+             "it issues the coins itself."},
+            {"To make a thief, make an owner;\nto create crime, create laws."},
+            {"No, I don't mean love, when I say patriotism.\nI mean fear. The fear of the other.\n"
+             "And its expressions are political, not poetical: hate, rivalry, aggression.",
+                    lv_font_montserrat_12},
+            {"The place they go towards is a place even less imaginable to most of us than the city "
+             "of happiness.\n"
+             "I cannot describe it at all.\n"
+             "It is possible that it does not exist.\n"
+             "But they seem to know where they are going, the ones who walk away from Omelas.",
+                    lv_font_montserrat_12},
+    };
+
+    assert(!ui.startup_overlay);
+    auto* overlay = lv_obj_create(ui.screen);
+    lv_obj_remove_style_all(overlay);
+    lv_obj_set_width(overlay, lv_pct(100));
+    lv_obj_set_height(overlay, lv_pct(100));
+    lv_obj_set_align(overlay, LV_ALIGN_CENTER);
+    lv_obj_set_style_bg_color(overlay, lv_color_hex(0x000000), LV_PART_MAIN);
+    lv_obj_set_style_bg_opa(overlay, 255, LV_PART_MAIN);
+    lv_obj_clear_flag(overlay, LV_OBJ_FLAG_SCROLLABLE);
+
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-constant-array-index)
+    auto const& entry = MESSAGES[get_rand_32() % (sizeof(MESSAGES) / sizeof(MESSAGES[0]))];
+    auto* message = lv_label_create(overlay);
+    lv_label_set_text(message, entry.text);
+    lv_obj_set_style_text_font(message, &entry.font, LV_PART_MAIN);
+    lv_obj_set_width(message, lv_pct(100));
+    lv_obj_set_height(message, LV_SIZE_CONTENT);
+    lv_obj_set_align(message, LV_ALIGN_CENTER);
+    lv_obj_set_style_text_align(message, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN);
+    lv_obj_set_style_text_color(message, lv_color_hex(0xFFFFFF), LV_PART_MAIN);
+    lv_obj_set_style_text_opa(message, 255, LV_PART_MAIN);
+
+    return overlay;
+}
+
 }  // namespace
 
 bool init() {
@@ -488,6 +554,17 @@ bool init() {
     mk_timer(display_update_plot, DISPLAY_TIMER_PLOT_INTERVAL);
     // clear the axis label until we get our first sample
     if (ui.chart_x_axis_scale) lv_label_set_text(ui.chart_x_axis_scale, "");
+
+    if (get_rand_32() % 4 == 0) {
+        ui.startup_overlay = startup_ui(ui);
+        mk_timer(
+                [](auto*) {
+                    if (!ui.startup_overlay) return;
+                    lv_obj_del(ui.startup_overlay);
+                    ui.startup_overlay = nullptr;
+                },
+                DISPLAY_STARTUP_OVERLAY_DURATION);
+    }
 
     mk_task("display-lvgl-tasks", Priority::Display, DISPLAY_TASK_STACK_SIZE)([]() {
         periodic<DISPLAY_LVGL_TIMER_INTERVAL>(lv_timer_handler);

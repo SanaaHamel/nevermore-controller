@@ -152,6 +152,7 @@ target_link_libraries(
          hardware_spi
          hardware_watchdog
          pico_btstack_ble
+         pico_rand
          pico_stdio_uart
         #  pico_stdio_usb
          pico_stdlib
