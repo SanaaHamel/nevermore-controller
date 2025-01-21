@@ -595,6 +595,7 @@ led_chain_count: 16
 # These `fan_power_*` entries are for a DELTA BFB0712HF (StealthMax BOM)
 # If you have a different fan then play with these numbers to the satisfaction.
 # See full config documentation for details.
+# (e.g. See `fan_power_automatic` if you'd prefer very quiet background filtering.)
 fan_power_coefficient: 0.8  # lower max power to keep things much more quiet
 
 # Optional
