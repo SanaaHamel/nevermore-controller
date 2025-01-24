@@ -134,12 +134,13 @@ mcu 'mcu': Starting CAN connect
 ... BLAH
 ... BLAH
 ```
-. If you've flashed a OTA-capable UF2 to the controller (v0.3+) you can update it wirelessly.
 
 . **Calibrate the sensors.** xref:doc/voc.adoc#baseline-calibration[See the calibration section in the VOC Guide.]
 
+. You can apply updates the controller without removing it from the filter. xref:guide-updating[See the Updating Guide.]
 
-Configured Nevermores will automatically turn on/off depending on whether any extruder heaters are active. They will also turn on/off depending on sensor values and configured fan policies.
+
+Configured Nevermores will automatically turn xref:klipper-print-mode[on/off depending on whether any extruder heaters are active]. They will also turn on/off xref:fan-control[depending on sensor values and configured fan policies].
 
 
 [#guide-updating]
@@ -1094,6 +1095,24 @@ image::doc/README-nrf-connect.png[nRC Connect Screenshot,256]
 
 You can test if the controller is accepting new connections by pressing the 'connect' button.
 
+[#klipper-print-mode]
+=== "Print Mode"
+
+The Klipper module enters/exits "print mode" based on whether any extruder is turned on (i.e. has a non-zero target temperature).
+
+This allows Nevermores to immediately begin filtering before VOC levels exceed thesholds and helps prevent calibration drift that could occur with long prints using low-VOC filaments.
+
+On entering "print mode":
+
+* xref:fan-control[Nevermore fan overrides are set to 100%.]
+* xref:NEVERMORE_VOC_CALIBRATION[VOC calibration is suspended.]
+
+On exiting "print mode":
+
+* Nevermores return to automatic control.
+* VOC calibration is resumed.
+
+These commands are automatically re-issued to a controller when they reconnect after losing connection.
 
 [#fan-control]
 === Fan Control & Macros
