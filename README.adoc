@@ -1138,9 +1138,10 @@ If you would like to limit the maximum speed of the fan, e.g. to reduce noise, x
 
 == Thanks To
 * https://github.com/0ndsk4[0ndsk4] - Donated hardware for testing
+* Appri (Nevermore Discord) - Testing Volunteer
 * BO_Andy (Nevermore Discord) - Testing Volunteer
 * https://central3dprinting.com[Central 3D Printing] - Donated hardware for testing
-* Drevic (Nevermore Discord) - SGP30 Testing Volunteer
+* Drevic (Nevermore Discord) - Testing Volunteer
 
 == Generous Donors
 * https://github.com/0ndsk4[0ndsk4]
