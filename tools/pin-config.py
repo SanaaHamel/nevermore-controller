@@ -290,6 +290,9 @@ def input_options(msg: str, default: str, opts: Set[str]):
         if response in opts:
             return response
 
+        print(f"Invalid response `{response}`.")
+        print(f"Enter one of the options listed. e.g. `{entries[0]}`")
+
 
 @dataclass
 class ControllerChars:
