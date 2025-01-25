@@ -41,7 +41,7 @@ NOTE: Sensors are available in various sizes, form factors, and pin orders. Chec
 
 NOTE: xref:supported-sensors[Many sensor boards are multi-function.] e.g. you'll likely only need one board for temperature/humidity.
 
-The only hard requirement is a Pico W.
+The only hard requirement is a RP2040 board.
 Everything else can be omitted at the cost of reduced functionality.
 
 The VOC sensors are critical; they measure the relevant contaminants we wish to filter out.
@@ -92,9 +92,9 @@ NOTE: Make sure you meet the xref:klipper-requirements[Klipper requirements].
 
 Instructions:
 
-. Build or https://github.com/SanaaHamel/nevermore-controller/releases[download the controller `uf2` binary], flash to Pico W.
+. Build or https://github.com/SanaaHamel/nevermore-controller/releases[download the controller `uf2` binary], flash to the RP2040 board (e.g. Pico W).
 +
-The Pico W's LED should start flashing once the controller has booted.
+If the board has a simple on-board LED, then it should start flashing once the controller has booted.
 
 . SSH into the printer. Execute the following to install the Klipper module:
 +
@@ -146,7 +146,7 @@ Configured Nevermores will automatically turn xref:klipper-print-mode[on/off dep
 [#guide-updating]
 == Updating Guide For Dummies
 
-If you've flashed a OTA-capable UF2 to the controller (v0.3+) you can update it wirelessly. The process is simple:
+If you've flashed a OTA-capable UF2 to the controller (v0.3+) you can update it without removing it from the filter. The process is simple:
 ```sh
 # switch to the nevermore-controller installation
 cd ~/nevermore-controller
@@ -311,12 +311,12 @@ When a sensor is found, there will be a line saying so (e.g. `Found SGP30`, or `
 The controller is in bootloader mode. If the image isn't corrupted it'll restart in application mode in about 60 seconds if you leave it alone. If it is corrupted, it won't reboot and will stay in bootloader mode to let you upload a valid image using the update tool.
 
 [#faq-is-the-bluetooth-on]
-* **The controller is properly flashed (e.g. the LED is blinking) but my Klipper can't connect to it.**
+* **The controller is properly flashed (e.g. the LED is blinking) but Klipper can't connect to it using BlueTooth.**
 +
 There are several possible causes:
 +
-. Verify sure the Bluetooth is turned on & working.
-If you're using Linux, follow the you can use the following to check
+. Verify sure BlueTooth is turned on & working.
+If you're using Linux, you can use the following to verify:
 +
 ```
 ⋊> ~ # ensure BT is on
@@ -331,10 +331,10 @@ Discovery started
 ^C⏎
 ```
 +
-If `bluetoothctl` doesn't work or the scan doesn't list any Bluetooth devices then there's something wrong with the OS's configuration and/or Bluetooth adapter.
+If `bluetoothctl` doesn't work or the scan doesn't list any BlueTooth devices then there's something wrong with the OS's configuration and/or BlueTooth adapter.
 You'll need to fix that first (see other FAQ entries for some ideas).
 +
-. Verify that the Bluetooth adapter can connect to the device. xref:xref:find-the-bt-address-bluetoothctl[If you're on Linux, follow this procedure to find and connect directly to the controller.]
+. Verify that the BlueTooth adapter can connect to the device. xref:xref:find-the-bt-address-bluetoothctl[If you're on Linux, follow this procedure to find and connect directly to the controller.]
 . Verify that *both* the Klipper installation and the controller are the same release version.
 +
 xref:guide-updating[Easiest way ensure this is to follow the update guide.]
@@ -348,10 +348,10 @@ Exception: 4553d138-1d00-4b6f-bc42-955a89cf8c36 (Handle: 67): Unknown doesn't ha
 Then you probably have a mismatch between the controller and Klipper module.
 
 +
-If you've checked all of the above and you still have exceptions in the printer log then you may go find me on the Nevermore Discord for help.
+If you've checked all of the above and you still have exceptions in the printer log then you may go find Sanaa on the Nevermore Discord for help.
 
 [#faq-2.4ghz-interference]
-* **I'm having trouble getting a reliable connection to the controller. Sometimes it works, sometimes it just doesn't connect.**
+* **I'm having trouble getting a reliable connection using BlueTooth to the controller. Sometimes it works, sometimes it just doesn't connect.**
 +
 (This is specifically for the case where the printer log does *not* show any exceptions mentioning bluetooth characteristics; xref:bluez-bad-cache[otherwise see below].)
 +
@@ -379,7 +379,7 @@ Try the following, in order:
 +
 . Disable and remove BlueZ GATT caches.
 +
-BlueZ (Linux's Bluetooth subsystem) has a known bug where it can store corrupt BLE attribute caches. footnote:[Observed in versions up to 5.66.] You can disable and clear this cache to work around this bug:
+BlueZ (Linux's BlueTooth subsystem) has a known bug where it can store corrupt BLE attribute caches. footnote:[Observed in versions up to 5.66.] You can disable and clear this cache to work around this bug:
 +
 .. ** Disable Caching**
 +
@@ -563,7 +563,7 @@ This can be done using xref:NEVERMORE_RESET[`NEVERMORE_RESET`], if you are conne
 [#klipper-requirements]
 === Requirements
 
-* xref:faq-is-the-bluetooth-on[Working BlueTooth on the Klipper host.]
+* xref:faq-is-the-bluetooth-on[Working BlueTooth on the Klipper host. (If using BlueTooth.)]
 * Klipper using Python 3.7+
 * KIAUH-like installation (required by installation script)
 
@@ -819,6 +819,7 @@ nevermore: <omitted, e.g. `nevermore custom_names_allowed`>
 === Klipper Object Naming
 
 Nevermore instances have two kinds of names:
+
 * Short names: Used by GCode commands (i.e. `NEVERMORE=<short name>`).
 * Full Klipper names: Used by the Klipper config files.
 
@@ -840,8 +841,8 @@ When referring to a Nevermore for LED effects, use the full Klipper name and rep
 
 The following command can be used to influence behaviour at runtime.
 
-These typically require a `NEVERMORE=` parameter to specify which Nevermore to interact with.
-At this time, there can only be one Nevermore controller, which is named `nevermore`.
+These typically have an optional `NEVERMORE=` parameter to specify which Nevermore to interact with.
+If no `NEVERMORE=` argument is provided then the command will apply to all Nevermores.
 
 
 ==== NEVERMORE_VENT_SERVO_SET
@@ -864,7 +865,6 @@ NEVERMORE_STATUS [NEVERMORE=<name>]
 ```
 
 Prints the Nevermores' current status to the console.
-Lists all Nevermores unless a specific one is named using`NEVERMORE=`.
 Not terribly useful for most things, but helpful if you're not sure it's connected
 yet. (e.g. when used with `connection_initial_timeout: 0`)
 
@@ -876,7 +876,6 @@ NEVERMORE_REBOOT [NEVERMORE=<name>]
 ```
 
 Reboots Nevermores, if connected. Persistent settings will be saved.
-Applies to all Nevermores unless a specific one is named using`NEVERMORE=`.
 
 Probably easier than power cycling the whole printer.
 
@@ -892,7 +891,6 @@ NEVERMORE_RESET FLAGS=<int> [NEVERMORE=<name>]
 
 Resets persistent settings to defaults.
 It is deliberately under-documented to dissuade causal use.
-Applies to all Nevermores unless a specific one is named using`NEVERMORE=`.
 
 Policy settings can can be reset to default using `FLAGS=2`.
 
@@ -908,7 +906,6 @@ WARNING: Calibration is automatically suspended by the Klipper module when any e
 
 Enables/disables the VOC sensor calibration.
 *Sensor calibration should be enabled whenever the printer isn't printing.*
-Applies to all Nevermores unless a specific one is named using`NEVERMORE=`.
 
 Sensor calibration should *only* be disabled when the printer is printing. Doing
 this prevents the VOC sensor from mistaking low VOC emissions for sensor drift
@@ -928,7 +925,6 @@ NEVERMORE_VOC_GATING_THRESHOLD_OVERRIDE [NEVERMORE=<name>] [THRESHOLD=<int \in [
 ```
 
 Overrides the VOC gating threshold (see `voc_gating_threshold` in the Klipper config). Omit the `THRESHOLD` parameter to clear any existing override.
-Applies to all Nevermores unless a specific one is named using`NEVERMORE=`.
 
 This is intended for setups where the slicer specifies the filament type using a user-defined G-Code macro (e.g. `SET_MATERIAL ABS`), and you would like to temporarily set the VOC gating threshold for a specific material/filament.
 
@@ -944,7 +940,6 @@ NEVERMORE_SENSOR_CALIBRATION_CHECKPOINT [NEVERMORE=<name>]
 
 Force sensors to checkpoint their calibration.
 The checkpoints will be persisted after a brief delay (under 20 seconds).
-Applies to all Nevermores unless a specific one is named using`NEVERMORE=`.
 
 Useful if you must save the current calibration immediately instead of waiting
 for the usual 24h periodic checkpoint.
@@ -959,7 +954,6 @@ NEVERMORE_SENSOR_CALIBRATION_RESET [NEVERMORE=<name>]
 ```
 
 Resets the sensor calibrations. Does not immediately persist this reset calibration, but it will eventually be applied when the checkpoint process triggers.
-Applies to all Nevermores unless a specific one is named using`NEVERMORE=`.
 
 Useful when moving the printer to a new environment.
 
