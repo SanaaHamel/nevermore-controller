@@ -385,13 +385,15 @@ async def _post_update_actions_interactive(
         print(f"previous version: {prev_version}")
         print(f" current version: {curr_version}")
 
+        # FUTURE WORK: query settings and only ask if they're different (ideally present a diff)
         if input_yes_no(
             args,
             True,
-            "Would you like to apply any default setting changes? (Recommended!)\n"
-            + "(Anything specified by your Klipper config will be re-applied when Klipper reconnects.)",
+            "Default settings may have changed.\n"
+            + "Do you wish to use any new defaults? [Recommended]\n"
+            + "(Settings customised in the Klipper config will be restored when Klipper reconnects.)",
         ):
-            print("appling new defaults for settings...")
+            print("applying new default settings...")
             await reset_setting_defaults(transport)
 
         if await pin_config(transport) == PinState.CUSTOMISED:
@@ -574,13 +576,22 @@ async def main(args: CmdLnArgs) -> int:
     else:
         await _update_via_bt_spp(args)
 
-    print("update complete.")
+    print(
+        """\n
+----------------------
+-- Update Completed --
+----------------------
+"""
+    )
 
     try:
         if not args.unattended:
-            print("You may abort if the following steps take too long [ctrl-c].")
             print(
-                "It is recommended to wait so the updater can verify if there are post-update actions you should perform."
+                """
+Reconnecting for post-update actions.
+It is recommended to wait so the updater can verify if there are post-update actions you should perform.
+( You may abort if the following steps take too long. [ctrl-c] )
+"""
             )
             print(f"waiting for device to reboot ({REBOOT_DELAY} seconds)...")
             await asyncio.sleep(REBOOT_DELAY)
