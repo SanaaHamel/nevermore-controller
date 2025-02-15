@@ -117,6 +117,8 @@
         "executor": "cpp",
         "comm_stream.h": "c",
         "stdio_usb.h": "c",
-        "ranges": "cpp"
+        "ranges": "cpp",
+        "memory": "cpp",
+        "format": "cpp"
     },
 }
