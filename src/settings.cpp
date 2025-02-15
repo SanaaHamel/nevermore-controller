@@ -320,18 +320,21 @@ void Settings::reset(ResetFlags flags) {
         auto display_hw_ = display_hw;
         auto save_counter_ = save_counter;
         auto pins_ = pins;
+        auto servo_ = servo_vent;
         *this = {};
         header = header_;
         voc_calibration = voc_calibration_;
         display_hw = display_hw_;
         save_counter = save_counter_;
         pins = pins_;
+        servo_vent = servo_;
     }
 
     if (flags & hardware) {
         // FIXME: This is a maintence nightmare. There must be a better way of doing things.
         display_hw = Settings{}.display_hw;
         pins = PINS_DEFAULT;
+        servo_vent = {};
     }
 }
 
