@@ -83,9 +83,14 @@ fix_mainsail_os_bluetooth() {
     if [ -f "$BOOT_CONFIG" ] && grep -q "^\s*dtoverlay=disable-bt\s*\(#.*\)\?$" "$BOOT_CONFIG"; then
         echo "[FAILED]"
         echo "It looks like you're using Mainsail OS and the BlueTooth is currently disabled."
-        echo "Do you wish to enable it now?"
+        echo "Do you wish to enable BlueTooth now?"
+        echo ""
+        echo "NOTE:     BlueTooth is optional, you can use USB to connect instead."
+        echo "          See README.adoc for details."
         echo "WARNING:  Do not do this if the Klipper host is using the UART to communicate with an MCU."
         echo "          This will disable the UART on Raspberry Pis."
+        echo "          ( If this machine isn't a Raspberry Pi, consult the machine's documentation."
+        echo "            You might be able to run both BlueTooth and use hardware UART. )"
         echo "Details:  https://docs-os.mainsail.xyz/faq/enable-bluetooth-on-rpi"
 
         while true; do
@@ -108,8 +113,7 @@ fix_mainsail_os_bluetooth() {
                 break
                 ;;
             [Nn])
-                echo "BlueTooth is required for this module. Exiting."
-                exit 1
+                break
                 ;;
             *) echo "Enable BlueTooth? [yn]" ;;
             esac
