@@ -697,6 +697,7 @@ serial: <device path>
 
 # float \in [0, 1] - Fan power used when the automatic fan policy is active.
 # Useful if you'd prefer slower but quieter background/automatic filtering.
+# NOTE: Automatic fan power is scaled based on several factors. See Fan Control.
 #fan_power_automatic: 1
 
 # float \in [0, 1] - Coefficient applied to the fan power.
@@ -1148,7 +1149,7 @@ These commands are automatically re-issued to a controller when they reconnect a
 
 There are two modes of operation:
 
-* Automatic - Fan power is managed by the controller based on its fan policy (xref:klipper-config-full[see here]).
+* Automatic - Fan power is managed by the controller based on its fan policy (xref:klipper-config-full[see here]) and the current VOC index readings (see below).
 
 * Manual - Fan power is overridden and will run at the specified power until the override is cleared.
 
@@ -1157,7 +1158,6 @@ In both cases, the fan power is scaled by two factors:
 * The `fan_power_coefficient` setting scales in all cases. Useful for limiting noise since the StealthMax recommended fans are more powerful than strictly needed.
 
 * Thermal Limiting scales the actual fan power applied based on the maximum of the intake and exhaust temperatures. This is intended to improve the carbon's effective lifespan, which degrades at high temperatures. This feature can be disabled by setting xref:klipper-config-full[`fan_thermal_limit_coefficient: 1`].
-
 
 From within Klipper, the fan can be controlled much like any other fan:
 
@@ -1171,6 +1171,26 @@ SET_FAN_SPEED FAN=nevermore_fan
 WARNING: Setting the fan speed to 0 in Mainsail/Fluidd UI does **not** clear the control override. It just sets it to zero. (i.e. disables the fan)
 
 If you would like to limit the maximum speed of the fan, e.g. to reduce noise, xref:klipper-config-full[set `fan_power_coefficient` to a value < 1].
+
+==== Automatic Fan Control
+
+Whenever the fan power isn't overridden, the fan is managed by a simple state machine. The computed fan power is then additionally xref:fan-control[scaled by other factors noted above].
+
+* **Automatic**: At least one automatic policy is satisfied (xref:klipper-config-full[see here]).
++
+Fan power is based on xref:klipper-config-full[`fan_power_automatic`] and scaled
+from 10% to 100% when the max of intake/exhaust VOC index reaches 1.5 std dev above `fan_policy_voc_passive_max` (or 200, max nominal, if not set).
++
+e.g. Using `fan_policy_voc_passive_max: 250`, the scaling factor would be 10% w/ VOC at 251, and ~90% w/ VOC at ~400.
+
+* **Cooldown**: An automatic fan policy was active within the last xref:klipper-config-full[`fan_policy_cooldown` seconds].
++
+Fan power is set to 10% of xref:klipper-config-full[`fan_power_automatic`].
+
+* **Passive**: Idle.
++
+Fan power is set to xref:klipper-config-full[`fan_power_passive`].
+
 
 == Credits
 
