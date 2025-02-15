@@ -6,6 +6,7 @@
 #include "utility/fan_policy_thermal.hpp"
 #include "utility/servo.hpp"
 #include <array>
+#include <utility>
 
 // Disables saving/loading settings from app storage. Useful for test builds.
 #ifndef NEVERMORE_SETTINGS_PERSISTENCE
@@ -59,6 +60,33 @@ enum class DisplayUI : uint8_t {
     CIRCLE_240_NO_PLOT = 2,
 };
 
+// NOLINTNEXTLINE(readability-enum-initial-value) doesn't recongise `COUNT`/`NUM` idiom
+enum class Flags : uint8_t {
+    // If a sensor in a `FilterSide` is missing, then try to fall back to the other side's sensor.
+    sensors_fallback = 0,
+    // StealthMax MCU is positioned inside the exhaust airflow.
+    // Disabled by default because not all Nevermores are StealthMaxes.
+    sensors_fallback_exhaust_mcu = 1,
+    MAX
+};
+
+// All flags must be off by default to correctly receive default values.
+// This is a limitation of using a bitset and the design of the setting system
+// which doesn't have bit-level granularity.
+struct [[gnu::packed]] FlagBitSet {
+    static constexpr uint8_t FLAGS_MAX = 64;
+    static_assert(std::to_underlying(Flags::MAX) <= FLAGS_MAX);
+
+    bool operator()(Flags const flag) const {
+        return (bitset & (uint64_t(1) << std::to_underlying(flag))) != 0;
+    }
+
+    bool operator==(FlagBitSet const&) const = default;
+
+    uint64_t bitset = 0;
+};
+static_assert(sizeof(FlagBitSet) == 8);
+
 // Layout **cannot** change. This would break back-compatibility.
 // Fields **can** be appended w/o bumping the header version.
 // Padding **must** be explicitly declared using `Padding<N>`.
@@ -83,6 +111,7 @@ struct [[gnu::packed]] SettingsV0 {
     Pins pins = PINS_DEFAULT;
     ServoRange servo_vent;
     Padding<3> _1{};  // HACK: cannot remove, would screw with def-init of new members
+    FlagBitSet flags;
 
     // replaces valid fields from RHS into self
     void merge_valid_fields(SettingsV0 const&);

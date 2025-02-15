@@ -27,7 +27,6 @@ namespace nevermore::sensors {
 
 Sensors g_sensors;
 SemaphoreHandle_t g_sensors_lock;
-Config g_config;
 
 namespace {
 
@@ -131,7 +130,7 @@ void foreach_sensor_bus(F&& go) {
 
 }  // namespace
 
-Sensors Sensors::with_fallbacks(Config const& config) const {
+Sensors Sensors::with_fallbacks(settings::Settings const& config) const {
     EnvironmentalFilter intake{EnvironmentalFilter::Kind::Intake};
     EnvironmentalFilter exhaust{EnvironmentalFilter::Kind::Exhaust};
     auto apply = [&]<typename A>(A& x, EnvironmentalFilter side) { x = side.get<A>(*this, config); };

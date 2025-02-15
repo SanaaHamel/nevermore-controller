@@ -451,6 +451,7 @@ void SettingsV0::merge_valid_fields(SettingsV0 const& x) {
     }
 
     if (x.servo_vent.validate()) servo_vent = x.servo_vent;
+    flags = x.flags;
 }
 
 }  // namespace nevermore::settings

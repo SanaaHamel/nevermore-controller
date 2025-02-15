@@ -31,8 +31,9 @@ struct EnvironmentalFilter {
 
     template <typename A>
         requires(!std::is_reference_v<A>)
-    [[nodiscard]] A get(Sensors const& sensors = g_sensors, Config const& config = g_config) const {
-        return get_<A>(sensors, config);
+    [[nodiscard]] A get(Sensors const& sensors = g_sensors,
+            settings::Settings const& settings = settings::g_active) const {
+        return get_<A>(sensors, settings);
     }
 
     template <typename A>
@@ -57,10 +58,10 @@ struct EnvironmentalFilter {
         std::get<A&>(main) = x;
     }
 
-    [[nodiscard]] double compensation_temperature(
-            Sensors const& sensors = g_sensors, Config const& config = g_config) const;
-    [[nodiscard]] double compensation_humidity(
-            Sensors const& sensors = g_sensors, Config const& config = g_config) const;
+    [[nodiscard]] double compensation_temperature(Sensors const& sensors = g_sensors,
+            settings::Settings const& settings = settings::g_active) const;
+    [[nodiscard]] double compensation_humidity(Sensors const& sensors = g_sensors,
+            settings::Settings const& settings = settings::g_active) const;
 
     // PRECONDITION: called immediately after `set<VOCRaw>`
     [[nodiscard]] bool was_voc_breakdown_measurement() const {
@@ -97,12 +98,14 @@ private:
 
     template <typename A>
         requires(!std::is_reference_v<A>)
-    [[nodiscard]] A get_(Sensors const& sensors = g_sensors, Config const& config = g_config) const {
+    [[nodiscard]] A get_(Sensors const& sensors = g_sensors,
+            settings::Settings const& settings = settings::g_active) const {
         // NOLINTNEXTLINE(cppcoreguidelines-pro-type-const-cast)
         auto [main, other] = pick(const_cast<Sensors&>(sensors));
         if constexpr (BLE::has_not_known<A>) {
             if (auto value = std::get<A&>(main); value != BLE::NOT_KNOWN) return value;
-            if (auto value = std::get<A&>(other); config.fallback) return value;
+            if (auto value = std::get<A&>(other); settings.flags(settings::Flags::sensors_fallback))
+                return value;
             return BLE::NOT_KNOWN;
         } else {
             return std::get<A&>(main);
@@ -136,23 +139,24 @@ private:
 // special: exhaust can prefer to fall back too the MCU temperature (always known) instead of intake
 template <>
 inline BLE::Temperature EnvironmentalFilter::get<BLE::Temperature>(
-        Sensors const& sensors, Config const& config) const {
+        Sensors const& sensors, settings::Settings const& settings) const {
     // NOLINTNEXTLINE(cppcoreguidelines-pro-type-const-cast)
     auto [main, other] = pick(const_cast<Sensors&>(sensors));
     if (auto value = std::get<BLE::Temperature&>(main); value != BLE::NOT_KNOWN) return value;
     // Exhaust falls back to MCU first, if enabled
-    if (g_config.fallback_exhaust_mcu && kind == Kind::Exhaust) return sensors.temperature_mcu;
+    if (settings.flags(settings::Flags::sensors_fallback_exhaust_mcu) && kind == Kind::Exhaust)
+        return sensors.temperature_mcu;
     // No other fallbacks allowed
-    if (!g_config.fallback) return BLE::NOT_KNOWN;
+    if (!settings.flags(settings::Flags::sensors_fallback)) return BLE::NOT_KNOWN;
     // Fall back to other side
     if (auto value = std::get<BLE::Temperature&>(other); value != BLE::NOT_KNOWN) return value;
     // we're intake, have no value, and neither does exhaust -> double fallback to MCU
-    if (g_config.fallback_exhaust_mcu) return sensors.temperature_mcu;
+    if (settings.flags(settings::Flags::sensors_fallback_exhaust_mcu)) return sensors.temperature_mcu;
     return BLE::NOT_KNOWN;
 }
 
 inline double EnvironmentalFilter::compensation_temperature(
-        Sensors const& sensors, Config const& config) const {
+        Sensors const& sensors, settings::Settings const& settings) const {
     auto fallback = [&]() { return 20.; };
 
 #if DBG_MEASURE_VOC_TEMPERATURE_HUMIDITY_EFFECT
@@ -163,10 +167,11 @@ inline double EnvironmentalFilter::compensation_temperature(
     }
 #endif
 
-    return get<BLE::Temperature>(sensors, config).value_or(sensors.temperature_mcu.value_or(fallback()));
+    return get<BLE::Temperature>(sensors, settings).value_or(sensors.temperature_mcu.value_or(fallback()));
 }
 
-inline double EnvironmentalFilter::compensation_humidity(Sensors const& sensors, Config const& config) const {
+inline double EnvironmentalFilter::compensation_humidity(
+        Sensors const& sensors, settings::Settings const& settings) const {
     // assume 25% humidity, which is not unreasonable in a hot printer
     // TODO: make fallback value based off temperature? is it worth the trouble?
     auto fallback = [&]() { return 25.; };
@@ -179,7 +184,7 @@ inline double EnvironmentalFilter::compensation_humidity(Sensors const& sensors,
     }
 #endif
 
-    return get<BLE::Humidity>(sensors, config).value_or(fallback());
+    return get<BLE::Humidity>(sensors, settings).value_or(fallback());
 }
 
 }  // namespace nevermore::sensors

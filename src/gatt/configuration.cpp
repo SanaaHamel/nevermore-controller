@@ -7,7 +7,6 @@
 #include "sensors.hpp"
 #include "settings.hpp"
 #include "utility/task.hpp"
-#include <array>
 #include <cstdio>
 
 using namespace std;
@@ -18,11 +17,6 @@ namespace {
 
 // delay must be long enough let transports finish responding
 constexpr auto REBOOT_DELAY = 200ms;
-
-constexpr array FLAGS{
-        &sensors::g_config.fallback,
-        &sensors::g_config.fallback_exhaust_mcu,
-};
 
 // Use a task instead of a timer in case a timer misbehaves and blocks.
 Task g_reboot_task;
@@ -78,12 +72,7 @@ optional<uint16_t> attr_read(
         HANDLE_READ_BLOB(CONFIG_VOC_GATING_THRESHOLD, VALID_RANGE, VOC_GATING_THRESHOLD_RANGE)
         HANDLE_READ_BLOB(CONFIG_VOC_GATING_THRESHOLD_OVERRIDE, VALID_RANGE, VOC_GATING_THRESHOLD_RANGE)
 
-        READ_VALUE(CONFIG_FLAGS, ([]() -> uint16_t {
-            uint64_t flags = 0;
-            for (size_t i = 0; i < FLAGS.size(); ++i)
-                flags |= uint64_t(*FLAGS.at(i)) << i;
-            return flags;
-        })())
+        READ_VALUE(CONFIG_FLAGS, settings::g_active.flags.bitset)
 
         READ_VALUE(CONFIG_VOC_GATING_THRESHOLD, settings::g_active.voc_gating_threshold)
         READ_VALUE(CONFIG_VOC_GATING_THRESHOLD_OVERRIDE, settings::g_active.voc_gating_threshold_override)
@@ -113,10 +102,8 @@ optional<int> attr_write(hci_con_handle_t conn, uint16_t attr, span<uint8_t cons
     case HANDLE_ATTR(CONFIG_FLAGS, VALUE): {
         uint64_t const flags = consume;
         uint64_t const mask = consume.or_default(std::numeric_limits<uint64_t>::max());
-        for (size_t i = 0; i < FLAGS.size(); ++i)
-            if (auto const bit = uint64_t(1) << i; mask & bit) {
-                *FLAGS.at(i) = !!(flags & bit);
-            }
+        uint64_t const curr = settings::g_active.flags.bitset;
+        settings::g_active.flags.bitset = (flags & mask) | (curr & ~mask);
         return 0;
     }
     case HANDLE_ATTR(CONFIG_RESET_SENSOR_CALIBRATION, VALUE): {

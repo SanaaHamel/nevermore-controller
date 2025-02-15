@@ -9,6 +9,13 @@
 
 #define DBG_MEASURE_VOC_TEMPERATURE_HUMIDITY_EFFECT 0
 
+namespace nevermore::settings {
+
+struct Settings;
+extern Settings g_active;
+
+}  // namespace nevermore::settings
+
 namespace nevermore::sensors {
 
 BLE_DECL_SCALAR_OPTIONAL(VOCIndex, uint16_t, 1, 0, 0, 0);      // range [0, 500], 0 = not-known;
@@ -26,16 +33,6 @@ struct [[gnu::packed]] VOCRawBreakdown {
 #undef NEWTYPE_VOC_RAW
 
 #endif
-
-struct Config {
-    // If a sensor in a `FilterSide` is missing, then try to fall back to the other side's sensor.
-    bool fallback = false;
-    // StealthMax MCU is positioned inside the exhaust airflow.
-    // Disabled by default because not all Nevermores are StealthMaxes.
-    bool fallback_exhaust_mcu = false;
-};
-
-extern Config g_config;
 
 // Requirements:
 // * Must match declared order of characteristics in environmental service
@@ -61,7 +58,7 @@ struct [[gnu::packed]] Sensors {
     VOCRawBreakdown voc_raw_breakdown_exhaust;
 #endif
 
-    [[nodiscard]] Sensors with_fallbacks(Config const& config = g_config) const;
+    [[nodiscard]] Sensors with_fallbacks(settings::Settings const& settings = settings::g_active) const;
 
     auto operator<=>(Sensors const&) const = default;
 };
