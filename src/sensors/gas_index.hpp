@@ -4,6 +4,8 @@
 #include "sensors.hpp"
 #include "sensors/environmental.hpp"
 #include "settings.hpp"
+#include <algorithm>
+#include <array>
 #include <cassert>
 #include <chrono>
 #include <cstring>
@@ -29,9 +31,19 @@ struct GasIndex {
         side.set(VOCRaw(raw));
         if (side.was_voc_breakdown_measurement()) return;
 
+        if (!settings.flags(settings::Flags::sensors_voc_expected_variance_independent)) {
+            auto _ = side.other().guard();
+            GasIndexAlgorithm_sraw_std_fix16_set(
+                    &gia, std::max(expected_variance(side.other()), GasIndexAlgorithm_sraw_std_fix16(&gia)));
+        }
+
         side.set(process(raw, settings));
         side.set(GIAState(gia));
         checkpoint(side.voc_calibration_blob(), log);
+
+        if (!settings.flags(settings::Flags::sensors_voc_expected_variance_independent)) {
+            expected_variance(side) = GasIndexAlgorithm_sraw_std_fix16(&gia);
+        }
     }
 
     // ~330 us during steady-state, ~30 us during startup blackout
@@ -105,6 +117,11 @@ struct GasIndex {
 
 private:
     using Blob = int32_t[2];
+
+    static std::array<fix16_t, 2> s_expected_variance;
+    static fix16_t& expected_variance(EnvironmentalFilter side) {
+        return s_expected_variance.at(side.kind == EnvironmentalFilter::Kind::Intake ? 0 : 1);
+    }
 };
 
 }  // namespace nevermore::sensors

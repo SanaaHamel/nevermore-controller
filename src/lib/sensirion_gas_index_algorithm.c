@@ -653,7 +653,16 @@ int32_t GasIndexAlgorithm_sraw_mean(GasIndexAlgorithmParams const* params) {
 }
 
 int32_t GasIndexAlgorithm_sraw_std(GasIndexAlgorithmParams const* params) {
-    return fix16_cast_to_int(params->m_Mox_Model__Sraw_Std);
+    return fix16_cast_to_int(GasIndexAlgorithm_sraw_std_fix16(params));
+}
+
+fix16_t GasIndexAlgorithm_sraw_std_fix16(GasIndexAlgorithmParams const* params) {
+    return GasIndexAlgorithm__mean_variance_estimator__get_std(params);
+}
+
+void GasIndexAlgorithm_sraw_std_fix16_set(GasIndexAlgorithmParams* params, fix16_t std) {
+    params->m_Mean_Variance_Estimator___Std = std;
+    params->m_Mox_Model__Sraw_Std = std;
 }
 
 // clang-format on

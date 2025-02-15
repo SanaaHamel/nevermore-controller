@@ -60,6 +60,7 @@ enum class DisplayUI : uint8_t {
     CIRCLE_240_NO_PLOT = 2,
 };
 
+// NB: All flags are considered by default. See `FlagBitSet`.
 // NOLINTNEXTLINE(readability-enum-initial-value) doesn't recongise `COUNT`/`NUM` idiom
 enum class Flags : uint8_t {
     // If a sensor in a `FilterSide` is missing, then try to fall back to the other side's sensor.
@@ -67,6 +68,8 @@ enum class Flags : uint8_t {
     // StealthMax MCU is positioned inside the exhaust airflow.
     // Disabled by default because not all Nevermores are StealthMaxes.
     sensors_fallback_exhaust_mcu = 1,
+    // If *NOT* set, use max expected variance of either side before updating VOC GIA
+    sensors_voc_expected_variance_independent = 2,
     MAX
 };
 
@@ -90,6 +93,8 @@ static_assert(sizeof(FlagBitSet) == 8);
 // Layout **cannot** change. This would break back-compatibility.
 // Fields **can** be appended w/o bumping the header version.
 // Padding **must** be explicitly declared using `Padding<N>`.
+//  !!  Generally cannot remove padding once added b/c it would cause the
+//      replacing fields to be incorrectly default initialised.
 //  (initialisation of padding affects CRC and is poorly standardised)
 struct [[gnu::packed]] SettingsV0 {
     template <size_t N>

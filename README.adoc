@@ -784,6 +784,41 @@ serial: <device path>
 # and don't have any dedicated temperature sensors.
 #sensors_fallback_exhaust_mcu: false
 
+# Use independent expected variance estimations for VOC sensors.
+# Enable this option if the build's VOC sensors have different expected variances
+# when exposed to the same environment.
+#   e.g. build uses different VOC sensor types for intake and exhaust.
+#
+# This option is disabled by default, causing the system to use the max of
+# intake's/exhaust's expected variance as the effective expected variance for both.
+# Having a shared variance bound is desirable useful for builds where the
+# intake/exhaust VOC sensors have very similar expected variances when exposed
+# to the same environment.
+# Why? Two reasons:
+# 1.  Different expected variances map the same change in raw response to
+#     different index scales. Recall that linear component of the VOC index is:
+#       `VOC_index_linear = (raw - expected_mean) / expected_variance`
+#     (A non-linear mapping is then used to remap `[-inf, inf]` to `[0, 500]`)
+#
+#     A shared expected variance means that the scale of the VOC indices are now
+#     equivalent between intake/exhaust.
+#     This still doesn't make them directly comparable, see `doc/voc.adoc`, but
+#     will make it behave *more* intuitively.
+#
+# 2.  Intake/exhaust likely have different ambient airflows when the filter is
+#     idle due to their positioning within the filter.
+#       e.g. StealthMax's exhaust filter is inside the central hub.
+#     Restricted airflow means that VOCs diffuse their way to the affected sensor,
+#     baffling fluctuations and reducing the variation the sensor experiences.
+#
+#     tl;dr:  The intake and exhuast sensor might have the same raw response to
+#             identical environments, but they don't inhabit the same environment.
+#
+# One might ask: "Why not do the same for the expected mean?"
+# In practice, Sanaa observed notable device-to-device variation in the
+# expected mean, but not the expected variance.
+#sensors_voc_expected_variance_independent: false
+
 
 # MOSTLY OBSOLETE.
 # Mainsail 2.7.1+ and Fluidd 1.31.0+ both have dedicated support for Nevermores.

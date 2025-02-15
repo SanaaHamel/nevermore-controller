@@ -9,6 +9,7 @@ struct GasIndexAlgorithmParams;
 
 namespace nevermore::sensors {
 
+// FUTURE WORK: promote to fix16_t to have decimal components
 BLE_DECL_SCALAR_OPTIONAL(GIA_Mean, uint16_t, 1, 0, 0, 0xFFFFu);      // range [0, 2^16-2], 0xFFFF = not-known;
 BLE_DECL_SCALAR_OPTIONAL(GIA_Variance, uint16_t, 1, 0, 0, 0xFFFFu);  // range [0, 2^16-2], 0xFFFF = not-known;
 BLE_DECL_SCALAR_OPTIONAL(GIA_Threshold, uint16_t, 1, 0, 0,

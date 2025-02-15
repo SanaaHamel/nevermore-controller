@@ -295,6 +295,9 @@ void GasIndexAlgorithm_process(GasIndexAlgorithmParams* params, int32_t sraw,
 int32_t GasIndexAlgorithm_sraw_mean(GasIndexAlgorithmParams const*);
 int32_t GasIndexAlgorithm_sraw_std(GasIndexAlgorithmParams const*);
 
+fix16_t GasIndexAlgorithm_sraw_std_fix16(GasIndexAlgorithmParams const*);
+void GasIndexAlgorithm_sraw_std_fix16_set(GasIndexAlgorithmParams*, fix16_t);
+
 #ifdef __cplusplus
 }
 #endif

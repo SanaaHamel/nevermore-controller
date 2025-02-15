@@ -227,6 +227,7 @@ class CmdConfiguration(Command):
 
         cfg_flag("sensors_fallback", 0)
         cfg_flag("sensors_fallback_exhaust_mcu", 1)
+        cfg_flag("sensors_voc_expected_variance_independent", 2)
 
     @override
     async def dispatch(self, comm: CommBindings):

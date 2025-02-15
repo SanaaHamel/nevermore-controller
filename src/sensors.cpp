@@ -147,7 +147,7 @@ Sensors Sensors::with_fallbacks(settings::Settings const& config) const {
 }
 
 bool init() {
-    g_sensors_lock = xSemaphoreCreateMutex();
+    g_sensors_lock = xSemaphoreCreateRecursiveMutex();
 
     adc_select_input(ADC_CHANNEL_TEMP_SENSOR);
     adc_set_temp_sensor_enabled(true);

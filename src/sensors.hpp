@@ -72,8 +72,8 @@ void calibrations_reset();
 void calibrations_force_checkpoint();
 
 [[nodiscard]] inline auto sensors_guard() {
-    xSemaphoreTake(g_sensors_lock, portMAX_DELAY);
-    return ScopeGuard{[&] { xSemaphoreGive(g_sensors_lock); }};
+    xSemaphoreTakeRecursive(g_sensors_lock, portMAX_DELAY);
+    return ScopeGuard{[&] { xSemaphoreGiveRecursive(g_sensors_lock); }};
 }
 
 }  // namespace nevermore::sensors

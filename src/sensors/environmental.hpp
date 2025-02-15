@@ -15,7 +15,7 @@
 namespace nevermore::sensors {
 
 struct EnvironmentalFilter {
-    enum class Kind { Intake, Exhaust };
+    enum class Kind : uint8_t { Intake, Exhaust };
     Kind kind;
 
     EnvironmentalFilter(Kind kind) : kind(kind) {}
@@ -24,6 +24,10 @@ struct EnvironmentalFilter {
     // NOLINTNEXTLINE(readability-convert-member-functions-to-static)
     [[nodiscard]] auto guard() const {
         return sensors::sensors_guard();
+    }
+
+    [[nodiscard]] EnvironmentalFilter other() const {
+        return {kind == Kind::Intake ? Kind::Exhaust : Kind::Intake};
     }
 
     // The Right Thing(TM) would be to have refs to config/service-data.
