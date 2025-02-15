@@ -39,6 +39,12 @@ endif()
 FetchContent_MakeAvailable(freertos_kernel)
 include(cmake/FreeRTOS_Kernel_import.cmake)
 
+find_program(CCACHE_PROGRAM ccache)
+if(CCACHE_PROGRAM)
+  set(CMAKE_C_COMPILER_LAUNCHER "${CCACHE_PROGRAM}")
+  set(CMAKE_CXX_COMPILER_LAUNCHER "${CCACHE_PROGRAM}")
+endif()
+
 project(nevermore-controller C CXX ASM)
 
 # debug logging options
