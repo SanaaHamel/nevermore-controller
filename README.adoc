@@ -705,6 +705,12 @@ serial: <device path>
 # e.g. At 0.75, requesting 100% power will run the fan at 75% power.
 #fan_power_coefficient: 1
 
+# float \in [0, 1], seconds - How long to kick-start the fan at 100%
+# Fan control currently updates at 10 Hz. Consequently, values have an effective
+# granularity of 0.1s. This may change in the future.
+# In practice, simply set it to the desired delay; it'll be round up in the worst case.
+#fan_kick_start_time: 0.1
+
 
 # Fan Policy
 # Controls how/when the fan turns on automatically.

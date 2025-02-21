@@ -6,6 +6,9 @@
 #include "utility/fan_policy_thermal.hpp"
 #include "utility/servo.hpp"
 #include <array>
+#include <concepts>
+#include <limits>
+#include <type_traits>
 #include <utility>
 
 // Disables saving/loading settings from app storage. Useful for test builds.
@@ -90,6 +93,24 @@ struct [[gnu::packed]] FlagBitSet {
 };
 static_assert(sizeof(FlagBitSet) == 8);
 
+template <std::unsigned_integral Store, float Lo, float Hi>
+struct [[gnu::packed]] PeriodSecInverse {
+    static_assert(Lo < Hi);
+
+    PeriodSecInverse(float period)
+            : store(Store(
+                      std::numeric_limits<Store>::max() * std::clamp((period - Lo) / (Hi - Lo), 0.f, 1.f))) {}
+
+    [[nodiscard]] operator float() const {
+        return Lo + (Hi - Lo) * ((1.f / std::numeric_limits<Store>::max()) * store);
+    }
+
+    bool operator==(PeriodSecInverse const&) const = default;
+
+private:
+    Store store = 0;
+};
+
 // Layout **cannot** change. This would break back-compatibility.
 // Fields **can** be appended w/o bumping the header version.
 // Padding **must** be explicitly declared using `Padding<N>`.
@@ -117,6 +138,7 @@ struct [[gnu::packed]] SettingsV0 {
     ServoRange servo_vent;
     Padding<3> _1{};  // HACK: cannot remove, would screw with def-init of new members
     FlagBitSet flags;
+    PeriodSecInverse<uint8_t, 0.f, 1.f> fan_kickstart_sec = 0.1f;
 
     // replaces valid fields from RHS into self
     void merge_valid_fields(SettingsV0 const&);

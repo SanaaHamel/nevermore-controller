@@ -112,6 +112,7 @@ UUID_SERVICE_SERVO = UUID("8959bb3e-3063-4a46-9b9a-69fdbc327f1c")
 UUID_CHAR_GATT = short_uuid(0x2803)
 UUID_CHAR_PERCENT8 = short_uuid(0x2B04)
 UUID_CHAR_COUNT16 = short_uuid(0x2AEA)
+UUID_CHAR_TIMEMILLI24 = short_uuid(0x2B15)
 UUID_CHAR_TIMESEC16 = short_uuid(0x2B16)
 UUID_CHAR_SERIAL_NUMBER = short_uuid(0x2A25)
 UUID_CHAR_HARDWARE_REVISION = short_uuid(0x2A27)
@@ -578,6 +579,7 @@ class CommBindings:
             self.fan_power_auto,
             self.fan_power_coeff,
         ) = self.fan.many(UUID_CHAR_PERCENT8, 4, {P.WRITE})
+        self.fan_kick_start_time = self.fan(UUID_CHAR_TIMEMILLI24, {P.WRITE})
         self.ws2812_length = self.ws2812(UUID_CHAR_COUNT16, {P.WRITE})
         self.ws2812_update = self.ws2812(
             UUID_CHAR_WS2812_UPDATE, {P.WRITE_WITHOUT_RESPONSE}
@@ -669,6 +671,15 @@ class CmdFanPowerAuto(CommandSimplePercent):
 @cmd_simple(lambda x: x.fan_power_coeff)
 class CmdFanPowerCoeff(CommandSimplePercent):
     percent: float
+
+
+@cmd_simple(lambda x: x.fan_kick_start_time)
+class CmdFanKickStartTime(CommandSimple):
+    time_sec: float
+
+    @override
+    def params(self) -> bytes:
+        return BleAttrWriter().time_milli_24(self.time_sec * 1000).value
 
 
 @cmd_simple(lambda x: x.fan_thermal_limit)
@@ -1077,6 +1088,9 @@ class BleAttrWriter:
 
     def temperature(self, t: Optional[float]):
         return self._presentation_format(t, 2, 2, 0x8000, signed=True)
+
+    def time_milli_24(self, t: Optional[float]):
+        return self._presentation_format(t, 3, 3, 0xFFFFFF, signed=False)
 
     def percentage16_10(self, t: Optional[float]):
         return self._presentation_format(t, 2, 2, 0xFFFF, signed=False)
