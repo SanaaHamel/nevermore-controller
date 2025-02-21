@@ -10,7 +10,7 @@ using namespace std::literals::chrono_literals;
 
 // spec is slightly better: 0.6ms. Round up to keep `ms` units.
 constexpr auto SGP40_POWER_ON_DELAY = 1ms;
-constexpr auto SGP40_READ_DELAY = 320ms;
+constexpr auto SGP40_READ_DELAY = 30ms;
 
 std::unique_ptr<Sensor> sgp40(Pins::BusI2C const&);
 

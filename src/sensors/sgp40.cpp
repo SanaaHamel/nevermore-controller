@@ -88,7 +88,7 @@ struct SGP40 final : SensorPeriodicEnvI2C<Cmd, "SGP40", 0xFF> {
                 humidity_tick, crc8(humidity_tick, 0xFF), temperature_tick, crc8(temperature_tick, 0xFF)};
         if (!i2c.write(Cmd::SGP40_MEASURE, params)) return false;
 
-        task_delay<320ms>();
+        task_delay<30ms>();
         return true;
     }
 
