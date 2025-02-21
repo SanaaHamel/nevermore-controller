@@ -243,26 +243,26 @@ class Transport:
     class Attribute:
         @abstractmethod
         async def write(self, blob: bytes) -> None:
-            raise NotImplemented
+            raise NotImplementedError
 
         @abstractmethod
         async def read(self) -> bytes:
-            raise NotImplemented
+            raise NotImplementedError
 
         @abstractmethod
         def has_property(self, prop: CharacteristicProperty) -> bool:
-            raise NotImplemented
+            raise NotImplementedError
 
         @property
         @abstractmethod
         def handle(self) -> int:
-            raise NotImplemented
+            raise NotImplementedError
 
     class Service:
         # POST CONDITION: ordered by handle #
         @abstractmethod
         def all(self, uuid: Optional[UUID] = None) -> Iterable['Transport.Attribute']:
-            raise NotImplemented
+            raise NotImplementedError
 
         def many(
             self,
@@ -287,16 +287,16 @@ class Transport:
     # May only be used if this instance owns the underlying transport mechanism
     @abstractmethod
     async def close(self) -> None:
-        raise NotImplemented
+        raise NotImplementedError
 
     @property
     @abstractmethod
     def all(self) -> Iterable['Transport.Service']:
-        raise NotImplemented
+        raise NotImplementedError
 
     @abstractmethod
     def service(self, uuid: UUID) -> Service:
-        raise NotImplemented
+        raise NotImplementedError
 
     def __call__(
         self,
@@ -619,13 +619,13 @@ def _clamp(x: _Float, min: _Float, max: _Float) -> _Float:
 class Command:
     @abstractmethod
     async def dispatch(self, comm: CommBindings):
-        raise NotImplemented
+        raise NotImplementedError
 
 
 class CommandSimple(Command):
     @abstractmethod
     def params(self) -> bytes:
-        raise NotImplemented
+        raise NotImplementedError
 
 
 class CommandSimplePercent(CommandSimple):
