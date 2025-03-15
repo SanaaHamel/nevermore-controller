@@ -17,25 +17,26 @@ namespace nevermore {
 
 constexpr Pins PINS_DEFAULT{
         .i2c{
-                Pins::BusI2C{.kind = Pins::BusI2C::Kind::intake, .clock = 27, .data = 26},
-                Pins::BusI2C{.kind = Pins::BusI2C::Kind::exhaust, .clock = 29, .data = 28},
+                Pins::BusI2C{.kind = Pins::BusI2C::Kind::intake, .clock = 3, .data = 2},
+                Pins::BusI2C{.kind = Pins::BusI2C::Kind::exhaust, .clock = 5, .data = 4},
         },
 
         .spi{
-                Pins::BusSPI{.kind = Pins::BusSPI::Kind::display, .clock = 2, .send = 3, .recv = 4},
+                Pins::BusSPI{.kind = Pins::BusSPI::Kind::display, .clock = 22, .send = 19, .recv = 20},
         },
 
-        .fan_pwm = {15},
-        .fan_tachometer = {14},
+        .fan_pwm = {6},
+        .fan_tachometer = {7},
         .neopixel_data = {12},
-        .photocatalytic_pwm = {11},
+        .photocatalytic_pwm = 14,
         .vent_servo_pwm = 13,
+        .cooler_pwm = 15,
 
-        .display_command = 5,
-        .display_reset = 6,
-        .display_brightness_pwm = 7,
-        .touch_interrupt = 8,
-        .touch_reset = 9,
+        .display_command = 18,  // could put this on 21 (SPI CSn)
+        .display_reset = 23,
+        .display_brightness_pwm = 17,
+        .touch_interrupt = 24,
+        .touch_reset = 25,
 };
 
 constexpr std::initializer_list<GPIO> PINS_RESERVED_BOARD{PICO_DEFAULT_WS2812_PIN};
