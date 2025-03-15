@@ -6,8 +6,10 @@
 #include "utility/scope_guard.hpp"
 #include <cassert>
 #include <climits>
+#include <concepts>
 #include <cstdarg>
 #include <cstdio>
+#include <initializer_list>
 #include <optional>
 #include <type_traits>
 #include <utility>
@@ -36,6 +38,10 @@ constexpr bool i2c_address_reserved(uint8_t addr) {
     return masked == 0 || masked == MASK;
 }
 
+template <typename A>
+concept I2C_Data = std::is_standard_layout_v<A> && !std::is_pointer_v<A> && std::is_trivial_v<A>;
+static_assert(!I2C_Data<std::initializer_list<int>>);
+
 struct I2C_Bus {  // NOLINT(cppcoreguidelines-special-member-functions)
     I2C_Bus(SemaphoreHandle_t lock = xSemaphoreCreateMutex()) : lock(lock) {};
     I2C_Bus(I2C_Bus const&) = delete;
@@ -53,6 +59,10 @@ struct I2C_Bus {  // NOLINT(cppcoreguidelines-special-member-functions)
         auto _ = guard();
 #if NEVERMORE_I2C_DEBUG
         log_debug(name, addr, "writing len=%d", len);
+        printf("\t[ ");
+        for (unsigned i = 0; i < len; ++i)
+            printf("0x%02X, ", src[i]);
+        printf("]\n");
 #endif
         int r = write(addr, src, len);
         if (r < 0 || size_t(r) != len) {
@@ -78,33 +88,71 @@ struct I2C_Bus {  // NOLINT(cppcoreguidelines-special-member-functions)
         return true;
     }
 
-    template <typename A>
-    [[nodiscard]] bool write(char const* name, uint8_t addr, A const& blob)
-        requires(!std::is_pointer_v<A>)
-    {
+    [[nodiscard]] bool read(
+            char const* name, uint8_t addr, std::unsigned_integral auto reg, uint8_t* dst, size_t len) {
+        assert(len <= INT_MAX && "success unrepresentable");
+        auto _ = guard();
+#if NEVERMORE_I2C_DEBUG
+        log_debug(name, addr, "reading reg=0x%02x len=%d", reg, len);
+#endif
+        int r = write(addr, &reg, sizeof(reg), false);
+        if (r < 0 || size_t(r) != sizeof(reg)) {
+            log_error(name, addr, "read-write failed; reg=0x%02x len=%d result=%d", reg, sizeof(reg), r);
+            return false;
+        }
+
+        r = read(addr, dst, len);
+        if (r < 0 || size_t(r) != len) {
+            log_error(name, addr, "read failed; reg=0x%02x len=%d result=%d", reg, len, r);
+            return false;
+        }
+
+        return true;
+    }
+
+    template <I2C_Data A>
+    [[nodiscard]] bool write(char const* name, uint8_t addr, A const& blob) {
         return write(name, addr, reinterpret_cast<uint8_t const*>(&blob), sizeof(A));
     }
 
-    template <typename A>
-    [[nodiscard]] bool read(char const* name, uint8_t addr, A& blob)
-        requires(!std::is_pointer_v<A>)
-    {
+    template <I2C_Data A>
+    [[nodiscard]] bool read(char const* name, uint8_t addr, A& blob) {
         return read(name, addr, reinterpret_cast<uint8_t*>(&blob), sizeof(A));
     }
 
-    template <typename A>
-    [[nodiscard]] std::optional<A> read(char const* name, uint8_t addr)
-        requires(!std::is_pointer_v<A>)
-    {
+    template <I2C_Data A>
+    [[nodiscard]] bool read(char const* name, uint8_t addr, std::unsigned_integral auto reg, A& blob) {
+        return read(name, addr, reg, reinterpret_cast<uint8_t*>(&blob), sizeof(A));
+    }
+
+    template <I2C_Data A>
+    [[nodiscard]] std::optional<A> read(char const* name, uint8_t addr) {
         A result;
         if (!read(name, addr, result)) return {};
         return {std::move(result)};
     }
 
-    template <CRC8_t CRC_INIT, typename A>
+    template <I2C_Data A>
+    [[nodiscard]] std::optional<A> read(char const* name, uint8_t addr, std::unsigned_integral auto reg) {
+        A result;
+        if (!read(name, addr, reg, result)) return {};
+        return {std::move(result)};
+    }
+
+    template <CRC8_t CRC_INIT, I2C_Data A>
     [[nodiscard]] std::optional<A> read_crc(char const* name, uint8_t addr) {
         ResponseCRC<A, CRC_INIT> response;
         if (!read(name, addr, response)) return {};
+        if (!verify(name, addr, response)) return {};
+
+        // HACK: explicit copy to work around packed value ref issue
+        return A(response.data);
+    }
+
+    template <CRC8_t CRC_INIT, I2C_Data A>
+    [[nodiscard]] std::optional<A> read_crc(char const* name, uint8_t addr, std::unsigned_integral auto reg) {
+        ResponseCRC<A, CRC_INIT> response;
+        if (!read(name, addr, reg, response)) return {};
         if (!verify(name, addr, response)) return {};
 
         // HACK: explicit copy to work around packed value ref issue
@@ -148,9 +196,9 @@ struct I2C_Bus {  // NOLINT(cppcoreguidelines-special-member-functions)
 
 protected:
     // return # of bytes written, < 0 if error
-    [[nodiscard]] virtual int write(uint8_t addr, uint8_t const* src, size_t len) = 0;
+    [[nodiscard]] virtual int write(uint8_t addr, uint8_t const* src, size_t len, bool stop = true) = 0;
     // return # of bytes read, < 0 if error
-    [[nodiscard]] virtual int read(uint8_t addr, uint8_t* dst, size_t len) = 0;
+    [[nodiscard]] virtual int read(uint8_t addr, uint8_t* dst, size_t len, bool stop = true) = 0;
 
 private:
     SemaphoreHandle_t lock;

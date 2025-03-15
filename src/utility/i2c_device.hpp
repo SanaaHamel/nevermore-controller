@@ -4,6 +4,7 @@
 #include "sdk/task.hpp"
 #include "utility/crc.hpp"
 #include "utility/template_string_literal.hpp"
+#include <concepts>
 #include <cstdarg>
 #include <cstdint>
 #include <cstring>
@@ -27,55 +28,73 @@ struct I2CDevice {
     I2C_Bus& bus;  // NOLINT(cppcoreguidelines-avoid-const-or-ref-data-members)
     uint8_t address;
 
-    [[nodiscard]] bool write(uint8_t reg, uint8_t const* data, size_t len) const {
-        uint8_t cmd[len + 1];
-        cmd[0] = reg;
-        memcpy(cmd + 1, data, len);  // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+    [[nodiscard]] bool write(std::unsigned_integral auto reg, uint8_t const* data, size_t len) const {
+        uint8_t cmd[sizeof(reg) + len];
+        memcpy(cmd, &reg, sizeof(reg));
+        memcpy(cmd + sizeof(reg), data, len);  // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
         return bus.write(name, address, cmd, sizeof(cmd));
     }
 
-    template <typename A>
+    [[nodiscard]] bool read(std::unsigned_integral auto reg, uint8_t* dest, size_t len) const {
+        return bus.read(name, address, reg, dest, len);
+    }
+
+    template <I2C_Data A>
+    [[nodiscard]] bool write(Register reg, std::span<A const> xs) const {
+        uint8_t cmd[sizeof(reg) + xs.size_bytes()];
+        memcpy(cmd, &reg, sizeof(reg));
+        memcpy(cmd + sizeof(reg), &*xs.begin(), xs.size_bytes());
+        return bus.write(name, address, cmd, sizeof(cmd));
+    }
+
+    template <I2C_Data A>
     [[nodiscard]] bool write(Register reg, A value) const {
         uint8_t cmd[sizeof(reg) + sizeof(value)];
         memcpy(cmd, &reg, sizeof(reg));
         memcpy(cmd + sizeof(reg), &value, sizeof(value));
-        return bus.write(name, address, cmd);
+        return bus.write(name, address, cmd, sizeof(cmd));
     }
 
     [[nodiscard]] bool touch(Register reg) const {
         return bus.write(name, address, reg);
     }
 
-    [[nodiscard]] bool read(uint8_t reg, uint8_t* dest, size_t len) const {
-        return bus.write(name, address, reg) && bus.read(name, address, dest, len);
-    }
-
-    template <typename A>
+    template <I2C_Data A>
     std::optional<A> read() const {
         A value;
         if (!bus.read(name, address, value)) return {};
         return value;
     }
 
-    template <typename A>
+    template <I2C_Data A>
     std::optional<A> read_crc() const {
         return bus.read_crc<CRC_Init, A>(name, address);
     }
 
-    template <typename A, TaskDelayArg delay = {}>
+    template <I2C_Data A, TaskDelayArg delay = {}>
     std::optional<A> read(Register reg) const {
-        if (!touch(reg)) return {};
+        if constexpr (delay.us == 0) {
+            A value;
+            if (!bus.read(name, address, std::to_underlying(reg), value)) return {};
+            return value;
+        } else {
+            if (!touch(reg)) return {};
 
-        task_delay<delay>();
-        return read<A>();
+            task_delay<delay>();
+            return read<A>();
+        }
     }
 
-    template <typename A, TaskDelayArg delay = {}>
+    template <I2C_Data A, TaskDelayArg delay = {}>
     std::optional<A> read_crc(Register reg) const {
-        if (!touch(reg)) return {};
+        if constexpr (delay.us == 0) {
+            return bus.read_crc<CRC_Init, A>(name, address, std::to_underlying(reg));
+        } else {
+            if (!touch(reg)) return {};
 
-        task_delay<delay>();
-        return read_crc<A>();
+            task_delay<delay>();
+            return read_crc<A>();
+        }
     }
 
     template <typename A>

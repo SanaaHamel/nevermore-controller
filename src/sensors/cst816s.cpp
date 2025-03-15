@@ -94,8 +94,7 @@ enum class Cmd : uint8_t {
 
 template <typename A = uint8_t>
 optional<A> reg_read(I2C_Bus& bus, Cmd const cmd, bool nostop = false) {
-    if (!bus.write("CST816S", ADDRESS, cmd)) return {};
-    return bus.read<A>("CST816S", ADDRESS);
+    return bus.read<A>("CST816S", ADDRESS, to_underlying(cmd));
 }
 
 bool reg_write(I2C_Bus& bus, Cmd const cmd, uint8_t value) {

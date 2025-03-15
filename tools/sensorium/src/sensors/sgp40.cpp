@@ -1,7 +1,6 @@
 #include "sgp40.hpp"
 #include "config.hpp"
 #include "utility/numeric_suffixes.hpp"
-#include "utility/packed_tuple.hpp"
 #include <bit>
 #include <cstdint>
 
@@ -35,6 +34,13 @@ static_assert(to_tick(25, -45, 130) == 0x6666, "temperature check");
 struct SGP40 final : SensorI2C<Cmd, "SGP40", 0xFF> {
     using SensorI2C::SensorI2C;
 
+    struct [[gnu::packed]] MeasureParams {
+        uint16_t humidity;
+        uint8_t crc0;
+        uint16_t temperature;
+        uint8_t crc1;
+    };
+
     bool setup() {
         if (!i2c.touch(Cmd::SGP4x_HEATER_OFF)) return false;
 
@@ -56,8 +62,12 @@ struct SGP40 final : SensorI2C<Cmd, "SGP40", 0xFF> {
     [[nodiscard]] bool measure(float temperature, float humidity) const {
         uint16_t temperature_tick = byteswap(to_tick(temperature, -45, 130));
         uint16_t humidity_tick = byteswap(to_tick(humidity, 0, 100));
-        PackedTuple params{
-                humidity_tick, crc8(humidity_tick, 0xFF), temperature_tick, crc8(temperature_tick, 0xFF)};
+        MeasureParams params{
+                .humidity = humidity_tick,
+                .crc0 = crc8(humidity_tick, 0xFF),
+                .temperature = temperature_tick,
+                .crc1 = crc8(temperature_tick, 0xFF),
+        };
         return i2c.write(Cmd::SGP40_MEASURE, params);
     }
 };

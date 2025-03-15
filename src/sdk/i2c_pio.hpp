@@ -14,8 +14,8 @@ struct I2C_PIO final : I2C_Bus {  // NOLINT(cppcoreguidelines-special-member-fun
     [[nodiscard]] char const* name() const override;
 
 protected:
-    [[nodiscard]] int write(uint8_t addr, uint8_t const* src, size_t len) override;
-    [[nodiscard]] int read(uint8_t addr, uint8_t* dst, size_t len) override;
+    [[nodiscard]] int write(uint8_t addr, uint8_t const* src, size_t len, bool stop) override;
+    [[nodiscard]] int read(uint8_t addr, uint8_t* dst, size_t len, bool stop) override;
 
 private:
     PIO pio;

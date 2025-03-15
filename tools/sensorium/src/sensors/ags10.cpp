@@ -1,7 +1,6 @@
 #include "config.hpp"
 #include "sgp40.hpp"
 #include "utility/numeric_suffixes.hpp"
-#include "utility/packed_tuple.hpp"
 #include <bit>
 #include <cstdint>
 
