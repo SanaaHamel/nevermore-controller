@@ -10,6 +10,7 @@
 #include <cassert>
 #include <compare>
 #include <cstdint>
+#include <initializer_list>
 #include <optional>
 #include <span>
 
@@ -162,8 +163,9 @@ struct [[gnu::packed]] Pins {
     GPIOs neopixel_data{};   // reserve space, but disallow multiple pins
     GPIO photocatalytic_pwm;
     GPIO vent_servo_pwm;
+    GPIO cooler_pwm;
     // photocatalytic used to allow multiple pins, but that's excessively wasteful.
-    std::array<uint8_t, 6> unused_spare_space_2{};
+    std::array<uint8_t, 5> unused_spare_space_2{};
 
     GPIO display_command;
     GPIO display_reset;
@@ -188,8 +190,12 @@ struct [[gnu::packed]] Pins {
                 go_outer(xs, allow_sharing);
         };
         go(fan_pwm, true);
-        go(photocatalytic_pwm);
         go(vent_servo_pwm);
+        // PC and cooler can share same PWM b/c we're just varying the duty %.
+        // Frequency can be the same for both.
+        // FUTURE WORK: The same can be true for other PWMs except servo,
+        //              which has timing limitations.
+        go(std::initializer_list{photocatalytic_pwm, cooler_pwm}, true);
         go(display_brightness_pwm);
     }
 
@@ -217,6 +223,7 @@ struct [[gnu::packed]] Pins {
         if (!apply(neopixel_data)) return false;
         if (!apply(photocatalytic_pwm)) return false;
         if (!apply(vent_servo_pwm)) return false;
+        if (!apply(cooler_pwm)) return false;
 
         if (!apply(display_brightness_pwm)) return false;
         if (!apply(display_command)) return false;
