@@ -747,6 +747,15 @@ serial: <device path>
 #fan_thermal_limit_coefficient: 0
 
 
+# Print-Mode Policy
+
+# float, Celsius, minimum target bed temperature for print-mode to engage
+# Useful if you sometimes use PLA w/ the enclosure open and you don't want it
+# turning on print mode.
+# (Or avoiding the fan turning on when doing nozzle changes.)
+# print_mode_min_bed_target:
+
+
 # Sensor Settings
 
 # voc index \in [175, 500], threshold where the system stops adjusting the

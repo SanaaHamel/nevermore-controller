@@ -824,6 +824,11 @@ class Nevermore:
                 "`fan_thermal_limit_temperature_min` must <= `fan_thermal_limit_temperature_max`"
             )
 
+        self._printing = False
+        self._print_mode_min_bed_target = config.getfloat(
+            "print_mode_min_bed_target", default=float('-inf')
+        )
+
         self._display_brightness = opt(
             CmdDisplayBrightness,
             config.getfloat("display_brightness", default=None, minval=0, maxval=1),
@@ -944,13 +949,18 @@ class Nevermore:
         self._interface.send_command(self._vent_servo_range)
 
         # ensure controller suspends calibration if we reconnection mid-print
-        self.send_printing_state_commands(
-            NevermoreGlobal.get_or_create(self.printer).printing
-        )
+        self.send_printing_state_commands(self._printing)
 
     def send_printing_state_commands(self, printing: bool):
         self.set_fan_power(1 if printing else None)
         self.cmd_NEVERMORE_VOC_CALIBRATION(not printing)
+
+    def printing_state_update(self, hotends_active: bool):
+        bed: Heater = self.printer.lookup_object('heaters').lookup_heater("heater_bed")
+        printing = hotends_active and self._print_mode_min_bed_target <= bed.target_temp
+        if self._printing != printing:
+            self._printing = printing
+            self.send_printing_state_commands(printing)
 
     def _handle_shutdown(self):
         self.send_printing_state_commands(False)  # release fan control & calibration
@@ -1242,12 +1252,9 @@ class NevermoreGlobal:
         ]
 
     def _check_heaters(self, eventtime: float) -> float:
-        printing = any(heater.target_temp for heater in self._heaters)
-        if self.printing != printing:
-            self.printing = printing
-
-            for _, nevermore in self.nevermores():
-                nevermore.send_printing_state_commands(printing)
+        hotends_active = any(heater.target_temp for heater in self._heaters)
+        for _, nevermore in self.nevermores():
+            nevermore.printing_state_update(hotends_active)
 
         return eventtime + CONTROLLER_REFRESH_DELAY
 
