@@ -76,7 +76,7 @@ optional<bool> vbus_powered() {
     return cyw43_arch_gpio_get(CYW43_WL_GPIO_VBUS_PIN);
 #elif defined(PICO_VBUS_PIN)
     gpio_set_function(PICO_VBUS_PIN, GPIO_FUNC_SIO);
-    gpio_set_dir(pin, false);
+    gpio_set_dir(PICO_VBUS_PIN, false);
     return gpio_get(PICO_VBUS_PIN);
 #else
     return {};  // don't know
