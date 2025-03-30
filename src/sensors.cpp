@@ -16,6 +16,7 @@
 #include "sensors/sgp30.hpp"
 #include "sensors/sgp40.hpp"
 #include "sensors/sht4x.hpp"
+#include "sensors/zmod4410.hpp"
 #include <algorithm>
 #include <cstdio>
 #include <set>
@@ -42,6 +43,7 @@ constexpr auto SENSOR_POWER_ON_DELAY = max({
         SGP30_POWER_ON_DELAY,
         SGP40_POWER_ON_DELAY,
         SHT4x_POWER_ON_DELAY,
+        ZMOD4410_POWER_ON_DELAY,
 });
 
 using VecSensors = vector<unique_ptr<Sensor>>;
@@ -98,6 +100,7 @@ bool sensors_init_bus(I2C_Bus& bus, optional<EnvironmentalFilter::Kind> state) {
         add_env(sgp30);
         add_env(sgp40);
         add_env(sht4x);
+        add_env(zmod4410);
     }
 
     return found_anything;
