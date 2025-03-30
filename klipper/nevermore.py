@@ -1146,6 +1146,7 @@ class NevermoreSensor:
 
 
 class NevermoreGlobal:
+    cmd_NEVERMORE_TEMPERATURE_WAIT_help = "Waits until temperature sensors reach specified threshold. Use *after* bed reaches target temperature. See docs for details."
     EXTRUDER_HEATER_REGEX = re.compile(r"extruder\d*")
 
     @staticmethod
@@ -1167,6 +1168,12 @@ class NevermoreGlobal:
         reactor = printer.get_reactor()
         gcode: GCodeDispatch = printer.lookup_object("gcode")
 
+        gcode.register_command(
+            "NEVERMORE_TEMPERATURE_WAIT",
+            self.cmd_NEVERMORE_TEMPERATURE_WAIT,
+            desc=self.cmd_NEVERMORE_TEMPERATURE_WAIT_help,
+        )
+
         for cmd, desc in Nevermore.gcode_command_names():
             # python is ugly and stupid and does dynamic capture of values.
             def go(gcmd: GCodeCommand, cmd: str = cmd):
@@ -1177,6 +1184,54 @@ class NevermoreGlobal:
 
         printer.register_event_handler("klippy:ready", self._handle_ready)
         reactor.register_timer(self._check_heaters, reactor.NOW)
+
+    def cmd_NEVERMORE_TEMPERATURE_WAIT(self, gcmd: GCodeCommand) -> None:
+        min_temp: float = gcmd.get_float('MINIMUM', default=float('-inf'))
+        max_temp: float = gcmd.get_float(
+            'MAXIMUM', default=float('inf'), above=min_temp
+        )
+        unavailable_timeout: float = gcmd.get_float(
+            "UNAVAILABLE_TIMEOUT", default=float('inf'), minval=0.0
+        )
+
+        nevermores = self.nevermores()
+        if not nevermores:
+            raise gcmd.error("no Nevermores declared; requires 1 <= nevermores")
+
+        # None IFF any unavailable.
+        def reached_target() -> Optional[bool]:
+            for _, nevermore in nevermores:
+                if nevermore._interface is None or not nevermore._interface.connected:
+                    return None
+
+                temp = (
+                    nevermore.state.intake.temperature
+                    if nevermore.state.intake.temperature is not None
+                    else nevermore.state.exhaust.temperature
+                )
+                if temp is None:
+                    return None
+                if not (min_temp <= temp <= max_temp):
+                    return False
+
+            return True
+
+        toolhead = self.printer.lookup_object("toolhead")
+        reactor = self.printer.get_reactor()
+        t_bgn = reactor.monotonic()
+        t_now = t_bgn
+
+        while not self.printer.is_shutdown():
+            if status := reached_target():
+                break  # all ready
+
+            t_elapsed = t_now - t_bgn
+            if status is None and unavailable_timeout <= t_elapsed:
+                break  # timed out
+
+            # IDK why `TEMPERATURE_WAIT` calls `get_last_move_time`, but there are side-effects
+            toolhead.get_last_move_time()
+            t_now = reactor.pause(t_now + 1.0)
 
     def _handle_ready(self) -> None:
         heaters = self.printer.lookup_object('heaters')

@@ -135,6 +135,10 @@ mcu 'mcu': Starting CAN connect
 ... BLAH
 ```
 
+. [Optional] Add support for chamber temperature waiting.
+.. Add xref:NEVERMORE_TEMPERATURE_WAIT[`NEVERMORE_TEMPERATURE_WAIT`] to your `PRINT_START` macro. xref:NEVERMORE_TEMPERATURE_WAIT_EXAMPLE[(See here for example.)]
+.. Update slicer profiles' `PRINT_START` to use the new 'CHAMBER' parameter.
+
 . **Calibrate the sensors.** xref:doc/voc.adoc#baseline-calibration[See the calibration section in the VOC Guide.]
 
 . You can apply updates the controller without removing it from the filter. xref:guide-updating[See the Updating Guide.]
@@ -583,6 +587,10 @@ This example configuration is intended for quickly getting up and running. You c
 Check out the full documentation section (just after this) after you've tested everything works with the minimal configuration; there are many useful options for customisation.
 
 ```ini
+# This minimal config is *MINIMAL*.
+# There are many extra features that might be worth checking out!
+# (e.g. chamber temperature waiting)
+
 [nevermore]
 # If you're using USB instead of BT, uncomment and specify the correct serial device.
 # WARNING: Make sure it's the `-if02` interface, not `-if00`.
@@ -885,6 +893,56 @@ The following command can be used to influence behaviour at runtime.
 
 These typically have an optional `NEVERMORE=` parameter to specify which Nevermore to interact with.
 If no `NEVERMORE=` argument is provided then the command will apply to all Nevermores.
+
+[#NEVERMORE_TEMPERATURE_WAIT]
+==== NEVERMORE_TEMPERATURE_WAIT
+
+Command:
+```
+NEVERMORE_TEMPERATURE_WAIT [MINIMUM=<celsius>] [MAXIMUM=<celsius>] [UNAVAILABLE_TIMEOUT=<seconds, inf>]
+```
+
+Waits until either:
+
+* All Nevermores are 'available' and their temperatures are within the range `[MINIMUM, MAXIMUM]`.
++
+Intake temperature is used when available, otherwise exhaust is used.
+
+* There exists an 'unavailable' Nevermore and `UNAVAILABLE_TIMEOUT` seconds have elapsed.
+
+A Nevermore is considered 'available' IFF it is connected and it has 1+ operating temperature sensors.
+
+This command requires at least 1 Nevermore defined.
+
+Suggested use: Wait for chamber temperature to reach target in `PRINT_START`.
+
+[#NEVERMORE_TEMPERATURE_WAIT_EXAMPLE]
+===== Example Setup
+
+Rough sketch of a `PRINT_START` macro with chamber temperatures.
+
+```
+[gcode_macro PRINT_START]
+#   Use PRINT_START for the slicer starting script - please customise for your slicer of choice
+gcode:
+    # Parameters
+    {% set TEMP_BED       = params.BED      |float %}
+    {% set TEMP_EXTRUDER  = params.EXTRUDER |float %}
+    # default to 30c if parameter isn't specified
+    {% set TEMP_CHAMBER   = params.CHAMBER  |default(30)|float %}
+
+    ... # existing code
+
+    # wait for bed to reach target temperature
+    M190 S{TEMP_BED}
+    # once the bed reached target, wait for the chamber to reach target
+    # (if a nevermore is still unavailable after 10+ min then stop waiting, hopefully the chamber reached target)
+    NEVERMORE_TEMPERATURE_WAIT MINIMUM={TEMP_CHAMBER} UNAVAILABLE_TIMEOUT=600
+    # wait 30s for things to stabilise
+    G4 P30000
+
+    ... # rest of existing code
+```
 
 
 ==== NEVERMORE_VENT_SERVO_SET
