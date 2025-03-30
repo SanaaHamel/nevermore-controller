@@ -851,6 +851,13 @@ def is_lost_connection_exception(e: Exception, is_connecting: bool = False) -> b
         if "device disconnected" in msg:
             return True
 
+    if isinstance(e, KeyError):
+        # HACK: bleak is a pile of shit and will occasionally seem to index a
+        #       path that isn't in one of its dicts.
+        #       e.g. '/org/bluez/hci0/dev_28_CD_C1_0B_7B_64/service0082'
+        if "/org/bluez/hci" in str(e).lower():
+            return True
+
     return False
 
 
