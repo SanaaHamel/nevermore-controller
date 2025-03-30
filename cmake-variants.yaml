@@ -20,6 +20,13 @@ board:
         PICO_BOARD: fysetc_rp2040_touch_v1
         NEVERMORE_BOARD: fysetc-rp2040-touch-v1
         NEVERMORE_PICO_W_BT: "false"
+    pico:
+      short: Pico
+      long: Pico
+      settings:
+        PICO_BOARD: pico
+        NEVERMORE_BOARD: pico
+        NEVERMORE_PICO_W_BT: "false"
     pico_w:
       short: Pico W
       long: Pico W
