@@ -8,7 +8,7 @@ namespace nevermore {
 enum class SPI_Pin : uint8_t { RECV = 0, SELECT = 1, CLOCK = 2, SEND = 3 };
 
 constexpr uint8_t spi_gpio_bus_num(uint8_t pin) {
-    return pin / 8;
+    return (pin / 8) & 1u;
 }
 
 constexpr SPI_Pin spi_gpio_kind(uint8_t pin) {
