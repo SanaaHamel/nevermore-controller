@@ -204,6 +204,11 @@ from collections import namedtuple
 import machine
 from machine import Pin
 
+try:
+    from typing import *
+except:
+    pass
+
 
 R_ProductID = 0x00  # u2 BE
 # !!!!!! HOLE [0x2, 0x20)  30 octets
