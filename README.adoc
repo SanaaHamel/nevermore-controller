@@ -608,6 +608,11 @@ led_chain_count: 16
 # (e.g. See `fan_power_automatic` if you'd prefer very quiet background filtering.)
 fan_power_coefficient: 0.8  # lower max power to keep things much more quiet
 
+# If the fan isn't a DELTA BFB0712HF (StealthMax BOM), you'll probably want to add
+#   fan_power_minimum: ???
+#   fan_power_kick_start_minimum: ???
+# See full-doc for details and some common values.
+
 # Optional
 # This 'temperature' sensor only serves to draw the intake VOC index on
 # Mainsail/Fluidd's temperature plot.
@@ -714,11 +719,31 @@ serial: <device path>
 # e.g. At 0.75, requesting 100% power will run the fan at 75% power.
 #fan_power_coefficient: 1
 
+# float \in [0, 1] - Absolute minimum power required to keep the fan spinning once kick-started.
+# This will vary by fan model, and possibly by fan instance.
+# This is an absolute power value; it is not scaled by any factor. (e.g. thermal limit, coefficient, etc)
+# Values for commonly used fan models:
+# |===
+# | Fan Model         | Suggested Value |
+# | DELTA BFB0712HF   |           0.175 |
+# |===
+#fan_power_minimum: 0.175
+
+# float \in [0, 1] - Absolute minimum power required to kick-start the fan.
+# This will vary by fan model, and possibly by fan instance.
+# This is an absolute power value; it is not scaled by any factor. (e.g. thermal limit, coefficient, etc)
+# Values for commonly used fan models:
+# |===
+# | Fan Model         | Suggested Value |
+# | DELTA BFB0712HF   |            0.18 |
+# |===
+#fan_power_kick_start_minimum: 0.18
+
 # float \in [0, 1], seconds - How long to kick-start the fan at 100%
 # Fan control currently updates at 10 Hz. Consequently, values have an effective
 # granularity of 0.1s. This may change in the future.
 # In practice, simply set it to the desired delay; it'll be round up in the worst case.
-#fan_kick_start_time: 0.1
+#fan_kick_start_time: 0.5
 
 
 # Fan Policy

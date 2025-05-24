@@ -585,7 +585,9 @@ class CommBindings:
             self.fan_power_passive,
             self.fan_power_auto,
             self.fan_power_coeff,
-        ) = self.fan.many(UUID_CHAR_PERCENT8, 4, {P.WRITE})
+            self.fan_power_min,
+            self.fan_power_kick_start_min,
+        ) = self.fan.many(UUID_CHAR_PERCENT8, 6, {P.WRITE})
         self.fan_kick_start_time = self.fan(UUID_CHAR_TIMEMILLI24, {P.WRITE})
         self.ws2812_length = self.ws2812(UUID_CHAR_COUNT16, {P.WRITE})
         self.ws2812_update = self.ws2812(
@@ -678,6 +680,16 @@ class CmdFanPowerAuto(CommandSimplePercent):
 
 @cmd_simple(lambda x: x.fan_power_coeff)
 class CmdFanPowerCoeff(CommandSimplePercent):
+    percent: float
+
+
+@cmd_simple(lambda x: x.fan_power_min)
+class CmdFanPowerMin(CommandSimplePercent):
+    percent: float
+
+
+@cmd_simple(lambda x: x.fan_power_kick_start_min)
+class CmdFanPowerKickStartMin(CommandSimplePercent):
     percent: float
 
 

@@ -51,6 +51,11 @@ struct Tachometer final : SensorPeriodic {
         return revolutions_per_second_;
     }
 
+    // `available()` IFF this tacho ever detected a pulse, indicating a tachometer is indeed available
+    [[nodiscard]] bool available() const {
+        return available_;
+    }
+
     [[nodiscard]] char const* name() const override {
         return "Tachometer";
     }
@@ -69,6 +74,7 @@ protected:
                 std::chrono::duration_cast<std::chrono::duration<float, std::ratio<1>>>(end - begin);
         // NOLINTNEXTLINE(bugprone-narrowing-conversions, cppcoreguidelines-narrowing-conversions)
         revolutions_per_second_ = pulses / duration_sec.count() / pulses_per_revolution;
+        available_ |= 0 < pulses;
 
         // printf("tachometer_measure dur=%f s cnt=%u rev-per-sec=%f rpm=%f\n", duration_sec.count(),
         //         unsigned(pulses), revolutions_per_second_, revolutions_per_second_ * 60);
@@ -127,6 +133,7 @@ private:
     std::array<ConsensusSet, Pins::ALTERNATIVES_MAX> denoise{};
     uint32_t pulses_per_revolution = 1;
     float revolutions_per_second_ = 0;
+    bool available_ = false;  // ever saw 1+ pulses during a sensor read (implies tachometer is available)
 
     static constexpr auto DENOISE_ALL = std::numeric_limits<ConsensusSet>::max();
 };

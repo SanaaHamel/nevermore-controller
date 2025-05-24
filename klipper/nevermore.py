@@ -780,8 +780,10 @@ class Nevermore:
         def opt(mk: Callable[[_A], _B], x: Optional[_A]):
             return mk(x) if x is not None else None
 
-        def cfg_fan_power(mk: Callable[[float], CommandSimplePercent], name: str):
-            return opt(mk, config.getfloat(name, default=None, minval=0, maxval=1))
+        def cfg_fan_power(
+            mk: Callable[[float], CommandSimplePercent], name: str, minval: float = 0
+        ):
+            return opt(mk, config.getfloat(name, default=None, minval=minval, maxval=1))
 
         self._voc_gating_threshold = opt(
             CmdConfigVocThreshold,
@@ -801,6 +803,12 @@ class Nevermore:
         self._fan_power_passive = cfg_fan_power(CmdFanPowerPassive, "fan_power_passive")
         self._fan_power_auto = cfg_fan_power(CmdFanPowerAuto, "fan_power_automatic")
         self._fan_power_coeff = cfg_fan_power(CmdFanPowerCoeff, "fan_power_coefficient")
+        self._fan_power_min = cfg_fan_power(CmdFanPowerMin, "fan_power_minimum")
+        self._fan_power_kick_start_min = cfg_fan_power(
+            CmdFanPowerKickStartMin,
+            "fan_power_kick_start_minimum",
+            minval=self._fan_power_min.percent or 0 if self._fan_power_min else 0,
+        )
         self._fan_kick_start_time = opt(
             CmdFanKickStartTime,
             config.getfloat("fan_kick_start_time", default=None, minval=0, maxval=1),
@@ -940,6 +948,8 @@ class Nevermore:
         self._interface.send_command(self._fan_power_passive)
         self._interface.send_command(self._fan_power_auto)
         self._interface.send_command(self._fan_power_coeff)
+        self._interface.send_command(self._fan_power_min)
+        self._interface.send_command(self._fan_power_kick_start_min)
         self._interface.send_command(self._fan_kick_start_time)
         self._interface.send_command(self._fan_thermal_limit)
         self._interface.send_command(self._display_brightness)

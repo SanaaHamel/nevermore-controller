@@ -138,7 +138,9 @@ struct [[gnu::packed]] SettingsV0 {
     ServoRange servo_vent;
     Padding<3> _1{};  // HACK: cannot remove, would screw with def-init of new members
     FlagBitSet flags;
-    PeriodSecInverse<uint8_t, 0.f, 1.f> fan_kickstart_sec = 0.1f;
+    PeriodSecInverse<uint8_t, 0.f, 1.f> fan_kick_start_sec = 0.5f;
+    BLE::Percentage8 fan_power_min = 17.5;           // Delta BFB0712HF
+    BLE::Percentage8 fan_power_kick_start_min = 18;  // Delta BFB0712HF
 
     // replaces valid fields from RHS into self
     void merge_valid_fields(SettingsV0 const&);
