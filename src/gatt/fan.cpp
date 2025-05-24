@@ -195,7 +195,12 @@ bool init() {
         // * need to refresh to account for thermal throttling policy
         // * automatic PID needs to be kept up to date for when we disengage
         auto perc = ({
-            auto _ = sensors::sensors_guard();
+            // HACK: FIXME: The fan control timer has been observed to stall.
+            //              (Presumably this means all timers stall, but I haven't been able to confirm.)
+            //              I've  had no luck reproducing this w/ debugger.
+            //              For now, disable the guard. This'll allow read races,
+            //              but those should be benign.
+            // auto _ = sensors::sensors_guard();
             g_instance(sensors::g_sensors);
         });
 
