@@ -378,8 +378,8 @@ def status_pprint(status: int):
     return f"Last Step: {status & Status_LastSeqStepMask:2} {', '.join(k for k, mask in FLAGS.items() if status & mask)}"
 
 
-def delay_pprint(delay: int):
-    assert 0 <= delay <= 0xFFFF
+def delay_pprint(delay: int, check_range: bool = True):
+    assert not check_range or 0 <= delay <= 0xFFFF
     return f'{round(delay * 0.2, 2):7.1f}ms'
 
 
@@ -503,7 +503,9 @@ class CmdCfg:
                 heat += f' {dev_config.heater_value(h):4}'
             return f"heat {heat}   {delay_pprint(delay[cmd.d_idx])}    {measure_pprint(self.measure[cmd.m_idx])}{unk}{stop}"
 
-        return '\n'.join(pprint(cmd) for cmd in SeqCmd.from_bytes(self))
+        total = sum(delay[cmd.d_idx] for cmd in SeqCmd.from_bytes(self))
+        steps = '\n'.join(pprint(cmd) for cmd in SeqCmd.from_bytes(self))
+        return steps + "\n" + (" " * 23 + delay_pprint(total, check_range=False))
 
 
 def validate_all(fn, suppress=False):
