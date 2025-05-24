@@ -38,9 +38,16 @@ from bleak.backends.service import BleakGATTService
 from typing_extensions import override
 
 if typing.TYPE_CHECKING:
+    from typing import dataclass_transform
+
     LoggerAdapter = logging.LoggerAdapter[logging.Logger]
 else:
     LoggerAdapter = logging.LoggerAdapter
+
+    # `dataclass_transform` added in py 3.11
+    def dataclass_transform(*x, **xs):
+        return lambda x: x
+
 
 _A = TypeVar("_A")
 _Float = TypeVar("_Float", bound=float)
@@ -642,6 +649,7 @@ class CommandSimplePercent(CommandSimple):
         return int(p * 2).to_bytes(1, "little")
 
 
+@dataclass_transform(frozen_default=True)
 def cmd_simple(dispatcher: Callable[[CommBindings], Transport.Attribute]):
     def wrap(cls: Type[CommandSimple]):
         class Derived(dataclass(frozen=True)(cls)):
