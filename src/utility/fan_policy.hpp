@@ -2,6 +2,7 @@
 
 #include "sdk/ble_data_types.hpp"
 #include "sensors.hpp"
+#include "utility/pid.hpp"
 #include <chrono>
 
 namespace nevermore {
@@ -24,9 +25,12 @@ struct [[gnu::packed]] FanPolicyEnvironmental {
 
     struct Instance {
         using Clock = std::chrono::steady_clock;
+        using PID = nevermore::PID<float>;
 
         FanPolicyEnvironmental const& params;  // NOLINT(cppcoreguidelines-avoid-const-or-ref-data-members)
+        Clock::time_point last_update = Clock::time_point::min();
         Clock::time_point last_filter = Clock::time_point::min();
+        PID::State<-1.f, 0.f> controller;
 
         // Stateful.
         // Returns fan power [0, 1] based on env state and policy parameters.

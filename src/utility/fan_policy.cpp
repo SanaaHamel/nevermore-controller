@@ -13,18 +13,14 @@ namespace nevermore {
 
 namespace {
 
+using PID = FanPolicyEnvironmental::Instance::PID;
+
 // configurable
-constexpr float FILTER_POWER_MINIMUM = 0.1f;
-constexpr float PROPORTIONAL_CONTROL_STDDEV = 1.5;  // max @ this many stddev away from passive-max threshold
+constexpr float FILTER_POWER_MINIMUM = 0.2f;
+constexpr auto FAN_PID = PID::mk(0.01f, PID::Sec(60), PID::Sec(0.1));
 
 // non-configurable
-constexpr float VOC_MAX = 500;
 constexpr float VOC_NOMINAL_MAX = 200;
-constexpr float VOC_1_5_ABOVE_NOMINAL_MAX = 300;
-// HACK: [100, 440] VOC index range is almost linear, no need to sigmoid^-1.
-//       We'll cheat and assume the rest is linear too.
-constexpr float PROPORTIONAL_CONTROL_IN_VOC =
-        PROPORTIONAL_CONTROL_STDDEV * (VOC_1_5_ABOVE_NOMINAL_MAX - VOC_NOMINAL_MAX);
 
 constexpr bool policy_voc_too_high(VOCIndex voc_passive_max, VOCIndex intake, VOCIndex exhaust) {
     return voc_passive_max <= max(intake.value_or(0), exhaust.value_or(0));
@@ -60,19 +56,21 @@ constexpr PolicyState evaluate(FanPolicyEnvironmental::Instance const& instance,
 
 float FanPolicyEnvironmental::Instance::operator()(
         nevermore::sensors::Sensors const& state, Clock::time_point now) {
+    auto const dt = now - last_update;
+    last_update = now;
+
+    // HACK: [100, 440] VOC index range is almost linear, no need to sigmoid^-1.
+    //       We'll cheat and assume the rest is linear too.
+    auto const voc_curr = float(max(state.voc_index_intake.value_or(0), state.voc_index_exhaust.value_or(0)));
+    auto const voc_limit = max(VOC_NOMINAL_MAX, float(params.voc_passive_max.value_or(0)));
+    auto const fan_power = -controller.update(FAN_PID, dt, voc_curr, voc_limit);
+
     switch (evaluate(*this, state, now)) {
     case Idle: return 0;
-    case Cooldown: return FILTER_POWER_MINIMUM;
+    case Cooldown: return max(FILTER_POWER_MINIMUM, fan_power);
     case Filtering: {
         last_filter = now;
-
-        auto const voc_limit = max(VOC_NOMINAL_MAX, float(params.voc_passive_max.value_or(0)));
-        if (VOC_MAX <= voc_limit) return 1;  // weird. whatever, don't second guess it.
-
-        auto const voc_control_range = min(PROPORTIONAL_CONTROL_IN_VOC, VOC_MAX - voc_limit);
-        auto const voc_curr =
-                float(max(state.voc_index_intake.value_or(0), state.voc_index_exhaust.value_or(0)));
-        return clamp((voc_curr - voc_limit) / voc_control_range, FILTER_POWER_MINIMUM, 1.f);
+        return max(FILTER_POWER_MINIMUM, fan_power);
     }
     }
 
@@ -105,5 +103,33 @@ static_assert(!policy_voc_improving(NOT_KNOWN, 1, 2));          // disabled
 static_assert(!policy_voc_improving(2, NOT_KNOWN, NOT_KNOWN));  // sensors not connected
 static_assert(!policy_voc_improving(NOT_KNOWN, 68, 76));        // disabled
 static_assert(!policy_voc_improving(1, 68, 76));                // disabled
+
+namespace {
+
+using State = decltype(FanPolicyEnvironmental::Instance::controller);
+[[maybe_unused]] constexpr float pid_sim(float voc, float voc_dt = 0) {
+    constexpr float dt = 0.1f;
+
+    State state;
+    float v;
+    for (float i = 0; i < 60; i += dt) {
+        v = state.update(FAN_PID, PID::Sec(dt), voc, VOC_NOMINAL_MAX);
+        voc += voc_dt * dt;
+    }
+    return v;
+}
+
+// PI tests
+static_assert(pid_sim(0) == State::max);                // < target
+static_assert(pid_sim(VOC_NOMINAL_MAX) == State::max);  // == target
+static_assert(pid_sim(500) == State::min);              // >> target
+
+// D tests
+static_assert(pid_sim(VOC_NOMINAL_MAX + 1, 0.f) < State::max);      // just above target, active
+static_assert(State::min < pid_sim(VOC_NOMINAL_MAX + 1, 0.f));      // just above target, but not saturated
+static_assert(pid_sim(VOC_NOMINAL_MAX + 1, -0.05f) == State::max);  // just above target, but going down
+static_assert(pid_sim(500, -10.f) == State::max);  // very high and quickly decreasing, but going down
+
+}  // namespace
 
 }  // namespace nevermore
