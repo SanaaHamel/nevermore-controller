@@ -597,11 +597,6 @@ Check out the full documentation section (just after this) after you've tested e
 # WARNING: Make sure it's the `-if02` interface, not `-if00`.
 #serial: /dev/serial/by-id/usb-Nevermore_Filter_<board>_<device-id>-if02
 
-# BOM specifies a 16 pixel ring.
-# If you don't have LEDs, you can omit the two `led_*` lines entirely
-led_colour_order: GBR
-led_chain_count: 16
-
 # These `fan_power_*` entries are for a DELTA BFB0712HF (StealthMax BOM)
 # If you have a different fan then play with these numbers to the satisfaction.
 # See full config documentation for details.
@@ -697,9 +692,19 @@ serial: <device path>
 #connection_initial_timeout: <default varies based on whether `bt_address` is set>
 
 # LED
-# For the optional LED ring feature.
+# For the optional LED feature.
 # Members generally behaves like the WS2812 Klipper module.
 # (e.g. supports heterogenous pixel chains)
+#
+# Values for commonly used LED strips (may be incorrect):
+# |===
+# | Device                  | led_chain_count | led_colour_order
+# | Max BOM ring            |              16 | GBR
+# | StealthMax v2 latch     |               7 | GBR
+# |===
+#
+# If the colours seem wrong, fiddle with `led_colour_order`.
+# Bear in mind that the device might also be a 4 component RGBW.
 #led_colour_order: GRB
 #led_chain_count: 0
 
