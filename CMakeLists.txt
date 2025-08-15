@@ -88,7 +88,7 @@ target_link_libraries(lvgl pico_time)
 set_target_properties(lvgl_demos lvgl_examples PROPERTIES EXCLUDE_FROM_ALL TRUE)
 
 # Touch outputs of config files so the rest of config knows there'll be associated outputs
-file(GLOB_RECURSE SRC_IN ${SRC_DIR}/*.in)
+file(GLOB_RECURSE SRC_IN CONFIGURE_DEPENDS "${SRC_DIR}/*.in")
 
 foreach(in_file ${SRC_IN})
   cmake_path(REMOVE_EXTENSION in_file LAST_ONLY)
@@ -98,10 +98,10 @@ foreach(in_file ${SRC_IN})
   endif()
 endforeach()
 
-file(GLOB_RECURSE SRC_H ${SRC_DIR}/*.h)
-file(GLOB_RECURSE SRC_C ${SRC_DIR}/*.c)
-file(GLOB_RECURSE SRC_HPP ${SRC_DIR}/*.hpp)
-file(GLOB_RECURSE SRC_CPP ${SRC_DIR}/*.cpp)
+file(GLOB_RECURSE SRC_H   CONFIGURE_DEPENDS "${SRC_DIR}/*.h")
+file(GLOB_RECURSE SRC_C   CONFIGURE_DEPENDS "${SRC_DIR}/*.c")
+file(GLOB_RECURSE SRC_HPP CONFIGURE_DEPENDS "${SRC_DIR}/*.hpp")
+file(GLOB_RECURSE SRC_CPP CONFIGURE_DEPENDS "${SRC_DIR}/*.cpp")
 set(SRC_FILES ${SRC_H} ${SRC_C} ${SRC_HPP} ${SRC_CPP})
 
 add_library(nevermore-controller ${SRC_FILES})
