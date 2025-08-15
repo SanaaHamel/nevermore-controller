@@ -292,12 +292,6 @@ async def pin_config(transport: Transport) -> PinState:
     return PinState.DEFAULT if current == default else PinState.CUSTOMISED
 
 
-async def pin_config_reset(transport: Transport):
-    print("!! Resetting pin assignments to defaults...")
-    pin_defaults = await transport(UUID_CHAR_CONFIG_PINS_DEFAULT).read()
-    await transport(UUID_CHAR_CONFIG_PINS, {P.WRITE}).write(pin_defaults)
-
-
 async def reboot_device(transport: Transport, *, bootloader: bool):
     try:
         char_reboot = transport(UUID_CHAR_CONFIG_REBOOT, {P.WRITE})
@@ -390,32 +384,25 @@ async def _post_update_actions_interactive(
             args,
             True,
             "Default settings may have changed.\n"
-            + "Do you wish to use any new defaults? [Recommended]\n"
-            + "(Settings customised in the Klipper config will be restored when Klipper reconnects.)",
+            "Do you wish to use any new defaults? [Recommended]\n"
+            "(Settings customised in the Klipper config will be restored when Klipper reconnects.)",
         ):
             print("applying new default settings...")
             await reset_setting_defaults(transport)
 
         if await pin_config(transport) == PinState.CUSTOMISED:
             if prev_pin_state == PinState.DEFAULT:
-                reset_pins = input_yes_no(
-                    args,
-                    True,
-                    "Pin assignment defaults have changed.\n"
-                    + "Would you like to reset them to the current defaults?",
-                )
+                print("Pin assignment defaults have changed.")
             else:
-                reset_pins = input_yes_no(
-                    args,
-                    False,
-                    "Current pin assignments do not match the defaults.\n"
-                    + "If there are new default pins, you will not be able to use them until they are assigned.\n"
-                    + "Would you like to reset them to the current defaults?",
-                )
+                print("Current pin assignments do not match the defaults.")
 
-            if reset_pins:
-                await pin_config_reset(transport)
-                await reboot_device(transport, bootloader=False)
+            print(
+                "  To replace the current pin config with the new defaults, run:  ./pin-config.py --reset-default\n"
+                "  To see the current pin config, run:  ./pin-config.py --echo-current\n"
+                "\n"
+                "You may safely ignore this warning if the controller is part of a completed filter\n"
+                "and you do not intend to make hardware changes."
+            )
 
     while True:
         if (transport := await args.connect(timeout=None)) is None:
