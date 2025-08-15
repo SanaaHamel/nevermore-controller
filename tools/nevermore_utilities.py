@@ -114,6 +114,7 @@ UUID_SERVICE_WS2812 = UUID("f62918ab-33b7-4f47-9fba-8ce9de9fecbb")
 UUID_SERVICE_FAN_POLICY = UUID("260a0845-e62f-48c6-aef9-04f62ff8bffd")
 UUID_SERVICE_DISPLAY = UUID("7be8ac4b-7eb4-4e09-b134-91a46b622832")
 UUID_SERVICE_PHOTOCATALYTIC = UUID("de44dd71-2400-4cd1-a3f3-9fb00c4697d7")
+UUID_SERVICE_COOLER = UUID("e67b7c24-ae14-40b3-a761-a543d83f026b")
 UUID_SERVICE_SERVO = UUID("8959bb3e-3063-4a46-9b9a-69fdbc327f1c")
 
 UUID_CHAR_GATT = short_uuid(0x2803)
@@ -576,6 +577,8 @@ class CommBindings:
         self.ws2812 = transport.service(UUID_SERVICE_WS2812)
         self.display = transport.service(UUID_SERVICE_DISPLAY)
         self.servo = transport.service(UUID_SERVICE_SERVO)
+        self.photocatalytic = transport.service(UUID_SERVICE_PHOTOCATALYTIC)
+        self.cooler = transport.service(UUID_SERVICE_COOLER)
 
         self.aggregate_env = self.env(UUID_CHAR_DATA_AGGREGATE, {P.READ, P.NOTIFY})
         self.aggregate_fan = self.fan(UUID_CHAR_FAN_AGGREGATE, {P.READ, P.NOTIFY})
@@ -617,6 +620,10 @@ class CommBindings:
         self.display_ui = self.display(UUID_CHAR_DISPLAY_UI, {P.WRITE})
         self.servo_vent_range = self.servo(UUID_CHAR_SERVO_RANGE, {P.WRITE})
         self.servo_vent_pwm = self.servo(UUID_CHAR_PERCENT16_8, {P.WRITE})
+        self.photocatalytic_override = self.photocatalytic(
+            UUID_CHAR_PERCENT8, {P.WRITE}
+        )
+        self.cooler_override = self.cooler(UUID_CHAR_PERCENT8, {P.WRITE})
 
 
 def _clamp(x: _Float, min: _Float, max: _Float) -> _Float:
@@ -757,6 +764,16 @@ class CmdServoPWM(CommandSimple, metaclass=ABCMeta):
 
 @cmd_simple(lambda x: x.servo_vent_pwm)
 class CmdServoVentPWM(CmdServoPWM):
+    percent: Optional[float]
+
+
+@cmd_simple(lambda x: x.photocatalytic_override)
+class CmdPhotocatalyticOverride(CommandSimplePercent):
+    percent: Optional[float]
+
+
+@cmd_simple(lambda x: x.cooler_override)
+class CmdCoolerOverride(CommandSimplePercent):
     percent: Optional[float]
 
 

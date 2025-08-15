@@ -5,6 +5,7 @@
 #include "btstack_event.h"
 #include "config.hpp"
 #include "gatt/configuration.hpp"
+#include "gatt/cooler.hpp"
 #include "gatt/device_info.hpp"
 #include "gatt/display.hpp"
 #include "gatt/environmental.hpp"
@@ -27,6 +28,7 @@ using namespace bt::advert;
 
 #define FOREACH_SERVICE()                  \
     FOREACH_SERVICE_ACTION(configuration)  \
+    FOREACH_SERVICE_ACTION(cooler)         \
     FOREACH_SERVICE_ACTION(device_info)    \
     FOREACH_SERVICE_ACTION(display)        \
     FOREACH_SERVICE_ACTION(environmental)  \

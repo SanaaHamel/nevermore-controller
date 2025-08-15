@@ -991,6 +991,23 @@ Set the vent's servo pulse to the specified % between . Omitting `PERCENT` disab
 Specifying `HOLD_FOR` disables the servo after the specified # of seconds.
 `HOLD_FOR` requires a `PERCENT`.
 
+==== NEVERMORE_PHOTOCATALYTIC_OVERRIDE
+
+Command:
+```
+NEVERMORE_PHOTOCATALYTIC_OVERRIDE [NEVERMORE=<name>] [POWER=<float \in [0, 1]>]
+```
+
+Set the photocatalytic override to specific %. Omitting `POWER` disables the override.
+
+==== NEVERMORE_COOLER_OVERRIDE
+
+Command:
+```
+NEVERMORE_COOLER_OVERRIDE [NEVERMORE=<name>] [POWER=<float \in [0, 1]>]
+```
+
+Set the cooler override to specific %. Omitting `POWER` disables the override.
 
 ==== NEVERMORE_STATUS
 

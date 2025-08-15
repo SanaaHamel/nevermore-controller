@@ -726,7 +726,11 @@ class Nevermore:
     cmd_NEVERMORE_PRINT_START_help = "`NEVERMORE_PRINT_START` is deprecated and no longer has any effect. Remove it from macros."
     cmd_NEVERMORE_PRINT_END_help = "`NEVERMORE_PRINT_END` is deprecated and no longer has any effect. Remove it from macros."
     cmd_NEVERMORE_VENT_SERVO_SET_help = (
-        "Set the PWM for the vent servo. Omit `PWM` to disable the servo."
+        "Set the PWM for the vent servo. Omit `PERCENT` to disable the servo."
+    )
+    cmd_NEVERMORE_PHOTOCATALYTIC_OVERRIDE_help = "Set the PWM override for the photocatalytic unit. Omit `POWER` to clear the override."
+    cmd_NEVERMORE_COOLER_OVERRIDE_help = (
+        "Set the PWM override for the cooling unit. Omit `POWER` to clear the override."
     )
     cmd_NEVERMORE_VOC_GATING_THRESHOLD_OVERRIDE_help = "Set/clear the VOC gating threshold override (omit `THRESHOLD` to clear override)"
     cmd_NEVERMORE_VOC_CALIBRATION_help = "Set the automatic VOC calibration process"
@@ -1000,6 +1004,16 @@ class Nevermore:
         if hold is not None and perc is None:
             gcmd.error("`HOLD_FOR` cannot be used w/o `PERCENT`")
         self.set_vent_servo(perc, hold)
+
+    def cmd_NEVERMORE_PHOTOCATALYTIC_OVERRIDE(self, gcmd: GCodeCommand) -> None:
+        self._interface.send_command(
+            CmdPhotocatalyticOverride(gcmd.get_float("POWER", None, 0, 1))
+        )
+
+    def cmd_NEVERMORE_COOLER_OVERRIDE(self, gcmd: GCodeCommand) -> None:
+        self._interface.send_command(
+            CmdCoolerOverride(gcmd.get_float("POWER", None, 0, 1))
+        )
 
     def cmd_NEVERMORE_VOC_GATING_THRESHOLD_OVERRIDE(self, gcmd: GCodeCommand) -> None:
         # `None` to allow explicitly clearing override by not specifying a `SPEED` arg
