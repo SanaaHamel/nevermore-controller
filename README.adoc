@@ -830,8 +830,9 @@ serial: <device path>
 #sensors_fallback: false
 
 # Use the MCU's temperature as an exhaust temperature fallback.
-# Only useful for filters which have the MCU in the exhaust airflow (e.g. StealthMax)
+# Only useful for filters which have the MCU in the exhaust airflow
 # and don't have any dedicated temperature sensors.
+# e.g. original StealthMax, pre-electronics bay
 #sensors_fallback_exhaust_mcu: false
 
 # Use independent expected variance estimations for VOC sensors.
