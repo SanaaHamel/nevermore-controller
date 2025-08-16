@@ -869,6 +869,10 @@ serial: <device path>
 # expected mean, but not the expected variance.
 #sensors_voc_expected_variance_independent: false
 
+# Enable debug logs of serial / ble connection
+# This option is disabled by default, only enable if you experience connection issues
+# enable_debug_logs: true
+
 
 # MOSTLY OBSOLETE.
 # Mainsail 2.7.1+ and Fluidd 1.31.0+ both have dedicated support for Nevermores.
