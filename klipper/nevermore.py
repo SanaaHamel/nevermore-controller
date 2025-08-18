@@ -694,7 +694,7 @@ class NevermoreSerial(NevermoreBackground):
                 await self._worker_using(self._transport)
 
             except NevermoreSerialException as e:
-                self.log.debug(e, exc_info=e)
+                self.log.exception(e)
 
             except Exception as e:
                 # common IO failure, USB likely got pulled
