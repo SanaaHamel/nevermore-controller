@@ -269,9 +269,11 @@ class UNSAFE_LazyAsyncioEvent(asyncio.Event):
 
 
 class NevermoreInterface:
-    def __init__(self, name: str):
+    def __init__(self, name: str, enable_debug_logs: bool):
         self.name = name
         self.log = LogPrefixed(LOG, lambda x: f"{name} - {x}")
+        if enable_debug_logs:
+            self.log.setLevel(logging.DEBUG)
         self._led_colour_data_old = bytearray()
 
     @property
@@ -335,7 +337,7 @@ class NevermoreBackground(NevermoreInterface):
         nevermore: "Nevermore",
         connection_initial_timeout: float,
     ) -> None:
-        super().__init__(name)
+        super().__init__(name, nevermore.enable_debug_logs)
 
         # A weak ref allows us to end the worker if the nevermore instance is
         # ever GC'd without asking us to disconnect (for whatever reason).
@@ -383,7 +385,7 @@ class NevermoreBackground(NevermoreInterface):
     @override
     def disconnect(self):
         assert self._disconnect is not None, "pre-condition violated"
-        self.log.debug('disconnect and do not try to connect again')
+        self.log.debug('requesting worker shutdown')
         self._disconnect.set_threadsafe(self._loop)
 
     @override
@@ -428,7 +430,7 @@ class NevermoreBackground(NevermoreInterface):
             asyncio.set_event_loop(self._loop)
             self._loop.run_until_complete(go())
         except asyncio.CancelledError:
-            self.log.debug("background thread stopped")
+            self.log.info("disconnecting")
         except:
             self.log.exception("worker failed")
 
@@ -508,8 +510,6 @@ class NevermoreBackground(NevermoreInterface):
 
     # Override if you need to suppress exceptions from transient failures
     async def _handle_command(self, comm: CommBindings, cmd: Command) -> None:
-        if self._disconnect.is_set():
-            return
         await cmd.dispatch(comm)
 
     @abstractmethod
@@ -636,7 +636,7 @@ class NevermoreBLE(NevermoreBackground):
 
 
 class NevermoreSerialException(Exception):
-    """Exception of serial initialization"""
+    """Exception during serial initialization"""
 
 
 class NevermoreSerial(NevermoreBackground):
@@ -646,7 +646,7 @@ class NevermoreSerial(NevermoreBackground):
         self, nevermore: "Nevermore", mk_serial: Callable[[], serial.Serial]
     ) -> None:
         super().__init__(
-            f"serial {nevermore.name}",
+            f"serial '{nevermore.name}'",
             nevermore,
             CONTROLLER_CONNECTION_RETRY_DELAY_INITIAL * 2,
         )
@@ -654,7 +654,7 @@ class NevermoreSerial(NevermoreBackground):
         self._transport: TransportSerial | None = None
         self._serial_connection: serial.Serial | None = None
 
-    def dipose_connections(self):
+    def dispose_connections(self):
         if self._transport is not None:
             self.log.debug("Disposing transport")
             self._transport.close()
@@ -665,11 +665,6 @@ class NevermoreSerial(NevermoreBackground):
             self._serial_connection.close()
             self._serial_connection = None
 
-    @override
-    def disconnect(self) -> None:
-        self.log.debug('serial connection disconnect called')
-        super().disconnect()
-        self.dipose_connections()
 
     @override
     async def _worker_setup(self) -> None:
@@ -680,19 +675,18 @@ class NevermoreSerial(NevermoreBackground):
             try:
                 self._serial_connection = self._mk_serial()
             except serial.SerialException as ex:
-                raise NevermoreSerialException("failed to connect to controller at - init serial") from ex
+                raise NevermoreSerialException("failed to create serial layer") from ex
 
         def create_transport():
             try:
                 self._transport = TransportSerial(self._serial_connection)
             except Exception as ex:
-                raise NevermoreSerialException("failed to connect to controller at - create transport") from ex
+                raise NevermoreSerialException("failed to create transport layer") from ex
 
         while True:
             try:
                 self.log.info(f"connecting to controller")
 
-                self.dipose_connections()
                 create_serial()
                 create_transport()
 
@@ -709,6 +703,9 @@ class NevermoreSerial(NevermoreBackground):
                     self.log.exception("OSError ", exc_info=e)
                     raise
                 self.log.debug("serial communication error", exc_info=e)
+
+            finally:
+                self.dispose_connections()
 
             reattempt = await self._reconnect_retry(connection_start)
             if not reattempt:
@@ -802,23 +799,7 @@ class Nevermore:
         self._state_min = ControllerState()
         self._state_max = ControllerState()
         self.fan = NevermoreFan(self)
-
-        # Register all handlers early
-        self.printer.register_event_handler("klippy:connect", self._handle_connect)
-        self.printer.register_event_handler("klippy:shutdown", self._handle_shutdown)
-        self.printer.register_event_handler("klippy:firmware_restart", self._handle_shutdown)
-        self.printer.register_event_handler("klippy:disconnect", self._handle_shutdown)
-        self.printer.register_event_handler(
-            "gcode:request_restart", lambda t: self._handle_shutdown()
-        )
-
-        enable_debug_logs = config.getboolean("enable_debug_logs", False)
-
-        if enable_debug_logs:
-            LOG.setLevel(logging.DEBUG)
-            LOG.debug("debug logs enabled")
-        else:
-            LOG.setLevel(logging.INFO)
+        self.enable_debug_logs = config.getboolean("enable_debug_logs", False)
 
         # LED-specific code.
         # Ripped from `extras/neopixel.py` because the processing code is entangled with MCU transmission.
@@ -938,6 +919,12 @@ class Nevermore:
         self._interface.launch()
 
         self.printer.add_object(f"fan_generic {self.fan.name}", self.fan)
+        self.printer.register_event_handler("klippy:connect", self._handle_connect)
+        self.printer.register_event_handler("klippy:shutdown", self._handle_shutdown)
+        self.printer.register_event_handler("klippy:disconnect", self._handle_shutdown)
+        self.printer.register_event_handler(
+            "gcode:request_restart", lambda t: self._handle_shutdown()
+        )
 
         reactor = self.printer.get_reactor()
         self._timer_vent_servo_release_handle = reactor.register_timer(
@@ -1035,8 +1022,6 @@ class Nevermore:
         if self._interface.connected:
             self.send_printing_state_commands(False)  # release fan control & calibration
 
-        # dispose connection
-        LOG.debug("restart received disposing connection")
         self._interface.disconnect()
 
     def _timer_vent_servo_release(self, eventtime: float) -> None:
