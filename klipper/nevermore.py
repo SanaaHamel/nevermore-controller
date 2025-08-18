@@ -1019,9 +1019,7 @@ class Nevermore:
             self.send_printing_state_commands(printing)
 
     def _handle_shutdown(self):
-        if self._interface.connected:
-            self.send_printing_state_commands(False)  # release fan control & calibration
-
+        self.send_printing_state_commands(False)  # release fan control & calibration
         self._interface.disconnect()
 
     def _timer_vent_servo_release(self, eventtime: float) -> None:
