@@ -837,9 +837,16 @@ class Nevermore:
             )
 
         self._printing = False
-        self._print_mode_min_bed_target = config.getfloat(
-            "print_mode_min_bed_target", default=float('-inf')
+        # HACK: Klipper sends its entire config as a fat JSON to Moonraker.
+        #       This includes the default values, which is a problem b/c JSON does not support
+        #       encoding infinity. Python's std lib JSON encoder is non-compliant and does encode,
+        #       which then chokes both Moonraker and Mainsail.
+        #       Therefore, use `None` as default and fix it afterwards.
+        self._print_mode_min_bed_target: Optional[float] = config.getfloat(
+            "print_mode_min_bed_target", default=None
         )
+        if self._print_mode_min_bed_target is None:
+            self._print_mode_min_bed_target = float('-inf')
 
         self._display_brightness = opt(
             CmdDisplayBrightness,
