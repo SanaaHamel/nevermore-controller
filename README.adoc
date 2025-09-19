@@ -515,23 +515,23 @@ WARNING: GPIO 0 and 1 are reserved for UART. They cannot be used in any pin assi
 |GPIO | Function
 |0    | UART - TX
 |1    | UART - RX
-|2    | Display - GC9A01 - SPI SCK
-|3    | Display - GC9A01 - SPI TX
-|4    | Display - GC9A01 - SPI RX (not used, for future hardware)
-|5    | Display - GC9A01 - Command
-|6    | Display - GC9A01 - Reset
-|7    | Display - Backlight Brightness PWM
-|8    | Display Touch - CST816S - Interrupt
-|9    | Display Touch - CST816S - Reset
-|11   | Photocatalytic Control (PWM)
+|2    | Intake - I2C SDA
+|3    | Intake - I2C SCL
+|4    | Exhaust - I2C SDA
+|5    | Exhaust - I2C SCL
+|6    | Fan - PWM
+|7    | Fan - Tachometer
 |12   | NeoPixel - Data
 |13   | Vent Servo PWM
-|14   | Fan - Tachometer
-|15   | Fan - PWM
-|26   | Intake - I2C SDA
-|27   | Intake - I2C SCL
-|28   | Exhaust - I2C SDA
-|29   | Exhaust - I2C SCL
+|14   | Photocatalytic Control (PWM)
+|17   | Display - Backlight Brightness PWM
+|18   | Display - GC9A01 - Command
+|19   | Display - GC9A01 - SPI TX
+|20   | Display - GC9A01 - SPI RX (not used, for future hardware)
+|22   | Display - GC9A01 - SPI SCK
+|23   | Display - GC9A01 - Reset
+|24   | Display Touch - CST816S - Interrupt
+|25   | Display Touch - CST816S - Reset
 |===
 
 [#default-pin-table-waveshare-touch-lcd-1.28]
