@@ -483,17 +483,24 @@ class NevermoreBackground(NevermoreInterface):
         finally:
             tasks.cancel()  # kill off all active tasks if any fail
 
+    def _get_reconnect_delay(self, connection_start: float):
+        delta = time.monotonic() - connection_start
+
+        if delta <= self.connection_initial_timeout:
+            return CONTROLLER_CONNECTION_RETRY_DELAY_INITIAL
+
+        return CONTROLLER_CONNECTION_RETRY_DELAY_POST_CONNECT
+
     async def _reconnect_retry(self, connection_start: float):
         self._connected.clear()
         if self._disconnect.is_set():
             return False
 
-        delta = time.monotonic() - connection_start
-        await asyncio.sleep(
-            CONTROLLER_CONNECTION_RETRY_DELAY_INITIAL
-            if delta <= self.connection_initial_timeout
-            else CONTROLLER_CONNECTION_RETRY_DELAY_POST_CONNECT
-        )
+        reconnect_delay = self._get_reconnect_delay(connection_start)
+
+        self.log.info("sleeping %d seconds before reconnecting",
+                       reconnect_delay)
+        await asyncio.sleep(reconnect_delay)
 
         return True
 
@@ -636,39 +643,47 @@ class NevermoreSerial(NevermoreBackground):
             CONTROLLER_CONNECTION_RETRY_DELAY_INITIAL * 2,
         )
         self._mk_serial = mk_serial
+        self._transport: Optional[TransportSerial] = None
+        self._serial_connection: Optional[serial.Serial] = None
+
+    def dispose_connections(self):
+        if self._transport is not None:
+            self._transport.close()
+            self._transport = None
+
+        if self._serial_connection is not None:
+            self._serial_connection.close()
+            self._serial_connection = None
 
     @override
     async def _worker_setup(self) -> None:
-        def mk_transport():
-            try:
-                s = self._mk_serial()
-            except serial.SerialException as e:
-                return None
-
-            try:
-                return TransportSerial(s)
-            except:
-                s.close()
-                self.log.exception("failed to load bindings")
-
-            return None
-
         connection_start = time.monotonic()
 
         while True:
-            self._connected.clear()
-
             try:
-                if (transport := mk_transport()) is not None:
-                    self.log.info(f"connected to controller")
-                    await self._worker_using(transport)
-                elif not await self._reconnect_retry(connection_start):
-                    break
-            except OSError as e:
+                self.log.info(f"connecting to controller")
+                self._serial_connection = self._mk_serial()
+                self._transport = TransportSerial(self._serial_connection)
+                self.log.info(f"connected to controller")
+                await self._worker_using(self._transport)
+
+            except Exception as e:
                 self.log.exception(e)
+
                 # common IO failure, USB likely got pulled
-                if e.errno != self._ERRNO_IO_ERROR:
-                    raise e  # not something we're expecting to handle
+                if isinstance(e, OSError) and e.errno != self._ERRNO_IO_ERROR:
+                    raise e # not something we're expecting to handle
+
+            finally:
+                self.dispose_connections()
+
+            reattempt = await self._reconnect_retry(connection_start)
+            if reattempt:
+                self.log.info("attempting serial reconnection...")
+            else:
+                self.log.info("do not reattempt to connect")
+                break
+
 
 
 @dataclass(frozen=True)
