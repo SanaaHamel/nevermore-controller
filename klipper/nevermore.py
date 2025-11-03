@@ -887,6 +887,7 @@ class Nevermore:
         self.printer.add_object(f"fan_generic {self.fan.name}", self.fan)
         self.printer.register_event_handler("klippy:connect", self._handle_connect)
         self.printer.register_event_handler("klippy:shutdown", self._handle_shutdown)
+        self.printer.register_event_handler("klippy:disconnect", self._handle_shutdown)
         self.printer.register_event_handler(
             "gcode:request_restart", lambda t: self._handle_shutdown()
         )
