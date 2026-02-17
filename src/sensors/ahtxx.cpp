@@ -79,6 +79,12 @@ struct AHTxxSensor final : SensorPeriodicEnvI2C<Reg, "AHTxx"> {
     using SensorPeriodicEnvI2C::SensorPeriodicEnvI2C;
 
     bool setup() {  // NOLINT(readability-make-member-function-const)
+        // 'AHT2x' (likely clones) devices have been found to happily init with AHT1x sequences.
+        // Reportedly others have work w/ a fallback to AHT2x official init seq.
+        // Honestly I have no idea what's going on here, and ASAIR's official docs are garbage.
+        // Given that there's no device identification feature, we have little choice but to blindly
+        // shove some init seqs into what we hope are the correct registers. Lovely.
+        // FUTURE WORK: AHT30 reportedly requires no initialisation. Figure out how to fingerprint.
         if (!i2c.write(Reg::Init_AHT1x, CMD_PAYLOAD_INIT))
             if (!i2c.write(Reg::Init_AHT2x, CMD_PAYLOAD_INIT)) return false;
 
