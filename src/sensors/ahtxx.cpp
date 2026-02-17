@@ -31,8 +31,7 @@ constexpr auto DELAY_MEASURE = 110ms;  // AHT21 spec says 250ms, Klipper does 11
 constexpr auto DELAY_RESET = 100ms;    // AHT10 and AHT21 spec says < 20ms, Klipper does 100ms?
 
 // From Klippy's aht10.py
-constexpr auto CMD_PAYLOAD_INIT = 0x0008_u16;   // not specified in AHT10 or AHT21 spec?
-constexpr auto CMD_PAYLOAD_RESET = 0x0008_u16;  // not specified in AHT10 or AHT21 spec?
+constexpr auto CMD_PAYLOAD_INIT = 0x0008_u16;  // not specified in AHT10 or AHT21 spec?
 constexpr auto DELAY_KLIPPER_INIT = 100ms;
 
 enum class Reg : uint8_t {
@@ -81,7 +80,7 @@ struct AHTxxSensor final : SensorPeriodicEnvI2C<Reg, "AHTxx"> {
     }
 
     bool reset() {  // NOLINT(readability-make-member-function-const)
-        if (!i2c.write(Reg::Reset, CMD_PAYLOAD_RESET)) return false;
+        if (!i2c.touch(Reg::Reset)) return false;
 
         task_delay<DELAY_RESET>();
         return true;
