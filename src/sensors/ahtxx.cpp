@@ -72,7 +72,9 @@ struct AHTxxSensor final : SensorPeriodicEnvI2C<Reg, "AHTxx"> {
     using SensorPeriodicEnvI2C::SensorPeriodicEnvI2C;
 
     bool setup() {  // NOLINT(readability-make-member-function-const)
-        if (!i2c.write(Reg::Init_1x, CMD_PAYLOAD_INIT)) return false;
+        if (!i2c.write(Reg::Init_1x, CMD_PAYLOAD_INIT))
+            if (!i2c.write(Reg::Init_2x, CMD_PAYLOAD_INIT))
+                return false;
 
         task_delay<DELAY_KLIPPER_INIT>();
         return true;
