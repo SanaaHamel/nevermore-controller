@@ -1326,17 +1326,15 @@ Fan power is set to xref:klipper-config-full[`fan_power_passive`].
 * https://github.com/Sensirion/embedded-sgp[Sensirion] - SGP30 library (referenced)
 * https://github.com/Sensirion/gas-index-algorithm[Sensirion] - SGP40 gas index library (included)
 * https://github.com/klipper3d/klipper[Klipper] - AHTxx library (referenced)
+* https://kernel.org[Linux Kernel] - AHTxx driver (referenced)
 * https://github.com/apache/nuttx[Apache Nuttx] - I2C software reset (derived)
 * Gary S. Brown - CRC32 table (included)
 * Ursula K. Le Guin
 
 == Thanks To
-* https://github.com/0ndsk4[0ndsk4] - Donated hardware for testing
+* https://github.com/0ndsk4[0ndsk4] - Sponsor, donated hardware for testing
 * Appri (Nevermore Discord) - Testing Volunteer
 * BO_Andy (Nevermore Discord) - Testing Volunteer
 * https://central3dprinting.com[Central 3D Printing] - Donated hardware for testing
 * Drevic (Nevermore Discord) - Testing Volunteer
-
-== Generous Donors
-* https://github.com/0ndsk4[0ndsk4]
-* https://www.fysetc.com[Fysetc]
+* https://www.fysetc.com[Fysetc] - Sponsor, donated hardware for testing
