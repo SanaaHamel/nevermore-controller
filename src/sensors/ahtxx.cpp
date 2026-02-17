@@ -27,8 +27,8 @@ constexpr array ADDRESSES{0x38_u8, 0x39_u8};
 // From AHT21 datasheet
 // AHT10 doesn't say anything about a payload, but AHT21 says to send `0x33 0x00`
 constexpr array CMD_PAYLOAD_MEASURE{0x33_u8, 0x00_u8};
-constexpr auto DELAY_MEASURE = 110ms;  // AHT21 spec says 250ms, Klipper does 110ms?
-constexpr auto DELAY_RESET = 100ms;    // AHT10 and AHT21 spec says < 20ms, Klipper does 100ms?
+constexpr auto DELAY_MEASURE = 110ms;  // AHT21 spec says 80ms (and wait again if busy), Klipper does 110ms.
+constexpr auto DELAY_RESET = 20ms;     // AHT10 and AHT20 spec says < 20ms
 
 // From Klippy's aht10.py
 constexpr auto CMD_PAYLOAD_INIT = 0x0008_u16;  // not specified in AHT10 or AHT21 spec?
