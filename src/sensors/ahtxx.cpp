@@ -10,7 +10,7 @@
 using namespace std;
 using namespace BLE;
 
-// Constants, payloads, and timings were draw from Klipper's `aht10.py` module
+// Constants, payloads, and timings were draw from Klipper's `aht10.py` module and the Linux kernel driver.
 
 namespace nevermore::sensors {
 
@@ -25,34 +25,42 @@ constexpr auto MEASURE_READ_RETRIES = 5u;
 constexpr array ADDRESSES{0x38_u8, 0x39_u8};
 
 // From AHT21 datasheet
-// AHT10 doesn't say anything about a payload, but AHT21 says to send `0x33 0x00`
+// AHT10 doesn't say anything about a payload, but AHT20+ says to send `0x33 0x00`
 constexpr array CMD_PAYLOAD_MEASURE{0x33_u8, 0x00_u8};
 constexpr auto DELAY_MEASURE = 110ms;  // AHT21 spec says 80ms (and wait again if busy), Klipper does 110ms.
 constexpr auto DELAY_RESET = 20ms;     // AHT10 and AHT20 spec says < 20ms
-
-// From Klippy's aht10.py
-constexpr auto CMD_PAYLOAD_INIT = 0x0008_u16;  // not specified in AHT10 or AHT21 spec?
 constexpr auto DELAY_KLIPPER_INIT = 100ms;
 
+// ASAIR's AHT20 demo is crazy and is either broken or uses registers that no other driver seems to reference.
+// That said, the datasheets for AHT10 and AHT20 both say to "initialise registers 0x1B, 0x1C, and 0x1E" when
+// `Status != 0x18`, which I don't see *anyone* else doing, including the Linux driver.
 enum class Reg : uint8_t {
     Status = 0x71,
+    // DHT20 seems to be a minor variant of the AHT20, but it inits by a direct write to `Status?`
+    // (See Linux driver.)
+    // Init_DHT20 = 0x71,
     StartMeasurement = 0xAC,
-    Reset = 0xBA,
-    Init_2x = 0xBE,  // AHT2x
-    Init_1x = 0xE1,  // AHT1x (? yet seems to work for AHT2x devices)
+    Reset = 0xBA,  // AHT10 doc only? Not mentioned in AHT20 or DHT20.
+    Init_AHT2x = 0xBE,
+    Init_AHT1x = 0xE1,
 };
 
-struct [[gnu::packed]] Status {
-    // AHT10 spec. `Command = 0b1x`, so `Command` and `Command1` are equiv
-    enum Mode { Normal = 0, Cyclic = 1, Command = 0b10, Command1 = 0b11 };
-
-    uint8_t _unknown0 : 2;
-    uint8_t calibrated : 1;
-    uint8_t _unknown1 : 1;
-    uint8_t mode : 2;  // `Mode`, defined on AHT10, but not on AHT21
-    uint8_t busy : 1;
+enum class Status : uint8_t {
+    Unk1_OutOfThreshold = 1u << 2,  // *UNVERIFIED* src: comment in expressif's AHT20 driver
+    Calibrated = 1u << 3,
+    Unk5_CrcOkay = 1u << 4,  // *UNVERIFIED* src: comment in expressif's AHT20 driver
+    ModeCyclic = 1u << 5,    // Self-issues measurements? No info in datasheet. Linux driver uses this.
+    ModeCommand = 1u << 6,   // AHT20. Overrides Cyclic. (i.e. ignore cyclic if cmd is set)
+    Busy = 1u << 7,
 };
-static_assert(sizeof(Status) == sizeof(uint8_t));
+
+constexpr uint8_t operator&(Status a, Status b) {
+    return uint8_t(a) & uint8_t(b);
+}
+
+// Inferring constant based on value. Spec says send 0x08 0x00.
+// Linux driver also uses this, but punts it into Cyclic Mode by default, which I guess is a thing after all.
+constexpr array CMD_PAYLOAD_INIT{(uint8_t)Status::Calibrated, 0x00_u8};
 
 struct [[gnu::packed]] State {
     Status status;
@@ -71,9 +79,8 @@ struct AHTxxSensor final : SensorPeriodicEnvI2C<Reg, "AHTxx"> {
     using SensorPeriodicEnvI2C::SensorPeriodicEnvI2C;
 
     bool setup() {  // NOLINT(readability-make-member-function-const)
-        if (!i2c.write(Reg::Init_1x, CMD_PAYLOAD_INIT))
-            if (!i2c.write(Reg::Init_2x, CMD_PAYLOAD_INIT))
-                return false;
+        if (!i2c.write(Reg::Init_AHT1x, CMD_PAYLOAD_INIT))
+            if (!i2c.write(Reg::Init_AHT2x, CMD_PAYLOAD_INIT)) return false;
 
         task_delay<DELAY_KLIPPER_INIT>();
         return true;
@@ -107,9 +114,9 @@ struct AHTxxSensor final : SensorPeriodicEnvI2C<Reg, "AHTxx"> {
             for (unsigned i = MEASURE_READ_RETRIES; 0 < i; --i) {
                 task_delay<DELAY_MEASURE>();
 
-                // AHT21 has a CRC at the end, but AHT10 (haven't checked AHT20)
+                // FUTURE WORK: AHT20+ has a CRC at the end. Verify it.
                 auto result = i2c.read<State>();
-                if (result && !result->status.busy) return result;
+                if (result && !(result->status & Status::Busy)) return result;
             }
         }
 
