@@ -1209,7 +1209,7 @@ class NevermoreGlobal:
     def __init__(self, printer: Printer) -> None:
         self.printer = printer
         self.printing: bool = False
-        self._heaters: List[Heater] = []
+        self._extruder_heaters: List[Heater] = []
 
         reactor = printer.get_reactor()
         gcode: GCodeDispatch = printer.lookup_object("gcode")
@@ -1229,7 +1229,7 @@ class NevermoreGlobal:
             gcode.register_mux_command(cmd, "NEVERMORE", None, go, desc=desc)
 
         printer.register_event_handler("klippy:ready", self._handle_ready)
-        reactor.register_timer(self._check_heaters, reactor.NOW)
+        reactor.register_timer(self._check_extruder_heaters, reactor.NOW)
 
     def cmd_NEVERMORE_TEMPERATURE_WAIT(self, gcmd: GCodeCommand) -> None:
         min_temp: float = gcmd.get_float('MINIMUM', default=float('-inf'))
@@ -1281,14 +1281,14 @@ class NevermoreGlobal:
 
     def _handle_ready(self) -> None:
         heaters = self.printer.lookup_object('heaters')
-        self._heaters = [
+        self._extruder_heaters = [
             heaters.lookup_heater(name)
             for name in heaters.get_all_heaters()
             if self.EXTRUDER_HEATER_REGEX.fullmatch(name)
         ]
 
-    def _check_heaters(self, eventtime: float) -> float:
-        hotends_active = any(heater.target_temp for heater in self._heaters)
+    def _check_extruder_heaters(self, eventtime: float) -> float:
+        hotends_active = any(heater.target_temp for heater in self._extruder_heaters)
         for _, nevermore in self.nevermores():
             nevermore.printing_state_update(hotends_active)
 
