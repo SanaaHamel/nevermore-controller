@@ -841,16 +841,6 @@ class Nevermore:
             )
 
         self._printing = False
-        # HACK: Klipper sends its entire config as a fat JSON to Moonraker.
-        #       This includes the default values, which is a problem b/c JSON does not support
-        #       encoding infinity. Python's std lib JSON encoder is non-compliant and does encode,
-        #       which then chokes both Moonraker and Mainsail.
-        #       Therefore, use `None` as default and fix it afterwards.
-        self._print_mode_min_bed_target: Optional[float] = config.getfloat(
-            "print_mode_min_bed_target", default=None
-        )
-        if self._print_mode_min_bed_target is None:
-            self._print_mode_min_bed_target = float('-inf')
 
         self._display_brightness = opt(
             CmdDisplayBrightness,
@@ -982,8 +972,7 @@ class Nevermore:
         self.cmd_NEVERMORE_VOC_CALIBRATION(not printing)
 
     def printing_state_update(self, hotends_active: bool):
-        bed: Heater = self.printer.lookup_object('heaters').lookup_heater("heater_bed")
-        printing = hotends_active and self._print_mode_min_bed_target <= bed.target_temp
+        printing = hotends_active and self._check_bed_heaters()
         if self._printing != printing:
             self._printing = printing
             self.send_printing_state_commands(printing)
@@ -1194,6 +1183,7 @@ class NevermoreSensor:
 class NevermoreGlobal:
     cmd_NEVERMORE_TEMPERATURE_WAIT_help = "Waits until temperature sensors reach specified threshold. Use *after* bed reaches target temperature. See docs for details."
     EXTRUDER_HEATER_REGEX = re.compile(r"extruder\d*")
+    BED_HEATER_REGEX = re.compile(r"heater_bed\d*")
 
     @staticmethod
     def get_or_create(printer: Printer) -> "NevermoreGlobal":
@@ -1210,6 +1200,7 @@ class NevermoreGlobal:
         self.printer = printer
         self.printing: bool = False
         self._extruder_heaters: List[Heater] = []
+        self._bed_heaters: List[Heater] = []
 
         reactor = printer.get_reactor()
         gcode: GCodeDispatch = printer.lookup_object("gcode")
@@ -1286,6 +1277,11 @@ class NevermoreGlobal:
             for name in heaters.get_all_heaters()
             if self.EXTRUDER_HEATER_REGEX.fullmatch(name)
         ]
+        self._bed_heaters = [
+            heaters.lookup_heater(name)
+            for name in heaters.get_all_heaters()
+            if self.BED_HEATER_REGEX.fullmatch(name)
+        ]
 
     def _check_extruder_heaters(self, eventtime: float) -> float:
         hotends_active = any(heater.target_temp for heater in self._extruder_heaters)
@@ -1293,6 +1289,20 @@ class NevermoreGlobal:
             nevermore.printing_state_update(hotends_active)
 
         return eventtime + CONTROLLER_REFRESH_DELAY
+
+    # HACK: Klipper sends its entire config as a fat JSON to Moonraker.
+    #       This includes the default values, which is a problem b/c JSON does not support
+    #       encoding infinity. Python's std lib JSON encoder is non-compliant and does encode,
+    #       which then chokes both Moonraker and Mainsail.
+    #       Therefore, use `None` as default and fix it afterwards.
+    self._print_mode_min_bed_target: Optional[float] = config.getfloat(
+        "print_mode_min_bed_target", default=None
+    )
+    if self._print_mode_min_bed_target is None:
+        self._print_mode_min_bed_target = float('-inf')
+
+    def _check_bed_heaters(self) -> bool:
+        return any((bed.target_temp >= self._print_mode_min_bed_target) for bed in self._bed_heaters)
 
     def nevermores(self) -> List[Tuple[str, Nevermore]]:
         return self.printer.lookup_objects("nevermore")
