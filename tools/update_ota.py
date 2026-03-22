@@ -397,8 +397,8 @@ async def _post_update_actions_interactive(
                 print("Current pin assignments do not match the defaults.")
 
             print(
-                "  To replace the current pin config with the new defaults, run:  ./pin-config.py --reset-default\n"
-                "  To see the current pin config, run:  ./pin-config.py --echo-current\n"
+                "  To replace the current pin config with the new defaults, run:  ./tools/pin-config.py --reset-default\n"
+                "  To see the current pin config, run:  ./tools/pin-config.py --echo-current\n"
                 "\n"
                 "You may safely ignore this warning if the controller is part of a completed filter\n"
                 "and you do not intend to make hardware changes."
