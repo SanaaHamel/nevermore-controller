@@ -11,11 +11,17 @@
 #include "sdk/btstack.hpp"  // IWYU pragma: keep [doesn't find overloads]
 #include <algorithm>
 #include <array>
+#include <atomic>
 #include <cassert>
 #include <cstdint>
 #include <cstdio>
 #include <span>
 #include <type_traits>
+
+#if NEVERMORE_PICO_W_BT
+#include "pico/async_context.h"
+#include "pico/cyw43_arch.h"
+#endif
 
 namespace nevermore::gatt {
 
@@ -104,10 +110,24 @@ template <void (*Handler)(hci_con_handle_t)>
 struct NotifyState {
     static_assert(Handler != nullptr);
     std::array<btstack_context_callback_registration_t, MAX_NR_HCI_CONNECTIONS> callbacks{};
-    btstack_context_callback_registration_t notify_callback{
-            .callback = [](void* ctx) { reinterpret_cast<NotifyState<Handler>*>(ctx)->notify_dispatch(); },
-            .context = this,
+#if NEVERMORE_PICO_W_BT
+    // `notify` is called from FreeRTOS timers. It must never block.
+    // `btstack_run_loop_execute_on_main_thread` takes the async-context lock. If the
+    // timer daemon waits on that lock while the async-context task spins on
+    // `xTimerChangePeriod` with a full timer queue, every FreeRTOS timer stalls
+    // (e.g. fan control). `async_context_set_work_pending` is lock-free.
+    async_when_pending_worker_t notify_worker{
+            .next = nullptr,
+            .do_work =
+                    [](async_context_t*, async_when_pending_worker_t* worker) {
+                        reinterpret_cast<NotifyState<Handler>*>(worker->user_data)->notify_dispatch();
+                    },
+            .work_pending = false,
+            .user_data = this,
     };
+    // Set by `register_` (btstack task only; USB GATT uses an invalid conn), read by `notify`.
+    std::atomic<bool> notify_worker_added = false;
+#endif
 
     NotifyState() {
         for (auto& cb : callbacks) {
@@ -126,6 +146,16 @@ struct NotifyState {
 
         for (auto&& cb : callbacks) {
             if (uintptr_t(cb.context) != HCI_CON_HANDLE_INVALID) continue;
+
+#if NEVERMORE_PICO_W_BT
+            // Deferred until first subscription b/c globals are constructed before the
+            // async context exists. Nothing to notify before then anyways.
+            // (Returns false if already added, which is fine.)
+            if (!notify_worker_added.load()) {
+                async_context_add_when_pending_worker(cyw43_arch_async_context(), &notify_worker);
+                notify_worker_added = true;
+            }
+#endif
 
             cb.context = reinterpret_cast<void*>(conn);  // NOLINT(performance-no-int-to-ptr)
             return true;
@@ -156,10 +186,10 @@ struct NotifyState {
         return false;
     }
 
-    // can be invoked by other tasks
+    // can be invoked by other tasks, timers, and ISRs; never blocks
     void notify() {
 #if NEVERMORE_PICO_W_BT
-        btstack_run_loop_execute_on_main_thread(&notify_callback);
+        if (notify_worker_added.load()) async_context_set_work_pending(cyw43_arch_async_context(), &notify_worker);
 #endif
     }
 

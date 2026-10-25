@@ -101,8 +101,10 @@
 // HACK:  usually 10 is enough, but async-ctx-freertos loves to spam change-period commands
 //        which can flood the timer cmd queue if a timer holds a lock for too long...
 //        (granted blocking in a timer is frowned upon, but hey)
-// FIXME: Remove all locks/calls to `btstack_run_loop_execute_on_main_thread` from timers.
-//        Move BLE notify to btstack-timer (those run in btstack task ctx).
+//        A blocked timer + full queue deadlocks: the async-ctx task retries
+//        `xTimerChangePeriod` forever while holding its lock.
+//        BLE notify (`NotifyState::notify`) no longer takes that lock from timers.
+// FIXME: Remove the remaining blocking calls from timers (settings flash save).
 #define configTIMER_QUEUE_LENGTH 30
 #define configTIMER_TASK_STACK_DEPTH 1024
 
